@@ -11,6 +11,11 @@ pygame.display.set_caption("Nija 2D Aula 01")
 #imagens\Sprites
 spriteGroup = pygame.sprite.Group()
 
+pixil = pygame.sprite.Sprite(spriteGroup)
+pixil.image = pygame.image.load("data/pixil0.png").convert_alpha()
+pixil.image = pygame.transform.scale(pixil.image, [100,100])
+pixil.rect = pixil.image.get_rect()
+
 #objetos\objects
 rect=pygame.Rect(0,200,100,100)
 speed = 3
@@ -35,18 +40,20 @@ while gameloop:
     keys = pygame.key.get_pressed()
     
     if keys[pygame.K_d]:
-        rect [0] += speed
+        pixil.rect [0] += speed
     if keys[pygame.K_a]:
-        rect [0] -= speed
+        pixil.rect [0] -= speed
     if keys[pygame.K_s]:
-        rect [1] += speed
+        pixil.rect [1] += speed
     if keys[pygame.K_w]:
-        rect [1] -= speed
+        pixil.rect [1] -= speed
 
     #Draw\Desenhos
     display.fill([25,25,25])
 
     pygame.draw.rect(display, [255,0,0], rect)
 
+    spriteGroup.update()
+    spriteGroup.draw(display)
 
     pygame.display.update()
