@@ -120,8 +120,17 @@ textarea{resize:vertical;min-height:64px;}
 .spacer{flex:1;}
 
 .linkbar{display:flex;justify-content:center;gap:18px;margin-top:18px;}
-.linkbar a{color:#cbb9ea;font-weight:800;text-decoration:none;font-size:.92rem;opacity:.85;}
+.linkbar a{color:#cbb9ea;font-weight:800;text-decoration:none;font-size:.92rem;opacity:.85;cursor:pointer;}
 .linkbar a:active{opacity:1;}
+
+.badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);
+  border:1.5px solid rgba(255,201,60,.4);color:var(--milho);font-weight:800;font-size:.85rem;
+  padding:7px 14px;border-radius:999px;margin-top:14px;align-self:flex-start;}
+
+/* banner instalar (iOS) */
+.install{display:none;background:rgba(76,201,240,.12);border:1.5px solid rgba(76,201,240,.4);
+  color:#cdeafe;border-radius:14px;padding:12px 14px;margin-top:14px;font-weight:700;font-size:.92rem;line-height:1.45;}
+.install b{color:#fff;}
 
 /* ---------- Cartão de pista (papel kraft) ---------- */
 .clue-card{
@@ -149,6 +158,20 @@ textarea{resize:vertical;min-height:64px;}
 #reader video{border-radius:18px;}
 .scan-hint{text-align:center;margin-top:14px;color:#e9def7;font-weight:700;line-height:1.4;}
 .scan-err{color:var(--vermelha);font-weight:800;margin-top:10px;text-align:center;display:none;}
+.scan-switch{text-align:center;margin-top:14px;}
+.scan-switch a{color:var(--azul);font-weight:800;cursor:pointer;text-decoration:underline;}
+
+/* animação NFC */
+#nfcPanel{display:none;flex-direction:column;align-items:center;margin-top:10px;}
+.nfc-stage{position:relative;width:200px;height:200px;display:flex;align-items:center;justify-content:center;}
+.nfc-stage .ring{position:absolute;border:3px solid var(--azul);border-radius:50%;opacity:0;
+  animation:nfcpulse 1.8s ease-out infinite;}
+.nfc-stage .ring:nth-child(1){width:80px;height:80px;animation-delay:0s;}
+.nfc-stage .ring:nth-child(2){width:130px;height:130px;animation-delay:.45s;}
+.nfc-stage .ring:nth-child(3){width:185px;height:185px;animation-delay:.9s;}
+@keyframes nfcpulse{0%{opacity:0;transform:scale(.5);}25%{opacity:.9;}100%{opacity:0;transform:scale(1);}}
+.nfc-phone{font-size:3.4rem;z-index:1;animation:tapwave 1.8s ease-in-out infinite;}
+@keyframes tapwave{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
 
 /* ---------- Celebração ---------- */
 .celebrate{align-items:center;text-align:center;justify-content:center;}
@@ -158,7 +181,7 @@ textarea{resize:vertical;min-height:64px;}
 @keyframes pop{from{transform:scale(.2) rotate(-15deg);opacity:0;}to{transform:none;opacity:1;}}
 
 /* ---------- Ranking ---------- */
-.rank{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;}
+.rank{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;width:100%;}
 .rank li{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.07);border-radius:14px;padding:12px 16px;border:2px solid transparent;}
 .rank li.me{border-color:var(--milho);background:rgba(255,201,60,.12);}
 .rank .pos{font-family:"Rye",cursive;color:var(--milho);font-size:1.3rem;width:34px;flex:none;text-align:center;}
@@ -178,6 +201,9 @@ textarea{resize:vertical;min-height:64px;}
 .qr-card .qbox{display:flex;justify-content:center;margin:10px 0;}
 .qr-card p{margin:6px 0 0;font-weight:700;color:#4a2c12;font-size:.95rem;}
 .qr-card .tag{display:inline-block;background:#241544;color:#ffc93c;font-weight:900;border-radius:999px;padding:3px 12px;font-size:.78rem;}
+.qr-card .nfc-btn{margin-top:10px;display:inline-block;background:#241544;color:#fff;border:none;
+  font-weight:800;border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;font-size:.9rem;}
+.qr-card small{display:block;color:#8a7a55;margin-top:8px;font-weight:700;}
 
 .note{font-size:.85rem;color:#cbb9ea;line-height:1.5;margin-top:14px;background:rgba(255,255,255,.05);padding:12px 14px;border-radius:12px;}
 .note b{color:var(--milho);}
@@ -190,6 +216,7 @@ textarea{resize:vertical;min-height:64px;}
   .app{max-width:none;}
   .noprint,.bunting{display:none !important;}
   .qr-card{box-shadow:none;border:1px solid #ccc;}
+  .qr-card .nfc-btn{display:none;}
 }
 </style>
 </head>
@@ -204,7 +231,7 @@ textarea{resize:vertical;min-height:64px;}
   <section id="view-splash" class="view active">
     <div class="kicker">São João &middot; 2026</div>
     <h1 class="title">Arraiá<br/>do Tesouro</h1>
-    <p class="lead">Bão demais da conta! Siga as pistas, ache os QR escondidos pelo arraiá e desenterre cada tesouro antes da turma.</p>
+    <p class="lead">Bão demais da conta! Siga as pistas e encoste o celular nas tags escondidas pelo arraiá pra desenterrar cada tesouro.</p>
 
     <div class="bonfire" aria-hidden="true">
       <div class="halo"></div>
@@ -214,25 +241,22 @@ textarea{resize:vertical;min-height:64px;}
       <div class="logs"><span></span><span></span></div>
     </div>
 
+    <span class="badge" id="gameBadge">🎯 Carregando caçada…</span>
+
     <label class="field" for="playerName">Seu nome de caipira</label>
     <input id="playerName" type="text" maxlength="22" placeholder="Ex: Zé do Milho" autocomplete="off" />
 
+    <div class="install" id="iosInstall">
+      📲 Pra abrir em <b>tela cheia</b> no iPhone: toque em <b>Compartilhar</b> e
+      depois em <b>“Adicionar à Tela de Início”</b>.
+    </div>
+
     <div class="spacer"></div>
-    <button class="btn fire" id="startBtn">Bora pra caçada 🔥</button>
+    <button class="btn fire" id="startBtn">Iniciar caçada 🔥</button>
     <div class="linkbar">
       <a id="toRanking">🏆 Ranking</a>
       <a id="toAdmin">⚙️ Organizador</a>
     </div>
-  </section>
-
-  <!-- ============ ESPERANDO LARGADA ============ -->
-  <section id="view-start" class="view celebrate">
-    <div class="chest">🚩</div>
-    <div class="big">Largada!</div>
-    <p class="lead" style="text-align:center">Pegue o celular e escaneie o <b>QR de Largada</b> que o organizador colou na entrada do arraiá pra começar.</p>
-    <div class="spacer"></div>
-    <button class="btn fire" id="scanStartBtn">Escanear largada 📷</button>
-    <button class="btn ghost noprint" id="backFromStart" style="margin-top:12px">Voltar</button>
   </section>
 
   <!-- ============ JOGO ============ -->
@@ -251,17 +275,30 @@ textarea{resize:vertical;min-height:64px;}
     <div class="beads" id="beads"></div>
 
     <div class="spacer"></div>
-    <button class="btn fire" id="digBtn">Achei! Desenterrar tesouro ⛏️</button>
+    <button class="btn fire" id="digBtn">Encostar pra desenterrar 📡</button>
     <button class="btn ghost noprint" id="giveUpBtn" style="margin-top:12px">Sair da caçada</button>
   </section>
 
-  <!-- ============ SCANNER ============ -->
+  <!-- ============ SCANNER (NFC / QR) ============ -->
   <section id="view-scan" class="view">
-    <div class="kicker">Mire no QR do tesouro</div>
+    <div class="kicker" id="scanKicker">Encoste na tag NFC</div>
     <h1 class="title" style="font-size:2.2rem">Cavando…</h1>
+
+    <!-- NFC -->
+    <div id="nfcPanel">
+      <div class="nfc-stage">
+        <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+        <div class="nfc-phone">📱</div>
+      </div>
+    </div>
+
+    <!-- QR -->
     <div id="reader"></div>
+
     <div class="scan-err" id="scanErr"></div>
-    <p class="scan-hint">Aponte a câmera pro QR Code escondido. Tem que ser o do tesouro certo, viu?</p>
+    <p class="scan-hint" id="scanHint">Aproxime a parte de trás do celular da tag escondida.</p>
+    <div class="scan-switch"><a id="switchMethod">Sem NFC? Usar a câmera (QR)</a></div>
+
     <div class="spacer"></div>
     <button class="btn ghost" id="cancelScan">Cancelar</button>
   </section>
@@ -306,16 +343,17 @@ textarea{resize:vertical;min-height:64px;}
       <label class="field" for="numTreasures">Quantos tesouros? (2 a 20)</label>
       <input id="numTreasures" type="number" min="2" max="20" value="5" />
       <div id="treasureForm"></div>
-      <button class="btn" id="genBtn" style="margin-top:18px">Gerar QR Codes 🎟️</button>
+      <button class="btn" id="genBtn" style="margin-top:18px">Gerar QR de início + tags 🎟️</button>
     </div>
 
     <div id="qrArea"></div>
 
     <div class="noprint">
       <div class="note" id="adminNote" style="display:none">
-        <b>Como usar:</b> imprima esta página (botão abaixo) e esconda cada QR no lugar da
-        pista correspondente. O <b>QR de Largada</b> vai na entrada — é por ele que a caçada começa.
-        Cada QR já carrega a sua pista, então funciona em qualquer celular, mesmo sem internet.
+        <b>Como usar:</b> imprima o <b>QR de Início</b> e cole na entrada — quem escaneia abre
+        o jogo já configurado. Para cada tesouro: no Android, toque em <b>Gravar tag NFC</b> e
+        encoste numa tag para gravá-la; para iPhones, imprima também o <b>QR de reserva</b> de
+        cada tesouro. Cada celular usa NFC se tiver, ou a câmera se não tiver.
       </div>
       <button class="btn fire" id="printBtn" style="margin-top:14px;display:none">Imprimir QR Codes 🖨️</button>
       <button class="btn ghost" id="adminBack" style="margin-top:12px">Voltar</button>
@@ -335,8 +373,14 @@ textarea{resize:vertical;min-height:64px;}
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 const LS_RANK = "arraia.ranking.v1";
-const SECRET = 0x5a;           // sal simples para dificultar QRs falsificados
+const SECRET = 0x5a;
 const PREFIX = "ARRAIA1:";
+
+const NFC_OK = ("NDEFReader" in window);
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = window.matchMedia("(display-mode: standalone)").matches ||
+  window.navigator.standalone === true;
 
 function show(id){
   $$(".view").forEach(v => v.classList.remove("active"));
@@ -351,8 +395,12 @@ function fmt(ms){
 }
 function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
 function b64decode(str){ return decodeURIComponent(escape(atob(str))); }
-
-// hash simples (não-criptográfico) só pra detectar QR adulterado/alheio
+function b64url(str){ return b64encode(str).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+function b64urlDecode(str){
+  str = str.replace(/-/g,"+").replace(/_/g,"/");
+  while(str.length % 4) str += "=";
+  return b64decode(str);
+}
 function checksum(str){
   let h = SECRET;
   for(let i=0;i<str.length;i++){ h = ((h<<5)-h + str.charCodeAt(i)) & 0xffff; }
@@ -360,28 +408,69 @@ function checksum(str){
 }
 function encodePayload(obj){
   const body = JSON.stringify(obj);
-  const c = checksum(body);
-  return PREFIX + b64encode(JSON.stringify({d:obj, c}));
+  return PREFIX + b64encode(JSON.stringify({d:obj, c:checksum(body)}));
 }
 function decodePayload(text){
-  if(typeof text!=="string" || !text.startsWith(PREFIX)) return null;
+  if(typeof text!=="string") return null;
+  text = text.trim();
+  if(!text.startsWith(PREFIX)) return null;
   try{
     const outer = JSON.parse(b64decode(text.slice(PREFIX.length)));
-    if(checksum(JSON.stringify(outer.d)) !== outer.c) return null; // adulterado
+    if(checksum(JSON.stringify(outer.d)) !== outer.c) return null;
     return outer.d;
   }catch(e){ return null; }
 }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => (
+  {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function goFullscreen(){
+  const el = document.documentElement;
+  const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  if(fn){ try{ const p = fn.call(el); if(p && p.catch) p.catch(()=>{}); }catch(e){} }
+  if(screen.orientation && screen.orientation.lock){
+    try{ const p = screen.orientation.lock("portrait"); if(p && p.catch) p.catch(()=>{}); }catch(e){}
+  }
+}
 
 /* ============================================================
-   Bandeirinhas (SVG gerado)
+   Config do jogo (vem na URL do QR de início: #g=<base64>)
+============================================================ */
+const DEMO = [
+  { text:"Onde a fogueira esquenta a noite", emoji:"🔥" },
+  { text:"Perto da barraca da pescaria", emoji:"🎣" },
+  { text:"Onde a bandeirinha mais colorida balança", emoji:"🚩" },
+];
+let config = null;   // {treasures:[{text,emoji}], demo:bool}
+
+function parseConfig(){
+  const m = location.hash.match(/[#&]g=([^&]+)/);
+  if(m){
+    try{
+      const obj = JSON.parse(b64urlDecode(m[1]));
+      if(obj && Array.isArray(obj.t) && obj.t.length>=2){
+        return { treasures: obj.t.map(x => ({ text:x[0], emoji:x[1] })), demo:false };
+      }
+    }catch(e){}
+  }
+  return { treasures: DEMO.slice(), demo:true };
+}
+function configToHash(treasures){
+  const obj = { v:1, t: treasures.map(t => [t.text, t.emoji]) };
+  return "#g=" + b64url(JSON.stringify(obj));
+}
+function startUrlFor(treasures){
+  return location.origin + location.pathname + configToHash(treasures);
+}
+
+/* ============================================================
+   Bandeirinhas
 ============================================================ */
 (function buntingInit(){
   const cols = ["#ff4d6d","#ffc93c","#21bf8f","#4cc9f0","#ffffff"];
   const W = 520, n = 13, gap = W/n;
   let flags = "";
   for(let i=0;i<n;i++){
-    const x = i*gap;
-    const c = cols[i%cols.length];
+    const x = i*gap, c = cols[i%cols.length];
     flags += `<path class="flag" style="animation-delay:${(i*0.13).toFixed(2)}s"
       d="M${x} 6 L${x+gap} 6 L${x+gap/2} 24 Z" fill="${c}" stroke="rgba(0,0,0,.12)" stroke-width="1"/>`;
   }
@@ -416,117 +505,170 @@ function renderClue(){
   $("#gameWho").textContent = "🤠 " + game.name;
   $("#clueStep").textContent = "Pista " + game.idx + " de " + game.total;
   const cl = game.clues[game.idx-1] || {};
-  $("#clueText").textContent = cl.text || "Procure pelo próximo QR!";
+  $("#clueText").textContent = cl.text || "Procure pela próxima tag!";
   $("#clueEmoji").textContent = cl.emoji || "🌽";
   renderBeads();
 }
 
 /* ============================================================
-   Fluxo: splash -> largada -> jogo
+   Splash -> jogo
 ============================================================ */
+function initSplash(){
+  config = parseConfig();
+  const n = config.treasures.length;
+  $("#gameBadge").textContent = config.demo
+    ? "🎈 Modo demonstração (" + n + " tesouros)"
+    : "🎯 Caçada pronta: " + n + " tesouros";
+  if(isIOS && !isStandalone) $("#iosInstall").style.display = "block";
+}
+
 $("#startBtn").addEventListener("click", () => {
   const name = $("#playerName").value.trim();
   if(!name){ $("#playerName").focus(); $("#playerName").style.borderColor = "var(--vermelha)"; return; }
-  game = { name, total:0, idx:0, startedAt:0, clues:[] };
-  show("view-start");
+  goFullscreen();
+  game = {
+    name,
+    total: config.treasures.length,
+    idx: 1,
+    startedAt: Date.now(),
+    clues: config.treasures.slice(),
+  };
+  if(navigator.vibrate) navigator.vibrate([40,40,120]);
+  renderClue();
+  startTimer();
+  show("view-game");
 });
-$("#backFromStart").addEventListener("click", () => show("view-splash"));
 
-$("#scanStartBtn").addEventListener("click", () => openScanner("start"));
-$("#digBtn").addEventListener("click", () => openScanner("treasure"));
-
+$("#digBtn").addEventListener("click", () => openScanner());
 $("#giveUpBtn").addEventListener("click", () => {
   clearInterval(timerInt); game = null; show("view-splash");
 });
 
 /* ============================================================
-   Scanner
+   Scanner: NFC com fallback de câmera (QR)
 ============================================================ */
-let html5Qr = null;
-let scanMode = "start";   // "start" | "treasure"
-let scanning = false;
+let scanMethod = "nfc";   // "nfc" | "qr"
+let html5Qr = null, qrRunning = false;
+let nfcReader = null, nfcAbort = null;
+let scanActive = false;
 
-async function openScanner(mode){
-  scanMode = mode;
+function openScanner(){
+  scanActive = true;
+  scanMethod = NFC_OK ? "nfc" : "qr";
   $("#scanErr").style.display = "none";
   show("view-scan");
+  startMethod();
+}
+async function startMethod(){
+  $("#scanErr").style.display = "none";
+  if(scanMethod === "nfc"){
+    $("#nfcPanel").style.display = "flex";
+    $("#reader").style.display = "none";
+    $("#scanKicker").textContent = "Encoste na tag NFC";
+    $("#scanHint").textContent = "Aproxime a parte de trás do celular da tag escondida. Mantenha o NFC ligado.";
+    $("#switchMethod").textContent = "Sem NFC? Usar a câmera (QR)";
+    await startNFC();
+  }else{
+    $("#nfcPanel").style.display = "none";
+    $("#reader").style.display = "block";
+    $("#scanKicker").textContent = "Mire no QR do tesouro";
+    $("#scanHint").textContent = "Aponte a câmera pro QR Code escondido no local da pista.";
+    $("#switchMethod").textContent = NFC_OK ? "Voltar pro NFC" : "Tentar a câmera de novo";
+    await startQR();
+  }
+}
+async function stopAll(){
+  scanActive = false;
+  if(nfcAbort){ try{ nfcAbort.abort(); }catch(e){} }
+  nfcAbort = null; nfcReader = null;
+  if(html5Qr && qrRunning){
+    qrRunning = false;
+    try{ await html5Qr.stop(); await html5Qr.clear(); }catch(e){}
+  }
+  html5Qr = null;
+}
+
+async function startNFC(){
+  try{
+    nfcReader = new NDEFReader();
+    nfcAbort = new AbortController();
+    await nfcReader.scan({ signal: nfcAbort.signal });
+    nfcReader.onreadingerror = () => flashScanError("Não consegui ler essa tag. Tente de novo.");
+    nfcReader.onreading = (ev) => {
+      for(const rec of ev.message.records){
+        let text = null;
+        try{
+          if(rec.recordType === "text"){
+            text = new TextDecoder(rec.encoding || "utf-8").decode(rec.data);
+          }else{
+            text = new TextDecoder().decode(rec.data);
+          }
+        }catch(e){}
+        if(text){ onScanText(text); return; }
+      }
+    };
+  }catch(err){
+    showScanErr("Ative o NFC do celular nas configurações e permita o acesso — ou toque em “Usar a câmera (QR)”.");
+  }
+}
+async function startQR(){
   if(!window.Html5Qrcode){
-    showScanErr("Leitor de QR não carregou. Verifique a conexão e recarregue.");
+    showScanErr("Leitor de câmera não carregou. Verifique a conexão e recarregue.");
     return;
   }
   try{
     html5Qr = new Html5Qrcode("reader", { verbose:false });
-    scanning = true;
+    qrRunning = true;
     await html5Qr.start(
       { facingMode: "environment" },
       { fps:10, qrbox:{width:240,height:240}, aspectRatio:1.0 },
-      onScan,
+      onScanText,
       () => {}
     );
   }catch(err){
     showScanErr("Não consegui abrir a câmera. Toque para permitir o acesso e tente de novo.");
   }
 }
-function showScanErr(msg){
-  const e = $("#scanErr"); e.textContent = msg; e.style.display = "block";
-}
-async function stopScanner(){
-  if(html5Qr && scanning){
-    scanning = false;
-    try{ await html5Qr.stop(); await html5Qr.clear(); }catch(e){}
-  }
-  html5Qr = null;
-}
+
+$("#switchMethod").addEventListener("click", async () => {
+  await stopAll();
+  scanActive = true;
+  scanMethod = (scanMethod === "nfc") ? "qr" : (NFC_OK ? "nfc" : "qr");
+  startMethod();
+});
 $("#cancelScan").addEventListener("click", async () => {
-  await stopScanner();
-  show(scanMode==="start" ? "view-start" : "view-game");
+  await stopAll();
+  show("view-game");
 });
 
-function onScan(text){
-  if(!scanning) return;
-  const data = decodePayload(text);
-  if(!data || data.t!=="arraia"){
-    flashScanError("Esse QR não é da caçada 🤔");
-    return;
-  }
-  if(scanMode === "start"){
-    if(data.k !== "start"){ flashScanError("Comece pelo QR de Largada!"); return; }
-    handleStart(data);
-  }else{
-    if(data.k !== "treasure"){ flashScanError("Esse é o QR de Largada, já passou disso!"); return; }
-    handleTreasure(data);
-  }
-}
+function showScanErr(msg){ const e=$("#scanErr"); e.textContent=msg; e.style.display="block"; }
 let lastErrAt = 0;
 function flashScanError(msg){
   const now = Date.now();
-  if(now - lastErrAt < 1500) return;   // evita spam
+  if(now - lastErrAt < 1500) return;
   lastErrAt = now;
   showScanErr(msg);
   if(navigator.vibrate) navigator.vibrate(120);
 }
 
-/* QR de largada: define total + primeira pista, inicia cronômetro */
-async function handleStart(data){
-  await stopScanner();
-  game.total = data.total;
-  game.idx = 1;
-  game.clues = [{ text:data.clue, emoji:data.emoji }];
-  game.startedAt = Date.now();
-  if(navigator.vibrate) navigator.vibrate([40,40,120]);
-  renderClue();
-  startTimer();
-  show("view-game");
+/* Recebe texto da tag NFC ou do QR e valida */
+function onScanText(text){
+  if(!scanActive) return;
+  const data = decodePayload(text);
+  if(!data || data.t !== "arraia" || data.k !== "treasure"){
+    flashScanError("Essa tag não é da caçada 🤔");
+    return;
+  }
+  handleTreasure(data);
 }
 
-/* QR de tesouro: precisa ser exatamente o tesouro esperado (ordem) */
 async function handleTreasure(data){
   if(data.idx !== game.idx){
     if(data.idx < game.idx) flashScanError("Esse tesouro você já achou! 😄");
     else flashScanError("Calma, caipira! Ache os tesouros na ordem das pistas.");
     return;
   }
-  await stopScanner();
+  await stopAll();
   if(navigator.vibrate) navigator.vibrate([40,30,40,30,120]);
   burstConfetti();
 
@@ -537,8 +679,6 @@ async function handleTreasure(data){
     $("#nextClueBtn").textContent = "Ver resultado 🏁";
     pendingFinish = true;
   }else{
-    // guarda a próxima pista que veio dentro do QR
-    game.clues[game.idx] = { text:data.nextClue, emoji:data.nextEmoji };
     $("#foundSub").textContent = "Desenterrado! Tem mais pista pela frente.";
     $("#nextClueBtn").textContent = "Próxima pista 👉";
     pendingFinish = false;
@@ -555,24 +695,20 @@ $("#nextClueBtn").addEventListener("click", () => {
 });
 
 /* ============================================================
-   Fim de jogo + ranking (localStorage)
+   Fim + ranking (localStorage)
 ============================================================ */
-function loadRank(){
-  try{ return JSON.parse(localStorage.getItem(LS_RANK)) || []; }catch(e){ return []; }
-}
+function loadRank(){ try{ return JSON.parse(localStorage.getItem(LS_RANK)) || []; }catch(e){ return []; } }
 function saveRank(list){ localStorage.setItem(LS_RANK, JSON.stringify(list)); }
 
 function finishGame(){
   clearInterval(timerInt);
   const elapsed = Date.now() - game.startedAt;
   $("#finalTime").textContent = fmt(elapsed);
-
   const list = loadRank();
   const entry = { name:game.name, ms:elapsed, at:Date.now(), total:game.total };
   list.push(entry);
   list.sort((a,b) => a.ms - b.ms);
   saveRank(list);
-
   renderRankInto("#finishRank", list, entry.at);
   burstConfetti(); setTimeout(burstConfetti, 350);
   show("view-finish");
@@ -589,14 +725,9 @@ function renderRankInto(sel, list, highlightAt){
     ul.appendChild(li);
   });
 }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => (
-  {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
-
 $("#playAgain").addEventListener("click", () => {
   game = null; $("#playerName").value=""; show("view-splash");
 });
-
-/* Ranking standalone */
 $("#toRanking").addEventListener("click", () => {
   const list = loadRank();
   renderRankInto("#rankList", list, null);
@@ -626,10 +757,7 @@ function buildTreasureForm(){
   const form = $("#treasureForm");
   const prev = {};
   $$("#treasureForm .admin-row").forEach((row,i) => {
-    prev[i] = {
-      text: row.querySelector("textarea").value,
-      emoji: row.dataset.emoji
-    };
+    prev[i] = { text: row.querySelector("textarea").value, emoji: row.dataset.emoji };
   });
   form.innerHTML = "";
   for(let i=0;i<n;i++){
@@ -639,7 +767,7 @@ function buildTreasureForm(){
     row.dataset.emoji = chosen;
     row.innerHTML = `
       <div class="rh"><span class="rh-emoji">${chosen}</span> Tesouro ${i+1}</div>
-      <textarea placeholder="Pista pra achar o tesouro ${i+1}. Ex: 'Onde a fogueira esquenta a noite'">${prev[i]?prev[i].text:""}</textarea>
+      <textarea placeholder="Pista pra achar o tesouro ${i+1}. Ex: 'Onde a fogueira esquenta a noite'">${prev[i]?escapeHtml(prev[i].text):""}</textarea>
       <div class="emoji-pick"></div>`;
     const pick = row.querySelector(".emoji-pick");
     EMOJIS.forEach(em => {
@@ -665,30 +793,34 @@ $("#genBtn").addEventListener("click", () => {
     emoji: r.dataset.emoji
   }));
   const total = treasures.length;
-
-  // QR de LARGADA: carrega total + a primeira pista
-  // QR do TESOURO i: confirma o tesouro i e carrega a pista do tesouro i+1
   const area = $("#qrArea");
   area.innerHTML = '<div class="qr-grid"></div>';
   const grid = area.querySelector(".qr-grid");
 
-  // Largada
-  addQrCard(grid, "Largada", "🚩 Cole na entrada do arraiá",
-    encodePayload({ t:"arraia", k:"start", total, clue:treasures[0].text, emoji:treasures[0].emoji }),
-    "Pista: " + treasures[0].text);
+  // QR de INÍCIO: abre o app já com a config (na URL). Não é NFC.
+  const startUrl = startUrlFor(treasures);
+  addQrCard(grid, {
+    tag: "🚩 Cole na entrada do arraiá",
+    title: "QR de Início",
+    qrText: startUrl,
+    footer: "Escaneie pra abrir o jogo já configurado",
+    small: startUrl.length > 1200 ? "Muitas pistas longas deixam este QR denso — encurte os textos se não escanear." : ""
+  });
 
-  // Tesouros
+  // Cada tesouro: tag NFC (Android) + QR de reserva (iOS), mesmo payload
   treasures.forEach((tr, i) => {
     const idx = i+1;
     const last = idx === total;
-    const next = last ? null : treasures[idx];
-    addQrCard(grid, "Tesouro " + idx, tr.emoji + " Esconda no local da pista " + idx,
-      encodePayload({
-        t:"arraia", k:"treasure", idx, total, last,
-        nextClue: next ? next.text : null,
-        nextEmoji: next ? next.emoji : null
-      }),
-      last ? "Último tesouro! 🏁" : "Próxima pista: " + next.text);
+    const payload = encodePayload({ t:"arraia", k:"treasure", idx, total, last });
+    addQrCard(grid, {
+      tag: tr.emoji + " Esconda no local da pista " + idx,
+      title: "Tesouro " + idx,
+      qrText: payload,
+      footer: last ? "Último tesouro! 🏁" : "Pista: " + tr.text,
+      nfcPayload: payload,
+      small: NFC_OK ? "Android: grave a tag NFC. iPhone: imprima este QR."
+                    : "Imprima este QR (NFC só grava no Chrome do Android)."
+    });
   });
 
   $("#adminNote").style.display = "block";
@@ -696,26 +828,56 @@ $("#genBtn").addEventListener("click", () => {
   area.scrollIntoView({behavior:"smooth"});
 });
 
-function addQrCard(grid, title, sub, payload, footer){
+function addQrCard(grid, opt){
   const card = document.createElement("div");
   card.className = "qr-card";
-  card.innerHTML = `<span class="tag">${escapeHtml(sub)}</span>
-    <h3>${escapeHtml(title)}</h3>
+  card.innerHTML = `<span class="tag">${escapeHtml(opt.tag)}</span>
+    <h3>${escapeHtml(opt.title)}</h3>
     <div class="qbox"></div>
-    <p>${escapeHtml(footer)}</p>`;
+    <p>${escapeHtml(opt.footer)}</p>`;
   grid.appendChild(card);
-  // qrcodejs renderiza no elemento
   new QRCode(card.querySelector(".qbox"), {
-    text: payload, width:180, height:180,
+    text: opt.qrText, width:180, height:180,
     colorDark:"#241544", colorLight:"#ffffff",
     correctLevel: QRCode.CorrectLevel.M
   });
+  if(opt.nfcPayload){
+    const btn = document.createElement("button");
+    btn.className = "nfc-btn noprint";
+    btn.textContent = "📡 Gravar tag NFC";
+    btn.addEventListener("click", () => writeTag(opt.nfcPayload, btn));
+    card.appendChild(btn);
+  }
+  if(opt.small){
+    const s = document.createElement("small");
+    s.textContent = opt.small;
+    card.appendChild(s);
+  }
+}
+
+async function writeTag(payload, btn){
+  if(!NFC_OK){
+    alert("Gravar tag NFC só funciona no Chrome do Android. Use o QR de reserva para iPhones.");
+    return;
+  }
+  const original = btn.textContent;
+  btn.textContent = "Aproxime a tag…";
+  try{
+    const writer = new NDEFReader();
+    await writer.write({ records:[{ recordType:"text", data: payload }] });
+    btn.textContent = "✔ Tag gravada!";
+    if(navigator.vibrate) navigator.vibrate([40,30,120]);
+    setTimeout(() => { btn.textContent = original; }, 2500);
+  }catch(e){
+    btn.textContent = "Falhou — toque pra tentar";
+    setTimeout(() => { btn.textContent = original; }, 2500);
+  }
 }
 
 $("#printBtn").addEventListener("click", () => window.print());
 
 /* ============================================================
-   Confete (canvas, sem libs)
+   Confete
 ============================================================ */
 const cvs = $("#confetti");
 const ctx = cvs.getContext("2d");
@@ -723,46 +885,38 @@ let parts = [];
 function resizeCanvas(){ cvs.width = innerWidth; cvs.height = innerHeight; }
 resizeCanvas(); addEventListener("resize", resizeCanvas);
 const CONFCOLORS = ["#ff4d6d","#ffc93c","#21bf8f","#4cc9f0","#ff7a18","#ffffff"];
+let rafOn = false;
 function burstConfetti(){
   for(let i=0;i<90;i++){
     parts.push({
-      x: innerWidth/2 + (Math.random()-.5)*120,
-      y: innerHeight*0.42,
-      vx:(Math.random()-.5)*9,
-      vy:-(Math.random()*11+5),
-      g:0.28+Math.random()*0.12,
-      s:5+Math.random()*7,
+      x: innerWidth/2 + (Math.random()-.5)*120, y: innerHeight*0.42,
+      vx:(Math.random()-.5)*9, vy:-(Math.random()*11+5),
+      g:0.28+Math.random()*0.12, s:5+Math.random()*7,
       rot:Math.random()*6.28, vr:(Math.random()-.5)*0.4,
-      c:CONFCOLORS[(Math.random()*CONFCOLORS.length)|0],
-      life:0
+      c:CONFCOLORS[(Math.random()*CONFCOLORS.length)|0], life:0
     });
   }
   if(!rafOn){ rafOn = true; requestAnimationFrame(tick); }
 }
-let rafOn = false;
 function tick(){
   ctx.clearRect(0,0,cvs.width,cvs.height);
   parts.forEach(p => {
     p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life++;
     ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
-    ctx.fillStyle = p.c; ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*0.6);
-    ctx.restore();
+    ctx.fillStyle = p.c; ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*0.6); ctx.restore();
   });
   parts = parts.filter(p => p.y < cvs.height+40 && p.life < 260);
   if(parts.length){ requestAnimationFrame(tick); } else { rafOn = false; ctx.clearRect(0,0,cvs.width,cvs.height); }
 }
 
 /* ============================================================
-   PWA: registra o service worker
+   PWA + init
 ============================================================ */
 if("serviceWorker" in navigator){
-  addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  });
+  addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
-
-/* limpa borda de erro do nome ao digitar */
 $("#playerName").addEventListener("input", e => { e.target.style.borderColor = ""; });
+initSplash();
 </script>
 </body>
 </html>
