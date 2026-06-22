@@ -33,12 +33,17 @@
   --sombra:0 14px 30px -12px rgba(0,0,0,.55);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+/* base escura no html cobre qualquer area fora do body (safe-area/gestos),
+   evitando a faixa branca em alguns Android (ex.: Galaxy S10) em tela cheia */
+html{background:#241544;}
 html,body{margin:0;padding:0;height:100%;}
 body{
   font-family:"Nunito",system-ui,sans-serif;
   color:#fff;
-  background:
-    radial-gradient(120% 80% at 50% -10%, #4a2a7a 0%, var(--noite-2) 38%, var(--noite) 100%);
+  background-color:#241544;
+  background-image:radial-gradient(120% 80% at 50% -10%, #4a2a7a 0%, var(--noite-2) 38%, var(--noite) 100%);
+  background-repeat:no-repeat;
+  background-attachment:fixed;            /* cobre toda a viewport, sem sobra */
   min-height:100dvh;
   overflow-x:hidden;
 }
@@ -474,6 +479,7 @@ const PREFIX = "ARRAIA1:";
 const NFC_OK = ("NDEFReader" in window);
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
   (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isAndroid = /android/i.test(navigator.userAgent);
 const isStandalone = window.matchMedia("(display-mode: standalone)").matches ||
   window.navigator.standalone === true;
 
@@ -558,10 +564,15 @@ function clearSession(){ localStorage.removeItem(LS_SESS); }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => (
   {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
-function goFullscreen(){
+function tryFullscreen(){
+  if(document.fullscreenElement || document.webkitFullscreenElement) return;
   const el = document.documentElement;
-  const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  const fn = el.requestFullscreen || el.webkitRequestFullscreen ||
+             el.mozRequestFullScreen || el.msRequestFullscreen;
   if(fn){ try{ const p = fn.call(el); if(p && p.catch) p.catch(()=>{}); }catch(e){} }
+}
+function goFullscreen(){
+  tryFullscreen();
   if(screen.orientation && screen.orientation.lock){
     try{ const p = screen.orientation.lock("portrait"); if(p && p.catch) p.catch(()=>{}); }catch(e){}
   }
@@ -676,7 +687,16 @@ function renderSplash(){
   $("#gameBadge").textContent = config.demo
     ? "🎈 Modo demonstração (" + n + " tesouros)"
     : "🎯 Caçada pronta: " + n + " tesouros";
-  if(isIOS && !isStandalone) $("#iosInstall").style.display = "block";
+  if(!isStandalone){
+    const inst = $("#iosInstall");
+    if(isAndroid){
+      inst.innerHTML = "📲 Pra <b>tela cheia garantida</b>, instale o app: menu <b>⋮</b> do " +
+        "navegador → <b>Instalar app</b> (ou <b>Adicionar à tela inicial</b>).";
+      inst.style.display = "block";
+    }else if(isIOS){
+      inst.style.display = "block";
+    }
+  }
   show("view-splash");
 }
 function splashNote(msg){
@@ -747,6 +767,7 @@ function defaultMethod(){ return NFC_OK ? "nfc" : (isIOS ? "nfctap" : "qr"); }
 
 function openScanner(){
   scanActive = true;
+  tryFullscreen();              // reforça tela cheia caso a 1ª tentativa não tenha pegado
   scanMethod = defaultMethod();
   $("#scanErr").style.display = "none";
   show("view-scan");
