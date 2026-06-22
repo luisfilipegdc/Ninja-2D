@@ -1,7 +1,7 @@
 // Service Worker do Arraiá do Tesouro.
 // Cache "app shell" + bibliotecas de CDN para o jogo funcionar offline
 // (importante numa festa onde o sinal costuma falhar).
-const CACHE = "arraia-tesouro-v4";
+const CACHE = "arraia-tesouro-v5";
 
 const APP_SHELL = [
   "./",
@@ -37,11 +37,36 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Estratégia: cache-first, com atualização em segundo plano (stale-while-revalidate)
+// Para o HTML (navegação) usamos NETWORK-FIRST: assim, online, o aparelho
+// sempre pega a versão mais nova do app (correções chegam no próximo reload),
+// caindo pro cache só quando estiver offline.
+// Para os demais arquivos (libs, ícones) seguimos CACHE-FIRST com revalidação.
+function isHtmlRequest(request) {
+  return request.mode === "navigate" ||
+    (request.destination === "document") ||
+    /\/$|\.html(\?|$)/.test(new URL(request.url).pathname);
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
 
+  if (isHtmlRequest(request)) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const copy = response.clone();
+            caches.open(CACHE).then((cache) => cache.put(request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request).then((c) => c || caches.match("./index.html")))
+    );
+    return;
+  }
+
+  // cache-first + revalidação em segundo plano
   event.respondWith(
     caches.match(request).then((cached) => {
       const network = fetch(request)

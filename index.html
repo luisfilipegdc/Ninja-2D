@@ -36,6 +36,10 @@
 /* base escura no html cobre qualquer area fora do body (safe-area/gestos),
    evitando a faixa branca em alguns Android (ex.: Galaxy S10) em tela cheia */
 html{background:#241544;}
+/* o elemento em tela cheia e o backdrop ganham fundo escuro, senao alguns
+   navegadores Android pintam de branco a area fora do conteudo */
+:fullscreen,:-webkit-full-screen{background:#241544 !important;}
+::backdrop,::-webkit-backdrop{background:#241544;}
 html,body{margin:0;padding:0;height:100%;}
 body{
   font-family:"Nunito",system-ui,sans-serif;
@@ -43,7 +47,6 @@ body{
   background-color:#241544;
   background-image:radial-gradient(120% 80% at 50% -10%, #4a2a7a 0%, var(--noite-2) 38%, var(--noite) 100%);
   background-repeat:no-repeat;
-  background-attachment:fixed;            /* cobre toda a viewport, sem sobra */
   min-height:100dvh;
   overflow-x:hidden;
 }
@@ -292,6 +295,20 @@ textarea{resize:vertical;min-height:64px;}
   box-shadow:var(--sombra);opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;}
 #toast.show{opacity:1;transform:translate(-50%,0);}
 
+/* ---------- Easter egg: Modo Mestre ---------- */
+#view-splash .bonfire{cursor:pointer;}
+#secretEgg{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
+  padding:28px;background:rgba(18,9,38,.86);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
+#secretEgg.show{display:flex;animation:fade .3s ease both;}
+#secretEgg .card{background:linear-gradient(180deg,#3a1f63,#241544);border:2px solid var(--milho);
+  border-radius:22px;padding:30px 24px;max-width:340px;text-align:center;box-shadow:var(--sombra);}
+#secretEgg .crown{font-size:3.6rem;animation:chestBurst .7s cubic-bezier(.2,1.4,.5,1) both;}
+#secretEgg h2{font-family:"Rye",cursive;color:var(--milho);margin:.25em 0 .15em;font-size:1.9rem;
+  text-shadow:0 2px 0 #b85c00;}
+#secretEgg p{color:#e9def7;font-weight:700;line-height:1.5;margin:.4em 0 1.3em;}
+/* fogueira "turbinada" depois de liberado */
+body.mestre #view-splash .bonfire .halo{animation-duration:1.5s;filter:blur(4px) brightness(1.15);}
+
 /* ---------- Respeitar reduced-motion ---------- */
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{
@@ -320,6 +337,18 @@ textarea{resize:vertical;min-height:64px;}
 <canvas id="confetti"></canvas>
 <div class="hot-flash" id="hotFlash" aria-hidden="true"></div>
 <div id="toast"></div>
+
+<!-- Easter egg: 5 toques na fogueira liberam o Modo Mestre -->
+<div id="secretEgg" aria-hidden="true">
+  <div class="card">
+    <div class="crown">🔥👑</div>
+    <h2>Mestre do Arraiá</h2>
+    <p>Você descobriu o segredo da fogueira! O <b>Modo Mestre</b> foi liberado —
+       agora a fogueira solta fogos a cada toque. 🎆</p>
+    <button class="btn fire" id="secretClose">Uhul! 🎉</button>
+  </div>
+</div>
+
 <div class="app">
 
   <!-- Bandeirinhas -->
@@ -871,6 +900,43 @@ function showToast(msg){
   clearTimeout(toastT);
   toastT = setTimeout(() => el.classList.remove("show"), 2600);
 }
+
+/* Easter egg: 5 toques na fogueira da splash liberam o "Modo Mestre".
+   Depois de liberado, cada toque na fogueira solta fogos. */
+(function fogueiraSecret(){
+  const fog = document.querySelector("#view-splash .bonfire");
+  const egg = $("#secretEgg"), closeBtn = $("#secretClose");
+  if(!fog || !egg) return;
+  let taps = 0, last = 0;
+
+  function fireworks(){
+    if(typeof burstConfetti !== "function") return;
+    burstConfetti();
+    for(let i=1;i<=5;i++) setTimeout(burstConfetti, i*260);
+  }
+  function unlock(){
+    document.body.classList.add("mestre");
+    try{ localStorage.setItem("arraia.mestre","1"); }catch(e){}
+    if(navigator.vibrate) navigator.vibrate([30,40,30,40,140]);
+    fireworks();
+    egg.classList.add("show"); egg.setAttribute("aria-hidden","false");
+  }
+  fog.addEventListener("click", () => {
+    if(navigator.vibrate) navigator.vibrate(8);
+    if(document.body.classList.contains("mestre")){
+      if(typeof burstConfetti === "function") burstConfetti();  // já liberado: fogos a cada toque
+      return;
+    }
+    const now = Date.now();
+    if(now - last > 1200) taps = 0;     // precisa ser em sequência
+    last = now;
+    if(++taps >= 5){ taps = 0; unlock(); }
+  });
+  function hide(){ egg.classList.remove("show"); egg.setAttribute("aria-hidden","true"); }
+  if(closeBtn) closeBtn.addEventListener("click", () => { hide(); fireworks(); });
+  egg.addEventListener("click", (e) => { if(e.target === egg) hide(); });
+  try{ if(localStorage.getItem("arraia.mestre") === "1") document.body.classList.add("mestre"); }catch(e){}
+})();
 let lastErrAt = 0;
 function flashScanError(msg){
   const now = Date.now();
