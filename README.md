@@ -1,61 +1,79 @@
 # 🔥 Arraiá do Tesouro — PWA de caça ao tesouro pra festa junina
 
-Caça ao tesouro gamificada com QR Codes, feita como **PWA** que roda no
-**iOS (Safari) e Android (Chrome)**. Funciona offline e **não precisa de
-servidor**: cada QR Code carrega a sua própria pista criptografada.
+Caça ao tesouro gamificada com **tags NFC** (e QR Code como reserva), feita
+como **PWA** que roda no **Android (Chrome) e iOS (Safari)**. Funciona offline
+e **não precisa de servidor**.
 
 ## Fluxo do jogo
 
-1. **QR de Largada** (na entrada) → abre a caçada e mostra a 1ª pista
-2. **Pista na tela** → o jogador procura o local e acha o QR escondido
-3. **Escanear (desenterrar)** → confete + revela a próxima pista
-4. Repete até o último tesouro → **tempo final + ranking**
+1. **QR de Início** (na entrada) → abre o app já configurado, **em tela cheia**,
+   e pede o nome do jogador
+2. Jogador digita o nome → **inicia a caçada** (cronômetro começa)
+3. **Pista na tela** → o jogador procura o local e **encosta o celular na tag NFC**
+   (ou aponta a câmera no QR de reserva)
+4. Tesouro desenterrado → confete + próxima pista
+5. Repete até o último tesouro → **tempo final + ranking**
 
-A ordem é obrigatória: escanear um tesouro fora de sequência não conta, e os
-QR Codes têm checksum, então não dá pra forjar um QR qualquer.
+A ordem é obrigatória: ler um tesouro fora de sequência não conta, e o
+conteúdo das tags/QR tem checksum, então não dá pra forjar.
+
+## NFC + QR: por que os dois?
+
+| Plataforma | NFC (Web NFC) | QR (câmera) |
+|---|:---:|:---:|
+| **Android (Chrome 89+)** | ✅ lê e grava tags | ✅ |
+| **iPhone / iPad (iOS)** | ❌ bloqueado pela Apple | ✅ |
+
+O **iOS não suporta Web NFC** — é um bloqueio do sistema, sem workaround por
+web/PWA. Por isso o app usa **NFC quando o aparelho tem (Android)** e cai
+**automaticamente para QR pela câmera** quando não tem (iPhones). Mesma tag,
+mesmo conteúdo, mesma lógica — só muda como o celular lê. Dentro do jogo, o
+botão **"Sem NFC? Usar a câmera (QR)"** troca o método a qualquer momento.
+
+## Tela cheia ("tipo app")
+
+- **Android:** ao iniciar a caçada o app pede tela cheia (Fullscreen API).
+- **iOS:** o Safari não dá tela cheia por web; para o efeito "tipo app", a tela
+  inicial mostra como **instalar** (Compartilhar → *Adicionar à Tela de Início*).
+  Aberto pela Tela de Início, roda em modo standalone, sem barras do navegador.
 
 ## Arquivos
 
 | Arquivo | Função |
 |---|---|
-| `index.html` | App inteiro (6 telas, scanner, admin, confete) |
+| `index.html` | App inteiro (telas, scanner NFC/QR, admin, confete) |
 | `manifest.json` | Metadados do PWA |
 | `sw.js` | Service worker (cache offline) |
 | `icons/` | Ícones (fogueira) |
 | `make_icons.py` | Script que gera os ícones |
 
-## Como publicar (HTTPS é obrigatório pra PWA + câmera)
+## Como publicar (HTTPS é obrigatório pra PWA, NFC e câmera)
 
-O app vive na **raiz do repositório**, então é só apontar um host estático
-com HTTPS grátis para ele:
+O app vive na **raiz do repositório**:
 
 - **Vercel**: já conectado — cada push faz deploy automático.
 - **Netlify / Cloudflare Pages**: arraste a pasta e está no ar.
 - **GitHub Pages**: ative Pages apontando pra branch.
 
-## Como usar na festa
+## Como montar a caçada (organizador)
 
 1. Abra o app → **⚙️ Organizador**.
 2. Defina a quantidade de tesouros (2 a 20), escreva a pista e escolha o emoji
    de cada um.
-3. **Gerar QR Codes** → **Imprimir**. Recorte e esconda:
-   - O **QR de Largada** vai na entrada.
-   - Cada **QR de Tesouro N** vai no local descrito pela pista N.
-4. Os convidados abrem o link (ou instalam: no iOS, Safari → Compartilhar →
-   *Adicionar à Tela de Início*), digitam o nome e escaneiam a largada.
+3. **Gerar QR de início + tags**:
+   - **QR de Início** → imprima e cole na entrada. Ele carrega a caçada inteira
+     na URL, então qualquer celular que escaneia abre o jogo já configurado.
+   - **Cada tesouro** → no Android, toque em **📡 Gravar tag NFC** e encoste numa
+     tag NTAG para gravá-la; para iPhones, **imprima o QR de reserva** do tesouro.
+4. Esconda cada tag/QR no local descrito pela sua pista.
+
+> Quer testar rápido? Abra a URL do app **sem QR**: ele entra em **modo
+> demonstração** com 3 tesouros de exemplo.
 
 ## Sobre o ranking
 
-O ranking é salvo **por aparelho** (localStorage). Cada celular vê os tempos
-de quem jogou nele. Para um **ranking ao vivo compartilhado entre todos os
-celulares**, é preciso um backend — dá pra plugar o Supabase (já disponível
-no projeto): uma tabela `scores` + insert no fim do jogo + leitura ordenada
-por tempo. É o próximo passo natural se quiser competição em tempo real de
-verdade.
-
-## Sobre NFC (contexto da conversa)
-
-A ideia inicial usava cartões NFC, mas **o iOS bloqueia a Web NFC API** — não
-há como ler NFC por PWA/web no iPhone. Por isso o jogo usa **QR Code via
-câmera**, que funciona 100% em iOS e Android. Mesma dinâmica de "cartões
-escondidos", sem a limitação da Apple.
+O ranking é salvo **por aparelho** (localStorage). Para um **ranking ao vivo
+compartilhado entre todos os celulares**, é preciso um backend — dá pra plugar
+o Supabase (já disponível no projeto): uma tabela `scores` + insert no fim do
+jogo + leitura ordenada por tempo. É o próximo passo natural se quiser
+competição em tempo real de verdade.
