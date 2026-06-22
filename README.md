@@ -17,18 +17,31 @@ e **não precisa de servidor**.
 A ordem é obrigatória: ler um tesouro fora de sequência não conta, e o
 conteúdo das tags/QR tem checksum, então não dá pra forjar.
 
-## NFC + QR: por que os dois?
+## NFC no iPhone E no Android (a sacada)
 
-| Plataforma | NFC (Web NFC) | QR (câmera) |
-|---|:---:|:---:|
-| **Android (Chrome 89+)** | ✅ lê e grava tags | ✅ |
-| **iPhone / iPad (iOS)** | ❌ bloqueado pela Apple | ✅ |
+As tags são gravadas com um **registro de URL** apontando pro app
+(`…/?t=<tesouro>`). Com isso, **uma única tag** funciona em todo lugar:
 
-O **iOS não suporta Web NFC** — é um bloqueio do sistema, sem workaround por
-web/PWA. Por isso o app usa **NFC quando o aparelho tem (Android)** e cai
-**automaticamente para QR pela câmera** quando não tem (iPhones). Mesma tag,
-mesmo conteúdo, mesma lógica — só muda como o celular lê. Dentro do jogo, o
-botão **"Sem NFC? Usar a câmera (QR)"** troca o método a qualquer momento.
+| Plataforma | Como lê a tag |
+|---|---|
+| **iPhone / iPad (iOS 14+)** | **Background Tag Reading**: encosta o topo do iPhone na tag → o iOS mostra um banner e **abre a URL no Safari sozinho** (sem app aberto, sem Web NFC). O app reconhece o tesouro pela URL e avança. |
+| **Android (Chrome 89+)** | **Web NFC** (`NDEFReader`) lê a tag dentro do app; e se o app não estiver na frente, o próprio Android abre a URL. |
+| **Qualquer um** | O **QR Code** com a mesma URL funciona pela câmera, como reserva. |
+
+> A **Web NFC em JavaScript** continua bloqueada no iOS — o truque é não depender
+> dela: o iOS lê a tag no nível do sistema e abre a URL. Por isso a tag é um
+> registro de **URL**, não de texto.
+
+Para a caçada continuar entre um toque e outro (cada toque no iOS recarrega a
+página no Safari), o app **salva a sessão** (nome, tempo e progresso) no
+aparelho e retoma de onde parou.
+
+### Importante pro iOS
+- Jogue pelo **Safari** (é onde a tag abre). Instalar na Tela de Início é ótimo
+  pra tela cheia, mas o toque na tag abre o Safari — então mantenha a partida lá.
+- As tags precisam ser **graváveis num Android** (o iPhone não grava tags por
+  web). Depois de gravadas, funcionam no iPhone normalmente.
+- Botão **"Sem NFC? Usar a câmera (QR)"** sempre disponível como alternativa.
 
 ## Tela cheia ("tipo app")
 

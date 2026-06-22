@@ -211,6 +211,14 @@ textarea{resize:vertical;min-height:64px;}
 /* confete */
 #confetti{position:fixed;inset:0;pointer-events:none;z-index:50;}
 
+/* toast (mensagens visíveis em qualquer tela) */
+#toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));
+  transform:translate(-50%,20px);z-index:60;max-width:88%;
+  background:#2a1840;color:#fff;border:1.5px solid rgba(255,201,60,.5);
+  padding:13px 18px;border-radius:14px;font-weight:800;font-size:.96rem;text-align:center;
+  box-shadow:var(--sombra);opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;}
+#toast.show{opacity:1;transform:translate(-50%,0);}
+
 @media print{
   body{background:#fff;}
   .app{max-width:none;}
@@ -222,6 +230,7 @@ textarea{resize:vertical;min-height:64px;}
 </head>
 <body>
 <canvas id="confetti"></canvas>
+<div id="toast"></div>
 <div class="app">
 
   <!-- Bandeirinhas -->
@@ -243,12 +252,14 @@ textarea{resize:vertical;min-height:64px;}
 
     <span class="badge" id="gameBadge">🎯 Carregando caçada…</span>
 
+    <div class="install" id="splashNote" style="display:none;background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.4);color:#ffd3dc"></div>
+
     <label class="field" for="playerName">Seu nome de caipira</label>
     <input id="playerName" type="text" maxlength="22" placeholder="Ex: Zé do Milho" autocomplete="off" />
 
     <div class="install" id="iosInstall">
-      📲 Pra abrir em <b>tela cheia</b> no iPhone: toque em <b>Compartilhar</b> e
-      depois em <b>“Adicionar à Tela de Início”</b>.
+      📲 No iPhone, é só <b>encostar na tag NFC</b> que o jogo abre sozinho.
+      Pra usar em <b>tela cheia</b>, toque em <b>Compartilhar</b> → <b>“Adicionar à Tela de Início”</b>.
     </div>
 
     <div class="spacer"></div>
@@ -351,9 +362,9 @@ textarea{resize:vertical;min-height:64px;}
     <div class="noprint">
       <div class="note" id="adminNote" style="display:none">
         <b>Como usar:</b> imprima o <b>QR de Início</b> e cole na entrada — quem escaneia abre
-        o jogo já configurado. Para cada tesouro: no Android, toque em <b>Gravar tag NFC</b> e
-        encoste numa tag para gravá-la; para iPhones, imprima também o <b>QR de reserva</b> de
-        cada tesouro. Cada celular usa NFC se tiver, ou a câmera se não tiver.
+        o jogo já configurado. Grave as <b>tags NFC</b> num Android (toque em <b>Gravar tag NFC</b>
+        e encoste numa tag): a mesma tag funciona no iPhone, que abre a URL sozinho ao encostar.
+        Cada cartão também tem o <b>QR</b> com o mesmo link, pra quem preferir a câmera.
       </div>
       <button class="btn fire" id="printBtn" style="margin-top:14px;display:none">Imprimir QR Codes 🖨️</button>
       <button class="btn ghost" id="adminBack" style="margin-top:12px">Voltar</button>
@@ -420,6 +431,46 @@ function decodePayload(text){
     return outer.d;
   }catch(e){ return null; }
 }
+/* Token compacto (b64url) usado dentro da URL da tag/QR: ...?t=<token> */
+function encodeToken(obj){
+  const body = JSON.stringify(obj);
+  return b64url(JSON.stringify({ d:obj, c:checksum(body) }));
+}
+function decodeToken(str){
+  try{
+    const outer = JSON.parse(b64urlDecode(str));
+    if(checksum(JSON.stringify(outer.d)) !== outer.c) return null;
+    return outer.d;
+  }catch(e){ return null; }
+}
+/* Extrai o tesouro de qualquer forma: URL com ?t=, ou payload ARRAIA1: legado */
+function extractToken(text){
+  if(typeof text !== "string") return null;
+  text = text.trim();
+  const m = text.match(/[?&]t=([^&\s#]+)/);
+  if(m){ try{ return decodeToken(decodeURIComponent(m[1])); }catch(e){ return null; } }
+  if(text.startsWith(PREFIX)) return decodePayload(text);
+  return null;
+}
+
+/* URL da tag/QR de um tesouro (registro de URL: o iOS abre sozinho ao encostar) */
+function treasureUrl(idx, total, last){
+  const token = encodeToken({ t:"arraia", k:"treasure", idx, total, last });
+  return location.origin + location.pathname + "?t=" + token;
+}
+function cleanUrl(){
+  try{ history.replaceState({}, "", location.origin + location.pathname); }catch(e){}
+}
+
+/* Sessão persistida: deixa a caçada continuar a cada vez que o iOS reabre a
+   página ao encostar numa tag NFC (cada toque recarrega o app no Safari). */
+const LS_SESS = "arraia.session.v1";
+function saveSession(){
+  if(game) localStorage.setItem(LS_SESS, JSON.stringify(Object.assign({ active:true }, game)));
+}
+function loadSession(){ try{ return JSON.parse(localStorage.getItem(LS_SESS)); }catch(e){ return null; } }
+function clearSession(){ localStorage.removeItem(LS_SESS); }
+
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => (
   {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
@@ -511,15 +562,48 @@ function renderClue(){
 }
 
 /* ============================================================
-   Splash -> jogo
+   Abertura do app
+   - ?t=<tesouro>  -> tag NFC/QR aberta pelo iOS: retoma a sessão e processa
+   - #g=<config>   -> QR de início: carrega a caçada e pede o nome
+   - sem nada      -> modo demonstração
 ============================================================ */
-function initSplash(){
+function renderSplash(){
   config = parseConfig();
   const n = config.treasures.length;
   $("#gameBadge").textContent = config.demo
     ? "🎈 Modo demonstração (" + n + " tesouros)"
     : "🎯 Caçada pronta: " + n + " tesouros";
   if(isIOS && !isStandalone) $("#iosInstall").style.display = "block";
+  show("view-splash");
+}
+function splashNote(msg){
+  const el = $("#splashNote");
+  if(!msg){ el.style.display = "none"; return; }
+  el.textContent = msg; el.style.display = "block";
+}
+
+function handleLaunch(){
+  const params = new URLSearchParams(location.search);
+  const t = params.get("t");
+
+  if(t){
+    const data = decodeToken(t);
+    const sess = loadSession();
+    cleanUrl();
+    if(data && data.t === "arraia" && data.k === "treasure" && sess && sess.active){
+      game = sess;            // retoma nome, tempo, progresso e pistas
+      renderClue();
+      startTimer();
+      show("view-game");      // dá contexto antes de processar (caso esteja fora de ordem)
+      handleTreasure(data);   // valida a ordem e mostra a tela de tesouro
+      return;
+    }
+    // Encostou numa tag, mas não tem caçada em andamento neste aparelho
+    renderSplash();
+    splashNote("Encoste na tag depois de começar: escaneie o QR de Início e digite seu nome primeiro. 😉");
+    return;
+  }
+  renderSplash();
 }
 
 $("#startBtn").addEventListener("click", () => {
@@ -533,6 +617,7 @@ $("#startBtn").addEventListener("click", () => {
     startedAt: Date.now(),
     clues: config.treasures.slice(),
   };
+  saveSession();
   if(navigator.vibrate) navigator.vibrate([40,40,120]);
   renderClue();
   startTimer();
@@ -541,20 +626,25 @@ $("#startBtn").addEventListener("click", () => {
 
 $("#digBtn").addEventListener("click", () => openScanner());
 $("#giveUpBtn").addEventListener("click", () => {
-  clearInterval(timerInt); game = null; show("view-splash");
+  clearInterval(timerInt); game = null; clearSession(); show("view-splash");
 });
 
 /* ============================================================
    Scanner: NFC com fallback de câmera (QR)
 ============================================================ */
-let scanMethod = "nfc";   // "nfc" | "qr"
+// "nfc"   = Android lê a tag em JS (Web NFC)
+// "nfctap"= iOS: o sistema abre a tag sozinho ao encostar (sem JS)
+// "qr"    = câmera lê o QR
+let scanMethod = "qr";
 let html5Qr = null, qrRunning = false;
 let nfcReader = null, nfcAbort = null;
 let scanActive = false;
 
+function defaultMethod(){ return NFC_OK ? "nfc" : (isIOS ? "nfctap" : "qr"); }
+
 function openScanner(){
   scanActive = true;
-  scanMethod = NFC_OK ? "nfc" : "qr";
+  scanMethod = defaultMethod();
   $("#scanErr").style.display = "none";
   show("view-scan");
   startMethod();
@@ -568,12 +658,19 @@ async function startMethod(){
     $("#scanHint").textContent = "Aproxime a parte de trás do celular da tag escondida. Mantenha o NFC ligado.";
     $("#switchMethod").textContent = "Sem NFC? Usar a câmera (QR)";
     await startNFC();
+  }else if(scanMethod === "nfctap"){
+    $("#nfcPanel").style.display = "flex";
+    $("#reader").style.display = "none";
+    $("#scanKicker").textContent = "Encoste na tag NFC";
+    $("#scanHint").textContent = "Encoste o topo do iPhone na tag — o jogo abre sozinho e marca o tesouro. Não precisa apertar nada.";
+    $("#switchMethod").textContent = "Sem NFC? Usar a câmera (QR)";
+    // No iOS a leitura é feita pelo sistema (abre a URL da tag); nada de JS aqui.
   }else{
     $("#nfcPanel").style.display = "none";
     $("#reader").style.display = "block";
     $("#scanKicker").textContent = "Mire no QR do tesouro";
     $("#scanHint").textContent = "Aponte a câmera pro QR Code escondido no local da pista.";
-    $("#switchMethod").textContent = NFC_OK ? "Voltar pro NFC" : "Tentar a câmera de novo";
+    $("#switchMethod").textContent = (NFC_OK || isIOS) ? "Voltar pro NFC" : "Tentar a câmera de novo";
     await startQR();
   }
 }
@@ -601,6 +698,7 @@ async function startNFC(){
           if(rec.recordType === "text"){
             text = new TextDecoder(rec.encoding || "utf-8").decode(rec.data);
           }else{
+            // url / absolute-url / mime: lê os bytes como texto (é a URL da tag)
             text = new TextDecoder().decode(rec.data);
           }
         }catch(e){}
@@ -633,7 +731,7 @@ async function startQR(){
 $("#switchMethod").addEventListener("click", async () => {
   await stopAll();
   scanActive = true;
-  scanMethod = (scanMethod === "nfc") ? "qr" : (NFC_OK ? "nfc" : "qr");
+  scanMethod = (scanMethod === "qr") ? defaultMethod() : "qr";
   startMethod();
 });
 $("#cancelScan").addEventListener("click", async () => {
@@ -642,19 +740,27 @@ $("#cancelScan").addEventListener("click", async () => {
 });
 
 function showScanErr(msg){ const e=$("#scanErr"); e.textContent=msg; e.style.display="block"; }
+let toastT = null;
+function showToast(msg){
+  const el = $("#toast");
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove("show"), 2600);
+}
 let lastErrAt = 0;
 function flashScanError(msg){
   const now = Date.now();
   if(now - lastErrAt < 1500) return;
   lastErrAt = now;
-  showScanErr(msg);
+  showScanErr(msg);   // visível no scanner
+  showToast(msg);     // visível em qualquer tela (ex.: toque de tag no iOS)
   if(navigator.vibrate) navigator.vibrate(120);
 }
 
-/* Recebe texto da tag NFC ou do QR e valida */
+/* Recebe texto da tag NFC ou do QR (ou URL) e valida */
 function onScanText(text){
   if(!scanActive) return;
-  const data = decodePayload(text);
+  const data = extractToken(text);
   if(!data || data.t !== "arraia" || data.k !== "treasure"){
     flashScanError("Essa tag não é da caçada 🤔");
     return;
@@ -662,9 +768,12 @@ function onScanText(text){
   handleTreasure(data);
 }
 
+// Chamado pela leitura ativa (Android/QR) e também pela abertura via URL no iOS
 async function handleTreasure(data){
-  if(data.idx !== game.idx){
-    if(data.idx < game.idx) flashScanError("Esse tesouro você já achou! 😄");
+  if(!game){ return; }
+  const foundIdx = data.idx;
+  if(foundIdx !== game.idx){
+    if(foundIdx < game.idx) flashScanError("Esse tesouro você já achou! 😄");
     else flashScanError("Calma, caipira! Ache os tesouros na ordem das pistas.");
     return;
   }
@@ -672,8 +781,13 @@ async function handleTreasure(data){
   if(navigator.vibrate) navigator.vibrate([40,30,40,30,120]);
   burstConfetti();
 
-  const isLast = data.last || game.idx >= game.total;
-  $("#foundTitle").textContent = "Tesouro " + game.idx + "!";
+  const isLast = data.last || foundIdx >= game.total;
+  // Avança o progresso já aqui: se o jogador encostar na próxima tag antes de
+  // tocar "Próxima pista" (comum no iOS), a sequência continua certinha.
+  game.idx = foundIdx + 1;
+  saveSession();
+
+  $("#foundTitle").textContent = "Tesouro " + foundIdx + "!";
   if(isLast){
     $("#foundSub").textContent = "Esse era o último! Bora ver seu tempo.";
     $("#nextClueBtn").textContent = "Ver resultado 🏁";
@@ -689,8 +803,7 @@ async function handleTreasure(data){
 let pendingFinish = false;
 $("#nextClueBtn").addEventListener("click", () => {
   if(pendingFinish){ finishGame(); return; }
-  game.idx += 1;
-  renderClue();
+  renderClue();   // game.idx já foi avançado em handleTreasure
   show("view-game");
 });
 
@@ -702,6 +815,7 @@ function saveRank(list){ localStorage.setItem(LS_RANK, JSON.stringify(list)); }
 
 function finishGame(){
   clearInterval(timerInt);
+  clearSession();
   const elapsed = Date.now() - game.startedAt;
   $("#finalTime").textContent = fmt(elapsed);
   const list = loadRank();
@@ -726,7 +840,7 @@ function renderRankInto(sel, list, highlightAt){
   });
 }
 $("#playAgain").addEventListener("click", () => {
-  game = null; $("#playerName").value=""; show("view-splash");
+  game = null; clearSession(); splashNote(""); $("#playerName").value=""; show("view-splash");
 });
 $("#toRanking").addEventListener("click", () => {
   const list = loadRank();
@@ -807,19 +921,21 @@ $("#genBtn").addEventListener("click", () => {
     small: startUrl.length > 1200 ? "Muitas pistas longas deixam este QR denso — encurte os textos se não escanear." : ""
   });
 
-  // Cada tesouro: tag NFC (Android) + QR de reserva (iOS), mesmo payload
+  // Cada tesouro vira uma URL. Gravada como registro de URL na tag NFC, o iOS
+  // abre sozinho ao encostar; no Android o app lê em JS; e o mesmo link no QR
+  // funciona pra quem prefere a câmera. Uma URL, três jeitos de ler.
   treasures.forEach((tr, i) => {
     const idx = i+1;
     const last = idx === total;
-    const payload = encodePayload({ t:"arraia", k:"treasure", idx, total, last });
+    const url = treasureUrl(idx, total, last);
     addQrCard(grid, {
       tag: tr.emoji + " Esconda no local da pista " + idx,
       title: "Tesouro " + idx,
-      qrText: payload,
+      qrText: url,
       footer: last ? "Último tesouro! 🏁" : "Pista: " + tr.text,
-      nfcPayload: payload,
-      small: NFC_OK ? "Android: grave a tag NFC. iPhone: imprima este QR."
-                    : "Imprima este QR (NFC só grava no Chrome do Android)."
+      nfcUrl: url,
+      small: NFC_OK ? "Android: grave a tag NFC. iPhone: encosta na mesma tag (ou usa este QR)."
+                    : "iPhone: encoste na tag (grave-a num Android) ou use este QR."
     });
   });
 
@@ -841,11 +957,11 @@ function addQrCard(grid, opt){
     colorDark:"#241544", colorLight:"#ffffff",
     correctLevel: QRCode.CorrectLevel.M
   });
-  if(opt.nfcPayload){
+  if(opt.nfcUrl){
     const btn = document.createElement("button");
     btn.className = "nfc-btn noprint";
     btn.textContent = "📡 Gravar tag NFC";
-    btn.addEventListener("click", () => writeTag(opt.nfcPayload, btn));
+    btn.addEventListener("click", () => writeTag(opt.nfcUrl, btn));
     card.appendChild(btn);
   }
   if(opt.small){
@@ -855,16 +971,17 @@ function addQrCard(grid, opt){
   }
 }
 
-async function writeTag(payload, btn){
+async function writeTag(url, btn){
   if(!NFC_OK){
-    alert("Gravar tag NFC só funciona no Chrome do Android. Use o QR de reserva para iPhones.");
+    alert("Gravar tag NFC só funciona no Chrome do Android. Grave as tags num Android — depois elas funcionam no iPhone (que abre a URL sozinho).");
     return;
   }
   const original = btn.textContent;
   btn.textContent = "Aproxime a tag…";
   try{
     const writer = new NDEFReader();
-    await writer.write({ records:[{ recordType:"text", data: payload }] });
+    // Registro de URL: é o que faz o iOS abrir a tag automaticamente ao encostar.
+    await writer.write({ records:[{ recordType:"url", data: url }] });
     btn.textContent = "✔ Tag gravada!";
     if(navigator.vibrate) navigator.vibrate([40,30,120]);
     setTimeout(() => { btn.textContent = original; }, 2500);
@@ -916,7 +1033,7 @@ if("serviceWorker" in navigator){
   addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
 $("#playerName").addEventListener("input", e => { e.target.style.borderColor = ""; });
-initSplash();
+handleLaunch();
 </script>
 </body>
 </html>
