@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="theme-color" content="#241544" />
+<title>Arraiá do Tesouro</title>
+
+<!-- PWA / iOS -->
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Arraiá" />
+<meta name="mobile-web-app-capable" content="yes" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Rye&family=Caveat:wght@500;700&family=Nunito:wght@500;700;900&display=swap" rel="stylesheet" />
+
+<style>
+:root{
+  --noite:#241544;
+  --noite-2:#3a1f63;
+  --fogueira:#ff7a18;
+  --milho:#ffc93c;
+  --vermelha:#ff4d6d;
+  --verde:#21bf8f;
+  --azul:#4cc9f0;
+  --papel:#fbefd6;
+  --papel-linha:#ecdab0;
+  --tinta:#4a2c12;
+  --sombra:0 14px 30px -12px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  font-family:"Nunito",system-ui,sans-serif;
+  color:#fff;
+  background:
+    radial-gradient(120% 80% at 50% -10%, #4a2a7a 0%, var(--noite-2) 38%, var(--noite) 100%);
+  min-height:100dvh;
+  overflow-x:hidden;
+}
+.app{
+  max-width:520px;margin:0 auto;min-height:100dvh;
+  display:flex;flex-direction:column;position:relative;
+  padding:env(safe-area-inset-top) 0 0;
+}
+
+/* ---------- Bandeirinhas ---------- */
+.bunting{position:relative;height:30px;flex:none;overflow:hidden;}
+.bunting svg{display:block;width:100%;height:100%;}
+.bunting .flag{transform-origin:top center;animation:sway 4s ease-in-out infinite;}
+@keyframes sway{0%,100%{transform:rotate(-2deg);}50%{transform:rotate(2deg);}}
+
+/* ---------- Views ---------- */
+.view{display:none;flex:1;flex-direction:column;padding:18px 22px 28px;animation:fade .4s ease both;}
+.view.active{display:flex;}
+@keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+/* ---------- Tipografia ---------- */
+.kicker{font-weight:900;letter-spacing:.28em;text-transform:uppercase;font-size:.72rem;color:var(--milho);opacity:.9;}
+h1.title{
+  font-family:"Rye",cursive;font-weight:400;line-height:.98;margin:.1em 0 0;
+  font-size:clamp(2.6rem,13vw,3.8rem);
+  color:var(--milho);
+  text-shadow:0 2px 0 #b85c00, 0 4px 22px rgba(255,140,30,.45);
+}
+.lead{font-size:1.05rem;color:#e9def7;opacity:.92;line-height:1.5;margin:.6em 0 0;}
+
+/* ---------- Fogueira (CSS) ---------- */
+.bonfire{position:relative;height:200px;margin:8px auto 0;width:200px;flex:none;}
+.bonfire .halo{position:absolute;inset:0;border-radius:50%;
+  background:radial-gradient(circle at 50% 62%, rgba(255,150,40,.55), transparent 62%);
+  filter:blur(6px);animation:halo 2.4s ease-in-out infinite;}
+@keyframes halo{0%,100%{opacity:.65;transform:scale(1);}50%{opacity:1;transform:scale(1.06);}}
+.flame{position:absolute;left:50%;bottom:46px;transform:translateX(-50%);
+  width:70px;height:120px;border-radius:50% 50% 50% 50%/ 62% 62% 38% 38%;
+  background:linear-gradient(to top,var(--milho),var(--fogueira) 55%,var(--vermelha));
+  clip-path:polygon(50% 0,78% 38%,90% 72%,72% 100%,28% 100%,10% 72%,22% 38%);
+  transform-origin:bottom center;animation:flick 1.1s ease-in-out infinite alternate;}
+.flame.f2{width:46px;height:88px;bottom:46px;
+  background:linear-gradient(to top,#fff3c4,var(--milho) 50%,var(--fogueira));
+  animation-duration:.8s;}
+.flame.f3{width:24px;height:54px;bottom:48px;
+  background:linear-gradient(to top,#fff,#fff3c4 60%,var(--milho));animation-duration:.6s;}
+@keyframes flick{from{transform:translateX(-50%) scaleY(.95) rotate(-3deg);}
+  to{transform:translateX(-52%) scaleY(1.06) rotate(3deg);}}
+.logs{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);width:120px;height:26px;}
+.logs span{position:absolute;left:0;right:0;top:8px;height:14px;border-radius:8px;
+  background:linear-gradient(#8a5326,#5e3415);}
+.logs span:nth-child(1){transform:rotate(10deg);}
+.logs span:nth-child(2){transform:rotate(-10deg);}
+
+/* ---------- Inputs e botões ---------- */
+label.field{display:block;margin-top:18px;font-weight:800;color:#e9def7;font-size:.95rem;}
+input[type=text],input[type=number],textarea,select{
+  width:100%;margin-top:8px;padding:14px 16px;border-radius:14px;border:2px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.07);color:#fff;font-family:inherit;font-size:1.05rem;font-weight:700;
+  outline:none;transition:border-color .15s,background .15s;
+}
+input::placeholder,textarea::placeholder{color:rgba(255,255,255,.45);font-weight:600;}
+input:focus,textarea:focus,select:focus{border-color:var(--milho);background:rgba(255,255,255,.12);}
+textarea{resize:vertical;min-height:64px;}
+
+.btn{
+  appearance:none;border:none;cursor:pointer;font-family:"Nunito",sans-serif;font-weight:900;
+  font-size:1.12rem;padding:16px 22px;border-radius:16px;width:100%;color:#3a1500;
+  background:linear-gradient(180deg,#ffd766,var(--milho));
+  box-shadow:0 6px 0 #c8860f, var(--sombra);
+  transition:transform .08s, box-shadow .08s;letter-spacing:.01em;
+}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c8860f, var(--sombra);}
+.btn.fire{background:linear-gradient(180deg,#ff9a4a,var(--fogueira));color:#3a1500;box-shadow:0 6px 0 #b8470a, var(--sombra);}
+.btn.fire:active{box-shadow:0 2px 0 #b8470a, var(--sombra);}
+.btn.ghost{background:transparent;color:#e9def7;box-shadow:none;border:2px solid rgba(255,255,255,.22);font-weight:800;}
+.btn.ghost:active{transform:translateY(2px);}
+.btn[disabled]{opacity:.5;}
+.spacer{flex:1;}
+
+.linkbar{display:flex;justify-content:center;gap:18px;margin-top:18px;}
+.linkbar a{color:#cbb9ea;font-weight:800;text-decoration:none;font-size:.92rem;opacity:.85;}
+.linkbar a:active{opacity:1;}
+
+/* ---------- Cartão de pista (papel kraft) ---------- */
+.clue-card{
+  position:relative;background:var(--papel);color:var(--tinta);border-radius:18px;
+  padding:26px 24px 28px;box-shadow:var(--sombra);margin-top:18px;
+  background-image:repeating-linear-gradient(transparent 0 33px, var(--papel-linha) 33px 34px);
+  background-position:0 18px;
+}
+.clue-card::before{content:"";position:absolute;left:14px;top:0;bottom:0;width:2px;background:rgba(255,77,109,.4);}
+.clue-emoji{font-size:3rem;line-height:1;}
+.clue-step{font-weight:900;color:#b85c00;letter-spacing:.06em;text-transform:uppercase;font-size:.8rem;margin-top:6px;}
+.clue-text{font-family:"Caveat",cursive;font-size:1.9rem;line-height:1.25;margin-top:4px;font-weight:700;}
+
+/* progresso em miçangas/milho */
+.beads{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;justify-content:center;}
+.bead{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.18);transition:.3s;}
+.bead.done{background:var(--milho);box-shadow:0 0 10px var(--milho);}
+.bead.now{background:var(--vermelha);box-shadow:0 0 10px var(--vermelha);transform:scale(1.25);}
+
+.statline{display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-weight:800;color:#e9def7;}
+.timer{font-variant-numeric:tabular-nums;font-size:1.15rem;color:var(--milho);}
+
+/* ---------- Scanner ---------- */
+#reader{width:100%;border-radius:18px;overflow:hidden;background:#000;margin-top:14px;box-shadow:var(--sombra);}
+#reader video{border-radius:18px;}
+.scan-hint{text-align:center;margin-top:14px;color:#e9def7;font-weight:700;line-height:1.4;}
+.scan-err{color:var(--vermelha);font-weight:800;margin-top:10px;text-align:center;display:none;}
+
+/* ---------- Celebração ---------- */
+.celebrate{align-items:center;text-align:center;justify-content:center;}
+.celebrate .big{font-family:"Rye",cursive;color:var(--milho);font-size:clamp(2.2rem,11vw,3.2rem);
+  text-shadow:0 2px 0 #b85c00;line-height:1;margin-top:10px;}
+.chest{font-size:5rem;animation:pop .6s cubic-bezier(.2,1.4,.5,1) both;}
+@keyframes pop{from{transform:scale(.2) rotate(-15deg);opacity:0;}to{transform:none;opacity:1;}}
+
+/* ---------- Ranking ---------- */
+.rank{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;}
+.rank li{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.07);border-radius:14px;padding:12px 16px;border:2px solid transparent;}
+.rank li.me{border-color:var(--milho);background:rgba(255,201,60,.12);}
+.rank .pos{font-family:"Rye",cursive;color:var(--milho);font-size:1.3rem;width:34px;flex:none;text-align:center;}
+.rank .nm{font-weight:900;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rank .tm{font-variant-numeric:tabular-nums;font-weight:800;color:#e9def7;}
+.empty{color:#cbb9ea;text-align:center;margin-top:20px;font-weight:700;}
+
+/* ---------- Admin ---------- */
+.admin-row{background:rgba(255,255,255,.06);border-radius:14px;padding:14px;margin-top:12px;}
+.admin-row .rh{display:flex;align-items:center;gap:10px;font-weight:900;color:var(--milho);}
+.emoji-pick{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.emoji-pick button{font-size:1.4rem;background:rgba(255,255,255,.08);border:2px solid transparent;border-radius:10px;padding:4px 8px;cursor:pointer;}
+.emoji-pick button.sel{border-color:var(--milho);background:rgba(255,201,60,.18);}
+.qr-grid{display:flex;flex-direction:column;gap:18px;margin-top:8px;}
+.qr-card{background:#fff;color:#1b1030;border-radius:16px;padding:18px;text-align:center;box-shadow:var(--sombra);page-break-inside:avoid;}
+.qr-card h3{font-family:"Rye",cursive;margin:0 0 4px;color:#b85c00;font-size:1.3rem;}
+.qr-card .qbox{display:flex;justify-content:center;margin:10px 0;}
+.qr-card p{margin:6px 0 0;font-weight:700;color:#4a2c12;font-size:.95rem;}
+.qr-card .tag{display:inline-block;background:#241544;color:#ffc93c;font-weight:900;border-radius:999px;padding:3px 12px;font-size:.78rem;}
+
+.note{font-size:.85rem;color:#cbb9ea;line-height:1.5;margin-top:14px;background:rgba(255,255,255,.05);padding:12px 14px;border-radius:12px;}
+.note b{color:var(--milho);}
+
+/* confete */
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:50;}
+
+@media print{
+  body{background:#fff;}
+  .app{max-width:none;}
+  .noprint,.bunting{display:none !important;}
+  .qr-card{box-shadow:none;border:1px solid #ccc;}
+}
+</style>
+</head>
+<body>
+<canvas id="confetti"></canvas>
+<div class="app">
+
+  <!-- Bandeirinhas -->
+  <div class="bunting noprint" id="bunting"></div>
+
+  <!-- ============ SPLASH ============ -->
+  <section id="view-splash" class="view active">
+    <div class="kicker">São João &middot; 2026</div>
+    <h1 class="title">Arraiá<br/>do Tesouro</h1>
+    <p class="lead">Bão demais da conta! Siga as pistas, ache os QR escondidos pelo arraiá e desenterre cada tesouro antes da turma.</p>
+
+    <div class="bonfire" aria-hidden="true">
+      <div class="halo"></div>
+      <div class="flame"></div>
+      <div class="flame f2"></div>
+      <div class="flame f3"></div>
+      <div class="logs"><span></span><span></span></div>
+    </div>
+
+    <label class="field" for="playerName">Seu nome de caipira</label>
+    <input id="playerName" type="text" maxlength="22" placeholder="Ex: Zé do Milho" autocomplete="off" />
+
+    <div class="spacer"></div>
+    <button class="btn fire" id="startBtn">Bora pra caçada 🔥</button>
+    <div class="linkbar">
+      <a id="toRanking">🏆 Ranking</a>
+      <a id="toAdmin">⚙️ Organizador</a>
+    </div>
+  </section>
+
+  <!-- ============ ESPERANDO LARGADA ============ -->
+  <section id="view-start" class="view celebrate">
+    <div class="chest">🚩</div>
+    <div class="big">Largada!</div>
+    <p class="lead" style="text-align:center">Pegue o celular e escaneie o <b>QR de Largada</b> que o organizador colou na entrada do arraiá pra começar.</p>
+    <div class="spacer"></div>
+    <button class="btn fire" id="scanStartBtn">Escanear largada 📷</button>
+    <button class="btn ghost noprint" id="backFromStart" style="margin-top:12px">Voltar</button>
+  </section>
+
+  <!-- ============ JOGO ============ -->
+  <section id="view-game" class="view">
+    <div class="statline">
+      <span id="gameWho">🤠 —</span>
+      <span class="timer" id="timer">00:00</span>
+    </div>
+
+    <div class="clue-card">
+      <div class="clue-emoji" id="clueEmoji">🌽</div>
+      <div class="clue-step" id="clueStep">Pista 1</div>
+      <div class="clue-text" id="clueText">…</div>
+    </div>
+
+    <div class="beads" id="beads"></div>
+
+    <div class="spacer"></div>
+    <button class="btn fire" id="digBtn">Achei! Desenterrar tesouro ⛏️</button>
+    <button class="btn ghost noprint" id="giveUpBtn" style="margin-top:12px">Sair da caçada</button>
+  </section>
+
+  <!-- ============ SCANNER ============ -->
+  <section id="view-scan" class="view">
+    <div class="kicker">Mire no QR do tesouro</div>
+    <h1 class="title" style="font-size:2.2rem">Cavando…</h1>
+    <div id="reader"></div>
+    <div class="scan-err" id="scanErr"></div>
+    <p class="scan-hint">Aponte a câmera pro QR Code escondido. Tem que ser o do tesouro certo, viu?</p>
+    <div class="spacer"></div>
+    <button class="btn ghost" id="cancelScan">Cancelar</button>
+  </section>
+
+  <!-- ============ TESOURO ACHADO ============ -->
+  <section id="view-found" class="view celebrate">
+    <div class="chest">🎁</div>
+    <div class="big" id="foundTitle">Achou!</div>
+    <p class="lead" id="foundSub" style="text-align:center">Tesouro desenterrado!</p>
+    <div class="spacer"></div>
+    <button class="btn fire" id="nextClueBtn">Próxima pista 👉</button>
+  </section>
+
+  <!-- ============ FIM ============ -->
+  <section id="view-finish" class="view celebrate">
+    <div class="chest">🏆</div>
+    <div class="big">Arraiá vencido!</div>
+    <p class="lead" style="text-align:center">Você achou todos os tesouros em</p>
+    <div class="timer" id="finalTime" style="font-size:2.4rem;margin-top:4px">00:00</div>
+    <ul class="rank" id="finishRank"></ul>
+    <div class="spacer"></div>
+    <button class="btn fire" id="playAgain">Jogar de novo 🔁</button>
+  </section>
+
+  <!-- ============ RANKING ============ -->
+  <section id="view-ranking" class="view">
+    <div class="kicker">Quem mandou bem no arraiá</div>
+    <h1 class="title" style="font-size:2.4rem">Ranking 🏆</h1>
+    <ul class="rank" id="rankList"></ul>
+    <p class="empty" id="rankEmpty" style="display:none">Ninguém terminou a caçada ainda. Bora ser o primeiro!</p>
+    <div class="spacer"></div>
+    <button class="btn ghost noprint" id="clearRank" style="margin-bottom:10px">Limpar ranking</button>
+    <button class="btn" id="rankBack">Voltar</button>
+  </section>
+
+  <!-- ============ ADMIN ============ -->
+  <section id="view-admin" class="view">
+    <div class="kicker noprint">Painel do organizador</div>
+    <h1 class="title noprint" style="font-size:2.2rem">Montar caçada</h1>
+
+    <div class="noprint">
+      <label class="field" for="numTreasures">Quantos tesouros? (2 a 20)</label>
+      <input id="numTreasures" type="number" min="2" max="20" value="5" />
+      <div id="treasureForm"></div>
+      <button class="btn" id="genBtn" style="margin-top:18px">Gerar QR Codes 🎟️</button>
+    </div>
+
+    <div id="qrArea"></div>
+
+    <div class="noprint">
+      <div class="note" id="adminNote" style="display:none">
+        <b>Como usar:</b> imprima esta página (botão abaixo) e esconda cada QR no lugar da
+        pista correspondente. O <b>QR de Largada</b> vai na entrada — é por ele que a caçada começa.
+        Cada QR já carrega a sua pista, então funciona em qualquer celular, mesmo sem internet.
+      </div>
+      <button class="btn fire" id="printBtn" style="margin-top:14px;display:none">Imprimir QR Codes 🖨️</button>
+      <button class="btn ghost" id="adminBack" style="margin-top:12px">Voltar</button>
+    </div>
+  </section>
+
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+"use strict";
+
+/* ============================================================
+   Utilidades
+============================================================ */
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => Array.from(document.querySelectorAll(s));
+const LS_RANK = "arraia.ranking.v1";
+const SECRET = 0x5a;           // sal simples para dificultar QRs falsificados
+const PREFIX = "ARRAIA1:";
+
+function show(id){
+  $$(".view").forEach(v => v.classList.remove("active"));
+  $("#"+id).classList.add("active");
+  window.scrollTo(0,0);
+}
+function fmt(ms){
+  const t = Math.max(0, Math.floor(ms/1000));
+  const m = String(Math.floor(t/60)).padStart(2,"0");
+  const s = String(t%60).padStart(2,"0");
+  return m+":"+s;
+}
+function b64encode(str){ return btoa(unescape(encodeURIComponent(str))); }
+function b64decode(str){ return decodeURIComponent(escape(atob(str))); }
+
+// hash simples (não-criptográfico) só pra detectar QR adulterado/alheio
+function checksum(str){
+  let h = SECRET;
+  for(let i=0;i<str.length;i++){ h = ((h<<5)-h + str.charCodeAt(i)) & 0xffff; }
+  return h;
+}
+function encodePayload(obj){
+  const body = JSON.stringify(obj);
+  const c = checksum(body);
+  return PREFIX + b64encode(JSON.stringify({d:obj, c}));
+}
+function decodePayload(text){
+  if(typeof text!=="string" || !text.startsWith(PREFIX)) return null;
+  try{
+    const outer = JSON.parse(b64decode(text.slice(PREFIX.length)));
+    if(checksum(JSON.stringify(outer.d)) !== outer.c) return null; // adulterado
+    return outer.d;
+  }catch(e){ return null; }
+}
+
+/* ============================================================
+   Bandeirinhas (SVG gerado)
+============================================================ */
+(function buntingInit(){
+  const cols = ["#ff4d6d","#ffc93c","#21bf8f","#4cc9f0","#ffffff"];
+  const W = 520, n = 13, gap = W/n;
+  let flags = "";
+  for(let i=0;i<n;i++){
+    const x = i*gap;
+    const c = cols[i%cols.length];
+    flags += `<path class="flag" style="animation-delay:${(i*0.13).toFixed(2)}s"
+      d="M${x} 6 L${x+gap} 6 L${x+gap/2} 24 Z" fill="${c}" stroke="rgba(0,0,0,.12)" stroke-width="1"/>`;
+  }
+  $("#bunting").innerHTML =
+    `<svg viewBox="0 0 ${W} 30" preserveAspectRatio="none">
+       <path d="M0 6 Q${W/2} 18 ${W} 6" stroke="#caa84a" stroke-width="2" fill="none"/>
+       ${flags}
+     </svg>`;
+})();
+
+/* ============================================================
+   Estado do jogo
+============================================================ */
+let game = null;     // {name, total, idx, startedAt, clues:[]}
+let timerInt = null;
+
+function startTimer(){
+  clearInterval(timerInt);
+  timerInt = setInterval(() => {
+    if(game) $("#timer").textContent = fmt(Date.now() - game.startedAt);
+  }, 500);
+}
+function renderBeads(){
+  const box = $("#beads"); box.innerHTML = "";
+  for(let i=1;i<=game.total;i++){
+    const b = document.createElement("div");
+    b.className = "bead" + (i<game.idx ? " done" : i===game.idx ? " now" : "");
+    box.appendChild(b);
+  }
+}
+function renderClue(){
+  $("#gameWho").textContent = "🤠 " + game.name;
+  $("#clueStep").textContent = "Pista " + game.idx + " de " + game.total;
+  const cl = game.clues[game.idx-1] || {};
+  $("#clueText").textContent = cl.text || "Procure pelo próximo QR!";
+  $("#clueEmoji").textContent = cl.emoji || "🌽";
+  renderBeads();
+}
+
+/* ============================================================
+   Fluxo: splash -> largada -> jogo
+============================================================ */
+$("#startBtn").addEventListener("click", () => {
+  const name = $("#playerName").value.trim();
+  if(!name){ $("#playerName").focus(); $("#playerName").style.borderColor = "var(--vermelha)"; return; }
+  game = { name, total:0, idx:0, startedAt:0, clues:[] };
+  show("view-start");
+});
+$("#backFromStart").addEventListener("click", () => show("view-splash"));
+
+$("#scanStartBtn").addEventListener("click", () => openScanner("start"));
+$("#digBtn").addEventListener("click", () => openScanner("treasure"));
+
+$("#giveUpBtn").addEventListener("click", () => {
+  clearInterval(timerInt); game = null; show("view-splash");
+});
+
+/* ============================================================
+   Scanner
+============================================================ */
+let html5Qr = null;
+let scanMode = "start";   // "start" | "treasure"
+let scanning = false;
+
+async function openScanner(mode){
+  scanMode = mode;
+  $("#scanErr").style.display = "none";
+  show("view-scan");
+  if(!window.Html5Qrcode){
+    showScanErr("Leitor de QR não carregou. Verifique a conexão e recarregue.");
+    return;
+  }
+  try{
+    html5Qr = new Html5Qrcode("reader", { verbose:false });
+    scanning = true;
+    await html5Qr.start(
+      { facingMode: "environment" },
+      { fps:10, qrbox:{width:240,height:240}, aspectRatio:1.0 },
+      onScan,
+      () => {}
+    );
+  }catch(err){
+    showScanErr("Não consegui abrir a câmera. Toque para permitir o acesso e tente de novo.");
+  }
+}
+function showScanErr(msg){
+  const e = $("#scanErr"); e.textContent = msg; e.style.display = "block";
+}
+async function stopScanner(){
+  if(html5Qr && scanning){
+    scanning = false;
+    try{ await html5Qr.stop(); await html5Qr.clear(); }catch(e){}
+  }
+  html5Qr = null;
+}
+$("#cancelScan").addEventListener("click", async () => {
+  await stopScanner();
+  show(scanMode==="start" ? "view-start" : "view-game");
+});
+
+function onScan(text){
+  if(!scanning) return;
+  const data = decodePayload(text);
+  if(!data || data.t!=="arraia"){
+    flashScanError("Esse QR não é da caçada 🤔");
+    return;
+  }
+  if(scanMode === "start"){
+    if(data.k !== "start"){ flashScanError("Comece pelo QR de Largada!"); return; }
+    handleStart(data);
+  }else{
+    if(data.k !== "treasure"){ flashScanError("Esse é o QR de Largada, já passou disso!"); return; }
+    handleTreasure(data);
+  }
+}
+let lastErrAt = 0;
+function flashScanError(msg){
+  const now = Date.now();
+  if(now - lastErrAt < 1500) return;   // evita spam
+  lastErrAt = now;
+  showScanErr(msg);
+  if(navigator.vibrate) navigator.vibrate(120);
+}
+
+/* QR de largada: define total + primeira pista, inicia cronômetro */
+async function handleStart(data){
+  await stopScanner();
+  game.total = data.total;
+  game.idx = 1;
+  game.clues = [{ text:data.clue, emoji:data.emoji }];
+  game.startedAt = Date.now();
+  if(navigator.vibrate) navigator.vibrate([40,40,120]);
+  renderClue();
+  startTimer();
+  show("view-game");
+}
+
+/* QR de tesouro: precisa ser exatamente o tesouro esperado (ordem) */
+async function handleTreasure(data){
+  if(data.idx !== game.idx){
+    if(data.idx < game.idx) flashScanError("Esse tesouro você já achou! 😄");
+    else flashScanError("Calma, caipira! Ache os tesouros na ordem das pistas.");
+    return;
+  }
+  await stopScanner();
+  if(navigator.vibrate) navigator.vibrate([40,30,40,30,120]);
+  burstConfetti();
+
+  const isLast = data.last || game.idx >= game.total;
+  $("#foundTitle").textContent = "Tesouro " + game.idx + "!";
+  if(isLast){
+    $("#foundSub").textContent = "Esse era o último! Bora ver seu tempo.";
+    $("#nextClueBtn").textContent = "Ver resultado 🏁";
+    pendingFinish = true;
+  }else{
+    // guarda a próxima pista que veio dentro do QR
+    game.clues[game.idx] = { text:data.nextClue, emoji:data.nextEmoji };
+    $("#foundSub").textContent = "Desenterrado! Tem mais pista pela frente.";
+    $("#nextClueBtn").textContent = "Próxima pista 👉";
+    pendingFinish = false;
+  }
+  show("view-found");
+}
+
+let pendingFinish = false;
+$("#nextClueBtn").addEventListener("click", () => {
+  if(pendingFinish){ finishGame(); return; }
+  game.idx += 1;
+  renderClue();
+  show("view-game");
+});
+
+/* ============================================================
+   Fim de jogo + ranking (localStorage)
+============================================================ */
+function loadRank(){
+  try{ return JSON.parse(localStorage.getItem(LS_RANK)) || []; }catch(e){ return []; }
+}
+function saveRank(list){ localStorage.setItem(LS_RANK, JSON.stringify(list)); }
+
+function finishGame(){
+  clearInterval(timerInt);
+  const elapsed = Date.now() - game.startedAt;
+  $("#finalTime").textContent = fmt(elapsed);
+
+  const list = loadRank();
+  const entry = { name:game.name, ms:elapsed, at:Date.now(), total:game.total };
+  list.push(entry);
+  list.sort((a,b) => a.ms - b.ms);
+  saveRank(list);
+
+  renderRankInto("#finishRank", list, entry.at);
+  burstConfetti(); setTimeout(burstConfetti, 350);
+  show("view-finish");
+}
+function renderRankInto(sel, list, highlightAt){
+  const ul = $(sel); ul.innerHTML = "";
+  list.slice(0,10).forEach((e,i) => {
+    const li = document.createElement("li");
+    if(highlightAt && e.at===highlightAt) li.className = "me";
+    const medal = ["🥇","🥈","🥉"][i] || (i+1);
+    li.innerHTML = `<span class="pos">${medal}</span>
+      <span class="nm">${escapeHtml(e.name)}</span>
+      <span class="tm">${fmt(e.ms)}</span>`;
+    ul.appendChild(li);
+  });
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => (
+  {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+$("#playAgain").addEventListener("click", () => {
+  game = null; $("#playerName").value=""; show("view-splash");
+});
+
+/* Ranking standalone */
+$("#toRanking").addEventListener("click", () => {
+  const list = loadRank();
+  renderRankInto("#rankList", list, null);
+  $("#rankEmpty").style.display = list.length ? "none" : "block";
+  show("view-ranking");
+});
+$("#rankBack").addEventListener("click", () => show("view-splash"));
+$("#clearRank").addEventListener("click", () => {
+  if(confirm("Apagar todo o ranking deste aparelho?")){
+    saveRank([]); $("#rankList").innerHTML=""; $("#rankEmpty").style.display="block";
+  }
+});
+
+/* ============================================================
+   Admin
+============================================================ */
+const EMOJIS = ["🌽","🎪","🔥","🎈","🪕","👒","🐔","🍿","🎯","🍡","🧨","🎻","🥜","🍯","⭐","🌶️"];
+
+$("#toAdmin").addEventListener("click", () => { buildTreasureForm(); show("view-admin"); });
+$("#adminBack").addEventListener("click", () => show("view-splash"));
+$("#numTreasures").addEventListener("input", buildTreasureForm);
+
+function buildTreasureForm(){
+  let n = parseInt($("#numTreasures").value,10);
+  if(isNaN(n)) return;
+  n = Math.max(2, Math.min(20, n));
+  const form = $("#treasureForm");
+  const prev = {};
+  $$("#treasureForm .admin-row").forEach((row,i) => {
+    prev[i] = {
+      text: row.querySelector("textarea").value,
+      emoji: row.dataset.emoji
+    };
+  });
+  form.innerHTML = "";
+  for(let i=0;i<n;i++){
+    const row = document.createElement("div");
+    row.className = "admin-row";
+    const chosen = (prev[i] && prev[i].emoji) || EMOJIS[i % EMOJIS.length];
+    row.dataset.emoji = chosen;
+    row.innerHTML = `
+      <div class="rh"><span class="rh-emoji">${chosen}</span> Tesouro ${i+1}</div>
+      <textarea placeholder="Pista pra achar o tesouro ${i+1}. Ex: 'Onde a fogueira esquenta a noite'">${prev[i]?prev[i].text:""}</textarea>
+      <div class="emoji-pick"></div>`;
+    const pick = row.querySelector(".emoji-pick");
+    EMOJIS.forEach(em => {
+      const b = document.createElement("button");
+      b.textContent = em;
+      if(em===chosen) b.classList.add("sel");
+      b.addEventListener("click", () => {
+        row.dataset.emoji = em;
+        row.querySelector(".rh-emoji").textContent = em;
+        pick.querySelectorAll("button").forEach(x => x.classList.remove("sel"));
+        b.classList.add("sel");
+      });
+      pick.appendChild(b);
+    });
+    form.appendChild(row);
+  }
+}
+
+$("#genBtn").addEventListener("click", () => {
+  const rows = $$("#treasureForm .admin-row");
+  const treasures = rows.map(r => ({
+    text: r.querySelector("textarea").value.trim() || "Procure o próximo tesouro!",
+    emoji: r.dataset.emoji
+  }));
+  const total = treasures.length;
+
+  // QR de LARGADA: carrega total + a primeira pista
+  // QR do TESOURO i: confirma o tesouro i e carrega a pista do tesouro i+1
+  const area = $("#qrArea");
+  area.innerHTML = '<div class="qr-grid"></div>';
+  const grid = area.querySelector(".qr-grid");
+
+  // Largada
+  addQrCard(grid, "Largada", "🚩 Cole na entrada do arraiá",
+    encodePayload({ t:"arraia", k:"start", total, clue:treasures[0].text, emoji:treasures[0].emoji }),
+    "Pista: " + treasures[0].text);
+
+  // Tesouros
+  treasures.forEach((tr, i) => {
+    const idx = i+1;
+    const last = idx === total;
+    const next = last ? null : treasures[idx];
+    addQrCard(grid, "Tesouro " + idx, tr.emoji + " Esconda no local da pista " + idx,
+      encodePayload({
+        t:"arraia", k:"treasure", idx, total, last,
+        nextClue: next ? next.text : null,
+        nextEmoji: next ? next.emoji : null
+      }),
+      last ? "Último tesouro! 🏁" : "Próxima pista: " + next.text);
+  });
+
+  $("#adminNote").style.display = "block";
+  $("#printBtn").style.display = "block";
+  area.scrollIntoView({behavior:"smooth"});
+});
+
+function addQrCard(grid, title, sub, payload, footer){
+  const card = document.createElement("div");
+  card.className = "qr-card";
+  card.innerHTML = `<span class="tag">${escapeHtml(sub)}</span>
+    <h3>${escapeHtml(title)}</h3>
+    <div class="qbox"></div>
+    <p>${escapeHtml(footer)}</p>`;
+  grid.appendChild(card);
+  // qrcodejs renderiza no elemento
+  new QRCode(card.querySelector(".qbox"), {
+    text: payload, width:180, height:180,
+    colorDark:"#241544", colorLight:"#ffffff",
+    correctLevel: QRCode.CorrectLevel.M
+  });
+}
+
+$("#printBtn").addEventListener("click", () => window.print());
+
+/* ============================================================
+   Confete (canvas, sem libs)
+============================================================ */
+const cvs = $("#confetti");
+const ctx = cvs.getContext("2d");
+let parts = [];
+function resizeCanvas(){ cvs.width = innerWidth; cvs.height = innerHeight; }
+resizeCanvas(); addEventListener("resize", resizeCanvas);
+const CONFCOLORS = ["#ff4d6d","#ffc93c","#21bf8f","#4cc9f0","#ff7a18","#ffffff"];
+function burstConfetti(){
+  for(let i=0;i<90;i++){
+    parts.push({
+      x: innerWidth/2 + (Math.random()-.5)*120,
+      y: innerHeight*0.42,
+      vx:(Math.random()-.5)*9,
+      vy:-(Math.random()*11+5),
+      g:0.28+Math.random()*0.12,
+      s:5+Math.random()*7,
+      rot:Math.random()*6.28, vr:(Math.random()-.5)*0.4,
+      c:CONFCOLORS[(Math.random()*CONFCOLORS.length)|0],
+      life:0
+    });
+  }
+  if(!rafOn){ rafOn = true; requestAnimationFrame(tick); }
+}
+let rafOn = false;
+function tick(){
+  ctx.clearRect(0,0,cvs.width,cvs.height);
+  parts.forEach(p => {
+    p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life++;
+    ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+    ctx.fillStyle = p.c; ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s*0.6);
+    ctx.restore();
+  });
+  parts = parts.filter(p => p.y < cvs.height+40 && p.life < 260);
+  if(parts.length){ requestAnimationFrame(tick); } else { rafOn = false; ctx.clearRect(0,0,cvs.width,cvs.height); }
+}
+
+/* ============================================================
+   PWA: registra o service worker
+============================================================ */
+if("serviceWorker" in navigator){
+  addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+
+/* limpa borda de erro do nome ao digitar */
+$("#playerName").addEventListener("input", e => { e.target.style.borderColor = ""; });
+</script>
+</body>
+</html>
