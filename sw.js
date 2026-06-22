@@ -1,7 +1,7 @@
 // Service Worker do Arraiá do Tesouro.
 // Cache "app shell" + bibliotecas de CDN para o jogo funcionar offline
 // (importante numa festa onde o sinal costuma falhar).
-const CACHE = "arraia-tesouro-v3";
+const CACHE = "arraia-tesouro-v4";
 
 const APP_SHELL = [
   "./",
