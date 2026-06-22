@@ -26,10 +26,12 @@ QR Codes têm checksum, então não dá pra forjar um QR qualquer.
 
 ## Como publicar (HTTPS é obrigatório pra PWA + câmera)
 
-Suba a pasta `arraia-tesouro/` inteira em qualquer host com HTTPS grátis:
+O app vive na **raiz do repositório**, então é só apontar um host estático
+com HTTPS grátis para ele:
 
-- **Netlify / Vercel / Cloudflare Pages**: arraste a pasta e está no ar.
-- **GitHub Pages**: ative Pages apontando pra esta pasta.
+- **Vercel**: já conectado — cada push faz deploy automático.
+- **Netlify / Cloudflare Pages**: arraste a pasta e está no ar.
+- **GitHub Pages**: ative Pages apontando pra branch.
 
 ## Como usar na festa
 
