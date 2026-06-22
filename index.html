@@ -49,12 +49,12 @@ body{
 }
 
 /* ---------- Bandeirinhas ---------- */
-.bunting{position:relative;height:30px;flex:none;overflow:hidden;}
+.bunting{position:relative;height:48px;flex:none;overflow:visible;}
 .bunting svg{display:block;width:100%;height:100%;
   transform-origin:top center;animation:buntingDrop .7s cubic-bezier(.34,1.4,.5,1) both;}
-@keyframes buntingDrop{from{transform:translateY(-30px);opacity:0;}to{transform:none;opacity:1;}}
-.bunting .flag{transform-origin:top center;animation:sway 4s ease-in-out infinite;}
-@keyframes sway{0%,100%{transform:rotate(-2deg);}50%{transform:rotate(2deg);}}
+@keyframes buntingDrop{from{transform:translateY(-48px);opacity:0;}to{transform:none;opacity:1;}}
+.bunting .flag{animation:sway 4.5s ease-in-out infinite;}
+@keyframes sway{0%,100%{transform:rotate(-1.6deg);}50%{transform:rotate(1.6deg);}}
 
 /* ---------- Entrada orquestrada da splash ---------- */
 #view-splash.active .kicker{animation:riseIn .6s ease both .15s;}
@@ -231,14 +231,11 @@ textarea{resize:vertical;min-height:64px;}
   text-shadow:0 2px 0 #b85c00;line-height:1;margin-top:10px;}
 .chest{font-size:5rem;filter:drop-shadow(0 8px 18px rgba(255,122,24,.5));}
 /* baú estoura e treme ao achar */
-#view-found.active .chest{animation:chestBurst .9s cubic-bezier(.2,1.4,.5,1) both;}
+#view-found.active .chest{animation:chestBurst .7s cubic-bezier(.2,1.4,.5,1) both;}
 @keyframes chestBurst{
-  0%{transform:scale(.2) rotate(-18deg);opacity:0;}
-  45%{transform:scale(1.25) rotate(6deg);opacity:1;}
-  55%{transform:scale(1.05) rotate(-5deg);}
-  65%{transform:scale(1.12) rotate(4deg);}
-  75%{transform:scale(1) rotate(-3deg);}
-  85%{transform:scale(1.04) rotate(2deg);}
+  0%{transform:scale(.3) rotate(-12deg);opacity:0;}
+  55%{transform:scale(1.18) rotate(4deg);opacity:1;}
+  75%{transform:scale(.98) rotate(-2deg);}
   100%{transform:none;}
 }
 #view-finish.active .chest{animation:pop .6s cubic-bezier(.2,1.4,.5,1) both;}
@@ -247,9 +244,9 @@ textarea{resize:vertical;min-height:64px;}
 #view-found.active .big{animation:riseIn .5s ease both .35s;}
 #view-found.active #foundSub{animation:riseIn .5s ease both .48s;}
 .hot-flash{position:fixed;inset:0;z-index:45;pointer-events:none;opacity:0;
-  background:radial-gradient(circle at 50% 42%, rgba(255,200,90,.85), rgba(255,122,24,.4) 40%, transparent 70%);}
-.hot-flash.go{animation:hotFlash .6s ease-out;}
-@keyframes hotFlash{0%{opacity:0;}15%{opacity:1;}100%{opacity:0;}}
+  background:radial-gradient(circle at 50% 42%, rgba(255,205,110,.5), rgba(255,122,24,.22) 42%, transparent 72%);}
+.hot-flash.go{animation:hotFlash .55s ease-out;}
+@keyframes hotFlash{0%{opacity:0;}18%{opacity:1;}100%{opacity:0;}}
 
 /* ---------- Ranking ---------- */
 .rank{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;width:100%;}
@@ -604,17 +601,36 @@ function startUrlFor(treasures){
    Bandeirinhas
 ============================================================ */
 (function buntingInit(){
-  const cols = ["#ff4d6d","#ffc93c","#21bf8f","#4cc9f0","#ffffff"];
-  const W = 520, n = 13, gap = W/n;
+  // Bandeirinhas clássicas de arraiá: rabo-de-andorinha penduradas numa
+  // corda que arqueia (catenária). Cada bandeira fica num grupo pra balançar.
+  const cols = ["#ff4d6d","#ffc93c","#21bf8f","#4cc9f0","#ff7a18"];
+  const W = 520, H = 48, n = 12, gap = W / n, top = 5, sag = 15;
+  const yAt = (x) => { const t = x / W; return top + sag * 4 * t * (1 - t); };
+
+  // corda (amostrada ao longo da curva)
+  let cord = "M0 " + top.toFixed(1);
+  for(let x = 0; x <= W; x += 24) cord += " L" + x + " " + yAt(x).toFixed(1);
+  cord += " L" + W + " " + top.toFixed(1);
+
+  const fw = gap * 0.84, fh = 27, notch = 9;
   let flags = "";
-  for(let i=0;i<n;i++){
-    const x = i*gap, c = cols[i%cols.length];
-    flags += `<path class="flag" style="animation-delay:${(i*0.13).toFixed(2)}s"
-      d="M${x} 6 L${x+gap} 6 L${x+gap/2} 24 Z" fill="${c}" stroke="rgba(0,0,0,.12)" stroke-width="1"/>`;
+  for(let i = 0; i < n; i++){
+    const ax = gap * (i + 0.5), ay = yAt(ax);
+    const l = (ax - fw/2).toFixed(1), r = (ax + fw/2).toFixed(1);
+    const t = ay.toFixed(1), b = (ay + fh).toFixed(1), nb = (ay + fh - notch).toFixed(1);
+    const c = cols[i % cols.length];
+    // corpo (rabo-de-andorinha) + faixa de dobra no topo + sombra interna p/ volume
+    flags +=
+      `<g class="flag" style="animation-delay:${(i*0.11).toFixed(2)}s;transform-origin:${ax.toFixed(1)}px ${t}px">
+         <path d="M${l} ${t} L${r} ${t} L${r} ${b} L${ax.toFixed(1)} ${nb} L${l} ${b} Z"
+               fill="${c}" stroke="rgba(0,0,0,.16)" stroke-width="1"/>
+         <path d="M${l} ${t} L${r} ${t} L${r} ${(ay+4).toFixed(1)} L${l} ${(ay+4).toFixed(1)} Z" fill="rgba(255,255,255,.30)"/>
+         <path d="M${ax.toFixed(1)} ${t} L${r} ${t} L${r} ${b} L${ax.toFixed(1)} ${nb} Z" fill="rgba(0,0,0,.10)"/>
+       </g>`;
   }
   $("#bunting").innerHTML =
-    `<svg viewBox="0 0 ${W} 30" preserveAspectRatio="none">
-       <path d="M0 6 Q${W/2} 18 ${W} 6" stroke="#caa84a" stroke-width="2" fill="none"/>
+    `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+       <path d="${cord}" stroke="#d9b85a" stroke-width="2.2" fill="none" stroke-linecap="round"/>
        ${flags}
      </svg>`;
 })();
@@ -1152,8 +1168,20 @@ handleLaunch();
 
   // Quantidade leve, proporcional à tela (mobile-first).
   var area = Math.max(1, (W * H) / (390 * 740));
-  var EMBERS = Math.min(26, Math.round(16 * area));
-  var FLIES  = Math.min(16, Math.round(10 * area));
+  var EMBERS = Math.min(20, Math.round(13 * area));
+  var FLIES  = Math.min(10, Math.round(7 * area));
+
+  // As brasas só fazem sentido onde há fogueira — concentram a "assinatura"
+  // na splash e nas telas de comemoração, em vez de poluir o jogo inteiro.
+  var fireViews = ["view-splash","view-found","view-finish"].map(function(id){
+    return document.getElementById(id);
+  });
+  function fireActive(){
+    for(var i=0;i<fireViews.length;i++){
+      if(fireViews[i] && fireViews[i].classList.contains("active")) return true;
+    }
+    return false;
+  }
 
   var embers = [], flies = [];
 
@@ -1177,8 +1205,8 @@ handleLaunch();
     return {
       x: Math.random() * W,
       y: Math.random() * H,
-      base: 0.25 + Math.random() * 0.45,
-      r: 1.4 + Math.random() * 1.8,
+      base: 0.16 + Math.random() * 0.30,
+      r: 1.3 + Math.random() * 1.7,
       ph: Math.random() * 6.28,
       pSpeed: 0.012 + Math.random() * 0.02,
       dx: (Math.random() - 0.5) * 0.18,
@@ -1219,32 +1247,34 @@ handleLaunch();
       ctx.fill();
     }
 
-    // ---- Brasas/faíscas subindo da fogueira ----
-    ctx.globalCompositeOperation = "lighter";
-    for(var e=0; e<embers.length; e++){
-      var em = embers[e];
-      em.life++;
-      em.sway += em.swaySpeed;
-      em.x += em.vx + Math.sin(em.sway) * 0.4;
-      em.y += em.vy;
-      em.vy -= 0.0008;                     // acelera levemente subindo
-      var k = em.life / em.max;
-      if(k >= 1 || em.y < -20){
-        embers[e] = newEmber(false);
-        continue;
+    // ---- Brasas/faíscas subindo da fogueira (só nas telas com fogo) ----
+    if(fireActive()){
+      ctx.globalCompositeOperation = "lighter";
+      for(var e=0; e<embers.length; e++){
+        var em = embers[e];
+        em.life++;
+        em.sway += em.swaySpeed;
+        em.x += em.vx + Math.sin(em.sway) * 0.4;
+        em.y += em.vy;
+        em.vy -= 0.0008;                     // acelera levemente subindo
+        var k = em.life / em.max;
+        if(k >= 1 || em.y < -20){
+          embers[e] = newEmber(false);
+          continue;
+        }
+        var alpha = Math.sin(k * Math.PI) * 0.85;
+        var r2 = em.size * (1.4 - k * 0.5);
+        var eg = ctx.createRadialGradient(em.x, em.y, 0, em.x, em.y, r2 * 4);
+        eg.addColorStop(0, "hsla(" + em.hue + ",100%,72%," + alpha + ")");
+        eg.addColorStop(0.5, "hsla(" + em.hue + ",100%,55%," + (alpha * 0.5) + ")");
+        eg.addColorStop(1, "hsla(" + em.hue + ",100%,50%,0)");
+        ctx.fillStyle = eg;
+        ctx.beginPath();
+        ctx.arc(em.x, em.y, r2 * 4, 0, 6.2832);
+        ctx.fill();
       }
-      var alpha = Math.sin(k * Math.PI) * 0.9;
-      var r2 = em.size * (1.4 - k * 0.5);
-      var eg = ctx.createRadialGradient(em.x, em.y, 0, em.x, em.y, r2 * 4);
-      eg.addColorStop(0, "hsla(" + em.hue + ",100%,72%," + alpha + ")");
-      eg.addColorStop(0.5, "hsla(" + em.hue + ",100%,55%," + (alpha * 0.5) + ")");
-      eg.addColorStop(1, "hsla(" + em.hue + ",100%,50%,0)");
-      ctx.fillStyle = eg;
-      ctx.beginPath();
-      ctx.arc(em.x, em.y, r2 * 4, 0, 6.2832);
-      ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
     }
-    ctx.globalCompositeOperation = "source-over";
 
     requestAnimationFrame(loop);
   }
