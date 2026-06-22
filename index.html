@@ -50,13 +50,40 @@ body{
 
 /* ---------- Bandeirinhas ---------- */
 .bunting{position:relative;height:30px;flex:none;overflow:hidden;}
-.bunting svg{display:block;width:100%;height:100%;}
+.bunting svg{display:block;width:100%;height:100%;
+  transform-origin:top center;animation:buntingDrop .7s cubic-bezier(.34,1.4,.5,1) both;}
+@keyframes buntingDrop{from{transform:translateY(-30px);opacity:0;}to{transform:none;opacity:1;}}
 .bunting .flag{transform-origin:top center;animation:sway 4s ease-in-out infinite;}
 @keyframes sway{0%,100%{transform:rotate(-2deg);}50%{transform:rotate(2deg);}}
 
+/* ---------- Entrada orquestrada da splash ---------- */
+#view-splash.active .kicker{animation:riseIn .6s ease both .15s;}
+#view-splash.active h1.title{animation:titleIn .75s cubic-bezier(.2,1.3,.4,1) both .25s;}
+#view-splash.active .lead{animation:riseIn .6s ease both .45s;}
+#view-splash.active .bonfire{animation:ignite 1s cubic-bezier(.2,1,.3,1) both .5s;}
+#view-splash.active #gameBadge{animation:riseIn .55s ease both .7s;}
+#view-splash.active label.field{animation:riseIn .55s ease both .8s;}
+#view-splash.active #playerName{animation:riseIn .55s ease both .88s;}
+#view-splash.active #startBtn{animation:riseIn .6s ease both .98s;}
+#view-splash.active .linkbar{animation:riseIn .6s ease both 1.08s;}
+@keyframes riseIn{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
+@keyframes titleIn{from{opacity:0;transform:translateY(26px) scale(.9);}to{opacity:1;transform:none;}}
+@keyframes ignite{from{opacity:0;transform:scale(.4) translateY(20px);}
+  70%{opacity:1;}to{opacity:1;transform:none;}}
+
+/* ---------- Ambiente (brasas + vaga-lumes) ---------- */
+#ambient{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;}
+.app{z-index:1;}
+
 /* ---------- Views ---------- */
-.view{display:none;flex:1;flex-direction:column;padding:18px 22px 28px;animation:fade .4s ease both;}
+.view{display:none;flex:1;flex-direction:column;padding:18px 22px 28px;
+  animation:viewIn .5s cubic-bezier(.22,1,.36,1) both;}
 .view.active{display:flex;}
+@keyframes viewIn{
+  from{opacity:0;transform:translateY(14px) scale(.985);}
+  60%{opacity:1;}
+  to{opacity:1;transform:none;}
+}
 @keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
 
 /* ---------- Tipografia ---------- */
@@ -109,10 +136,17 @@ textarea{resize:vertical;min-height:64px;}
   font-size:1.12rem;padding:16px 22px;border-radius:16px;width:100%;color:#3a1500;
   background:linear-gradient(180deg,#ffd766,var(--milho));
   box-shadow:0 6px 0 #c8860f, var(--sombra);
-  transition:transform .08s, box-shadow .08s;letter-spacing:.01em;
+  transition:transform .08s, box-shadow .08s, filter .15s;letter-spacing:.01em;
+  position:relative;overflow:hidden;isolation:isolate;
 }
-.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c8860f, var(--sombra);}
+/* brilho/quentura no toque — sem custo de layout (pseudo + opacity) */
+.btn::after{content:"";position:absolute;inset:0;z-index:-1;opacity:0;
+  background:radial-gradient(120% 90% at 50% -20%, rgba(255,255,255,.85), transparent 60%);
+  transition:opacity .12s ease;}
+.btn:active::after{opacity:1;}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c8860f, var(--sombra);filter:saturate(1.2) brightness(1.05);}
 .btn.fire{background:linear-gradient(180deg,#ff9a4a,var(--fogueira));color:#3a1500;box-shadow:0 6px 0 #b8470a, var(--sombra);}
+.btn.fire::after{background:radial-gradient(120% 90% at 50% -20%, rgba(255,224,150,.95), transparent 62%);}
 .btn.fire:active{box-shadow:0 2px 0 #b8470a, var(--sombra);}
 .btn.ghost{background:transparent;color:#e9def7;box-shadow:none;border:2px solid rgba(255,255,255,.22);font-weight:800;}
 .btn.ghost:active{transform:translateY(2px);}
@@ -140,15 +174,28 @@ textarea{resize:vertical;min-height:64px;}
   background-position:0 18px;
 }
 .clue-card::before{content:"";position:absolute;left:14px;top:0;bottom:0;width:2px;background:rgba(255,77,109,.4);}
+/* desdobrar o cartão de pista ao entrar no jogo */
+#view-game.active .clue-card{transform-origin:top center;
+  animation:unfold .6s cubic-bezier(.2,1,.3,1) both .1s;}
+@keyframes unfold{
+  from{opacity:0;transform:perspective(700px) rotateX(-32deg) translateY(-8px);}
+  to{opacity:1;transform:none;}
+}
 .clue-emoji{font-size:3rem;line-height:1;}
 .clue-step{font-weight:900;color:#b85c00;letter-spacing:.06em;text-transform:uppercase;font-size:.8rem;margin-top:6px;}
 .clue-text{font-family:"Caveat",cursive;font-size:1.9rem;line-height:1.25;margin-top:4px;font-weight:700;}
+/* a escrita manuscrita surgindo */
+#view-game.active .clue-text{animation:inkIn .7s ease both .42s;}
+@keyframes inkIn{from{opacity:0;transform:translateY(6px) rotate(-1deg);}to{opacity:1;transform:none;}}
 
 /* progresso em miçangas/milho */
 .beads{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;justify-content:center;}
-.bead{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.18);transition:.3s;}
-.bead.done{background:var(--milho);box-shadow:0 0 10px var(--milho);}
-.bead.now{background:var(--vermelha);box-shadow:0 0 10px var(--vermelha);transform:scale(1.25);}
+.bead{width:16px;height:16px;border-radius:50%;background:rgba(255,255,255,.18);
+  transition:background .3s, box-shadow .3s, transform .3s;}
+.bead.done{background:var(--milho);box-shadow:0 0 10px var(--milho);animation:beadPop .45s cubic-bezier(.2,1.5,.4,1);}
+.bead.now{background:var(--vermelha);box-shadow:0 0 10px var(--vermelha);transform:scale(1.25);animation:beadNow 1.4s ease-in-out infinite;}
+@keyframes beadPop{0%{transform:scale(1);}40%{transform:scale(1.6);}100%{transform:scale(1);}}
+@keyframes beadNow{0%,100%{transform:scale(1.25);}50%{transform:scale(1.45);box-shadow:0 0 16px var(--vermelha);}}
 
 .statline{display:flex;justify-content:space-between;align-items:center;margin-top:16px;font-weight:800;color:#e9def7;}
 .timer{font-variant-numeric:tabular-nums;font-size:1.15rem;color:var(--milho);}
@@ -164,21 +211,45 @@ textarea{resize:vertical;min-height:64px;}
 /* animação NFC */
 #nfcPanel{display:none;flex-direction:column;align-items:center;margin-top:10px;}
 .nfc-stage{position:relative;width:200px;height:200px;display:flex;align-items:center;justify-content:center;}
+.nfc-stage::before{content:"";position:absolute;width:90px;height:90px;border-radius:50%;
+  background:radial-gradient(circle,rgba(76,201,240,.35),transparent 70%);
+  animation:nfcGlow 1.8s ease-in-out infinite;}
+@keyframes nfcGlow{0%,100%{opacity:.5;transform:scale(.92);}50%{opacity:1;transform:scale(1.08);}}
 .nfc-stage .ring{position:absolute;border:3px solid var(--azul);border-radius:50%;opacity:0;
-  animation:nfcpulse 1.8s ease-out infinite;}
+  box-shadow:0 0 14px rgba(76,201,240,.6);animation:nfcpulse 2s cubic-bezier(.2,.7,.3,1) infinite;}
 .nfc-stage .ring:nth-child(1){width:80px;height:80px;animation-delay:0s;}
-.nfc-stage .ring:nth-child(2){width:130px;height:130px;animation-delay:.45s;}
-.nfc-stage .ring:nth-child(3){width:185px;height:185px;animation-delay:.9s;}
-@keyframes nfcpulse{0%{opacity:0;transform:scale(.5);}25%{opacity:.9;}100%{opacity:0;transform:scale(1);}}
-.nfc-phone{font-size:3.4rem;z-index:1;animation:tapwave 1.8s ease-in-out infinite;}
-@keyframes tapwave{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+.nfc-stage .ring:nth-child(2){width:130px;height:130px;animation-delay:.5s;}
+.nfc-stage .ring:nth-child(3){width:185px;height:185px;animation-delay:1s;}
+@keyframes nfcpulse{0%{opacity:0;transform:scale(.45);}20%{opacity:1;}100%{opacity:0;transform:scale(1);}}
+.nfc-phone{font-size:3.4rem;z-index:1;filter:drop-shadow(0 6px 12px rgba(0,0,0,.4));
+  animation:tapwave 1.8s ease-in-out infinite;}
+@keyframes tapwave{0%,100%{transform:translateY(0) rotate(-3deg);}50%{transform:translateY(-9px) rotate(3deg);}}
 
 /* ---------- Celebração ---------- */
 .celebrate{align-items:center;text-align:center;justify-content:center;}
 .celebrate .big{font-family:"Rye",cursive;color:var(--milho);font-size:clamp(2.2rem,11vw,3.2rem);
   text-shadow:0 2px 0 #b85c00;line-height:1;margin-top:10px;}
-.chest{font-size:5rem;animation:pop .6s cubic-bezier(.2,1.4,.5,1) both;}
+.chest{font-size:5rem;filter:drop-shadow(0 8px 18px rgba(255,122,24,.5));}
+/* baú estoura e treme ao achar */
+#view-found.active .chest{animation:chestBurst .9s cubic-bezier(.2,1.4,.5,1) both;}
+@keyframes chestBurst{
+  0%{transform:scale(.2) rotate(-18deg);opacity:0;}
+  45%{transform:scale(1.25) rotate(6deg);opacity:1;}
+  55%{transform:scale(1.05) rotate(-5deg);}
+  65%{transform:scale(1.12) rotate(4deg);}
+  75%{transform:scale(1) rotate(-3deg);}
+  85%{transform:scale(1.04) rotate(2deg);}
+  100%{transform:none;}
+}
+#view-finish.active .chest{animation:pop .6s cubic-bezier(.2,1.4,.5,1) both;}
 @keyframes pop{from{transform:scale(.2) rotate(-15deg);opacity:0;}to{transform:none;opacity:1;}}
+/* flash quente ao abrir o baú */
+#view-found.active .big{animation:riseIn .5s ease both .35s;}
+#view-found.active #foundSub{animation:riseIn .5s ease both .48s;}
+.hot-flash{position:fixed;inset:0;z-index:45;pointer-events:none;opacity:0;
+  background:radial-gradient(circle at 50% 42%, rgba(255,200,90,.85), rgba(255,122,24,.4) 40%, transparent 70%);}
+.hot-flash.go{animation:hotFlash .6s ease-out;}
+@keyframes hotFlash{0%{opacity:0;}15%{opacity:1;}100%{opacity:0;}}
 
 /* ---------- Ranking ---------- */
 .rank{list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:10px;width:100%;}
@@ -219,8 +290,22 @@ textarea{resize:vertical;min-height:64px;}
   box-shadow:var(--sombra);opacity:0;pointer-events:none;transition:opacity .25s, transform .25s;}
 #toast.show{opacity:1;transform:translate(-50%,0);}
 
+/* ---------- Respeitar reduced-motion ---------- */
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms !important;
+    animation-iteration-count:1 !important;
+    transition-duration:.05s !important;
+  }
+  .bunting svg,.flame,.flame.f2,.flame.f3,.halo,.nfc-stage .ring,.nfc-stage::before,
+  .nfc-phone,.bead.now,#ambient{animation:none !important;}
+  #ambient{display:none !important;}
+  .view{animation:fade .2s ease both !important;}
+}
+
 @media print{
   body{background:#fff;}
+  #ambient,.hot-flash{display:none !important;}
   .app{max-width:none;}
   .noprint,.bunting{display:none !important;}
   .qr-card{box-shadow:none;border:1px solid #ccc;}
@@ -229,7 +314,9 @@ textarea{resize:vertical;min-height:64px;}
 </style>
 </head>
 <body>
+<canvas id="ambient" aria-hidden="true"></canvas>
 <canvas id="confetti"></canvas>
+<div class="hot-flash" id="hotFlash" aria-hidden="true"></div>
 <div id="toast"></div>
 <div class="app">
 
@@ -1034,6 +1121,149 @@ if("serviceWorker" in navigator){
 }
 $("#playerName").addEventListener("input", e => { e.target.style.borderColor = ""; });
 handleLaunch();
+</script>
+
+<!-- ============================================================
+     Ambiente: brasas/faíscas subindo + vaga-lumes (assinatura).
+     Bloco autônomo — não interfere em nada do jogo. Pausa em
+     reduced-motion e quando a aba fica oculta.
+============================================================ -->
+<script>
+(function ambientFX(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
+  if(reduce && reduce.matches) return;
+
+  var cvs = document.getElementById("ambient");
+  if(!cvs || !cvs.getContext) return;
+  var ctx = cvs.getContext("2d");
+  var W = 0, H = 0, dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  function resize(){
+    W = window.innerWidth; H = window.innerHeight;
+    cvs.width = Math.round(W * dpr);
+    cvs.height = Math.round(H * dpr);
+    cvs.style.width = W + "px";
+    cvs.style.height = H + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  resize();
+  window.addEventListener("resize", resize);
+
+  // Quantidade leve, proporcional à tela (mobile-first).
+  var area = Math.max(1, (W * H) / (390 * 740));
+  var EMBERS = Math.min(26, Math.round(16 * area));
+  var FLIES  = Math.min(16, Math.round(10 * area));
+
+  var embers = [], flies = [];
+
+  function srcX(){ return W * 0.5 + (Math.random() - 0.5) * Math.min(W * 0.42, 150); }
+
+  function newEmber(seed){
+    return {
+      x: srcX(),
+      y: seed ? Math.random() * H : H + 10,
+      vx: (Math.random() - 0.5) * 0.25,
+      vy: -(0.35 + Math.random() * 0.7),
+      size: 1 + Math.random() * 2.2,
+      life: 0,
+      max: 180 + Math.random() * 160,
+      hue: 20 + Math.random() * 28,         // laranja -> milho
+      sway: Math.random() * 6.28,
+      swaySpeed: 0.01 + Math.random() * 0.02
+    };
+  }
+  function newFly(seed){
+    return {
+      x: Math.random() * W,
+      y: Math.random() * H,
+      base: 0.25 + Math.random() * 0.45,
+      r: 1.4 + Math.random() * 1.8,
+      ph: Math.random() * 6.28,
+      pSpeed: 0.012 + Math.random() * 0.02,
+      dx: (Math.random() - 0.5) * 0.18,
+      dy: (Math.random() - 0.5) * 0.18,
+      t: Math.random() * 1000
+    };
+  }
+  for(var i=0;i<EMBERS;i++) embers.push(newEmber(true));
+  for(var j=0;j<FLIES;j++) flies.push(newFly(true));
+
+  var running = true;
+  document.addEventListener("visibilitychange", function(){
+    running = !document.hidden;
+    if(running) requestAnimationFrame(loop);
+  });
+
+  function loop(){
+    if(!running) return;
+    ctx.clearRect(0, 0, W, H);
+
+    // ---- Vaga-lumes (fundo, atrás das brasas) ----
+    for(var f=0; f<flies.length; f++){
+      var fl = flies[f];
+      fl.t += 1;
+      fl.ph += fl.pSpeed;
+      fl.x += fl.dx + Math.sin(fl.t * 0.01) * 0.12;
+      fl.y += fl.dy + Math.cos(fl.t * 0.013) * 0.12;
+      if(fl.x < -10) fl.x = W + 10; if(fl.x > W + 10) fl.x = -10;
+      if(fl.y < -10) fl.y = H + 10; if(fl.y > H + 10) fl.y = -10;
+      var glow = fl.base * (0.45 + 0.55 * (0.5 + 0.5 * Math.sin(fl.ph)));
+      var g = ctx.createRadialGradient(fl.x, fl.y, 0, fl.x, fl.y, fl.r * 5);
+      g.addColorStop(0, "rgba(255,236,150," + glow + ")");
+      g.addColorStop(0.4, "rgba(180,230,120," + (glow * 0.5) + ")");
+      g.addColorStop(1, "rgba(180,230,120,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(fl.x, fl.y, fl.r * 5, 0, 6.2832);
+      ctx.fill();
+    }
+
+    // ---- Brasas/faíscas subindo da fogueira ----
+    ctx.globalCompositeOperation = "lighter";
+    for(var e=0; e<embers.length; e++){
+      var em = embers[e];
+      em.life++;
+      em.sway += em.swaySpeed;
+      em.x += em.vx + Math.sin(em.sway) * 0.4;
+      em.y += em.vy;
+      em.vy -= 0.0008;                     // acelera levemente subindo
+      var k = em.life / em.max;
+      if(k >= 1 || em.y < -20){
+        embers[e] = newEmber(false);
+        continue;
+      }
+      var alpha = Math.sin(k * Math.PI) * 0.9;
+      var r2 = em.size * (1.4 - k * 0.5);
+      var eg = ctx.createRadialGradient(em.x, em.y, 0, em.x, em.y, r2 * 4);
+      eg.addColorStop(0, "hsla(" + em.hue + ",100%,72%," + alpha + ")");
+      eg.addColorStop(0.5, "hsla(" + em.hue + ",100%,55%," + (alpha * 0.5) + ")");
+      eg.addColorStop(1, "hsla(" + em.hue + ",100%,50%,0)");
+      ctx.fillStyle = eg;
+      ctx.beginPath();
+      ctx.arc(em.x, em.y, r2 * 4, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = "source-over";
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+
+  // Flash quente ao achar tesouro (escuta a troca pra view-found sem tocar no jogo).
+  var hot = document.getElementById("hotFlash");
+  var foundView = document.getElementById("view-found");
+  if(hot && foundView && "MutationObserver" in window){
+    var obs = new MutationObserver(function(){
+      if(foundView.classList.contains("active")){
+        hot.classList.remove("go");
+        void hot.offsetWidth;            // reinicia a animação
+        hot.classList.add("go");
+      }
+    });
+    obs.observe(foundView, { attributes:true, attributeFilter:["class"] });
+  }
+})();
 </script>
 </body>
 </html>
