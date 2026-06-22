@@ -370,6 +370,8 @@ body.mestre #view-splash .bonfire .halo{animation-duration:1.5s;filter:blur(4px)
 
     <span class="badge" id="gameBadge">🎯 Carregando caçada…</span>
 
+    <div class="install" id="nfcNotice" style="display:none;background:rgba(76,201,240,.12);border-color:rgba(76,201,240,.45);color:#cdeafe"></div>
+
     <div class="install" id="splashNote" style="display:none;background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.4);color:#ffd3dc"></div>
 
     <label class="field" for="playerName">Seu nome de caipira</label>
@@ -716,6 +718,21 @@ function renderSplash(){
   $("#gameBadge").textContent = config.demo
     ? "🎈 Modo demonstração (" + n + " tesouros)"
     : "🎯 Caçada pronta: " + n + " tesouros";
+
+  // Aviso de NFC já na entrada: a pessoa precisa saber que usa NFC e que ele
+  // tem que estar LIGADO — senão acha que o jogo está quebrado (feedback real).
+  const nfc = $("#nfcNotice");
+  if(NFC_OK){
+    nfc.innerHTML = "📡 Pra desenterrar por aproximação, <b>ligue o NFC</b> do celular " +
+      "(puxe a barra de cima → ícone <b>NFC</b>). Sem NFC? Use a câmera no QR.";
+  }else if(isIOS){
+    nfc.innerHTML = "📡 Encoste o <b>topo do iPhone</b> na plaquinha pra ler a tag. " +
+      "Não rolou? Use a câmera no QR.";
+  }else{
+    nfc.innerHTML = "📷 Este aparelho vai usar a <b>câmera</b> (QR Code) pra desenterrar os tesouros.";
+  }
+  nfc.style.display = "block";
+
   if(!isStandalone){
     const inst = $("#iosInstall");
     if(isAndroid){
@@ -859,7 +876,17 @@ async function startNFC(){
       }
     };
   }catch(err){
-    showScanErr("Ative o NFC do celular nas configurações e permita o acesso — ou toque em “Usar a câmera (QR)”.");
+    // Erros típicos: NFC desligado, sem permissão, ou aparelho sem NFC.
+    const name = (err && err.name) || "";
+    let msg;
+    if(name === "NotSupportedError" || name === "TypeError"){
+      msg = "Este celular não tem NFC disponível no navegador. Toque em “Usar a câmera (QR)”.";
+    }else if(name === "NotAllowedError"){
+      msg = "Precisa permitir o NFC. Toque de novo e aceite — e confira se o NFC está LIGADO (barra de cima → ícone NFC).";
+    }else{
+      msg = "Ligue o NFC do celular: puxe a barra de cima e toque no ícone NFC. Depois tente de novo — ou use a câmera (QR).";
+    }
+    showScanErr(msg);
   }
 }
 async function startQR(){
