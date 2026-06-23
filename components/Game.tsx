@@ -61,6 +61,7 @@ export default function Game() {
   const [toast, setToast] = useState("");
   const [mestre, setMestre] = useState(false);
   const [eggOpen, setEggOpen] = useState(false);
+  const [festaHoje, setFestaHoje] = useState(false);
 
   // scanner
   const [scanErr, setScanErr] = useState("");
@@ -228,6 +229,29 @@ export default function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------- easter eggs: data da festa + chacoalhar ---------- */
+  useEffect(() => {
+    const d = new Date();
+    if (d.getMonth() === 5 && (d.getDate() === 27 || d.getDate() === 24)) {
+      setFestaHoje(true);
+      setTimeout(() => burstRef.current(), 700);
+    }
+    let last = 0, lx = 0, ly = 0, lz = 0, primed = false;
+    const onMotion = (e: DeviceMotionEvent) => {
+      const a = e.accelerationIncludingGravity; if (!a) return;
+      const x = a.x || 0, y = a.y || 0, z = a.z || 0;
+      const delta = Math.abs(x - lx) + Math.abs(y - ly) + Math.abs(z - lz);
+      lx = x; ly = y; lz = z;
+      if (!primed) { primed = true; return; }
+      if (delta > 45) {
+        const now = Date.now(); if (now - last < 4000) return; last = now;
+        vibrate([20, 30, 20]); burstRef.current(); showToast("☔ Olha a chuva… é mentira! 😄");
+      }
+    };
+    window.addEventListener("devicemotion", onMotion);
+    return () => window.removeEventListener("devicemotion", onMotion);
+  }, [showToast]);
+
   /* ---------- confete ---------- */
   useEffect(() => {
     const cvs = confettiRef.current; if (!cvs) return;
@@ -315,10 +339,17 @@ export default function Game() {
     const nm = name.trim();
     if (!nm) return;
     goFullscreen();
+    // easter egg: nome mágico
+    const magic = nm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (["marista", "sao joao", "festa junina", "ze do milho"].includes(magic)) {
+      setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {}
+      vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 250);
+      showToast("✨ Nome mágico! Modo Mestre liberado 🔥👑");
+    }
     const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {}, 2: {} }, seen: [], doneLocks: [], active: true };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
     setView("game");
-  }, [name, goFullscreen, persist]);
+  }, [name, goFullscreen, persist, burst, showToast]);
 
   const completeLock = useCallback((L: number) => {
     const g = gameRef.current!; const combo: (number | string)[] = [];
@@ -642,6 +673,7 @@ export default function Game() {
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
             <div className="logs"><span /><span /></div>
           </div>
+          {festaHoje ? <div className="festa-hoje">🎉 É hoje! Festa Junina do Marista. Boa caçada!</div> : null}
           <span className="badge" id="gameBadge">🔓 Vale a senha do Cadeado {activeLock} agora</span>
           <div className="install" style={{ display: "block" }}>{nfcNotice}</div>
           {splashMsg ? <div className="install warn" style={{ display: "block" }}>{splashMsg}</div> : null}
