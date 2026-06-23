@@ -91,6 +91,7 @@ export default function Game() {
   const nfcAbortRef = useRef<AbortController | null>(null);
   const channelsRef = useRef<any[]>([]);
   const burstRef = useRef<() => void>(() => {});
+  const rainRef = useRef<() => void>(() => {});
   const lastErrRef = useRef(0);
   const toastT = useRef<any>(null);
 
@@ -245,7 +246,7 @@ export default function Game() {
       if (!primed) { primed = true; return; }
       if (delta > 45) {
         const now = Date.now(); if (now - last < 4000) return; last = now;
-        vibrate([20, 30, 20]); burstRef.current(); showToast("☔ Olha a chuva… é mentira! 😄");
+        vibrate([20, 30, 20]); rainRef.current(); showToast("☔ Olha a chuva… é mentira! 😄");
       }
     };
     window.addEventListener("devicemotion", onMotion);
@@ -261,8 +262,14 @@ export default function Game() {
     resize(); window.addEventListener("resize", resize);
     const tick = () => {
       ctx.clearRect(0, 0, cvs.width, cvs.height);
-      parts.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life++;
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); ctx.restore(); });
+      parts.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life++;
+        if (p.kind === "rain") {
+          ctx.strokeStyle = p.c; ctx.lineWidth = p.s; ctx.lineCap = "round"; ctx.globalAlpha = p.a;
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .6, p.y - p.vy * 1.1); ctx.stroke(); ctx.globalAlpha = 1;
+        } else {
+          p.rot += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); ctx.restore();
+        }
+      });
       parts = parts.filter(p => p.y < cvs.height + 40 && p.life < 260);
       if (parts.length) requestAnimationFrame(tick); else { rafOn = false; ctx.clearRect(0, 0, cvs.width, cvs.height); }
     };
@@ -270,6 +277,13 @@ export default function Game() {
       for (let i = 0; i < 90; i++) parts.push({ x: innerWidth / 2 + (Math.random() - .5) * 120, y: innerHeight * 0.42,
         vx: (Math.random() - .5) * 9, vy: -(Math.random() * 11 + 5), g: 0.28 + Math.random() * 0.12, s: 5 + Math.random() * 7,
         rot: Math.random() * 6.28, vr: (Math.random() - .5) * 0.4, c: COLORS[(Math.random() * COLORS.length) | 0], life: 0 });
+      if (!rafOn) { rafOn = true; requestAnimationFrame(tick); }
+    };
+    const RAIN = ["#9fd6f5", "#bfe3ff", "#d6ecff", "#8ecbf0"];
+    rainRef.current = () => {
+      for (let i = 0; i < 150; i++) parts.push({ kind: "rain", x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * 0.8,
+        vx: 2 + Math.random() * 1.5, vy: 13 + Math.random() * 9, g: 0.12, s: 1.3 + Math.random() * 1.6,
+        a: 0.4 + Math.random() * 0.45, c: RAIN[(Math.random() * RAIN.length) | 0], life: 0 });
       if (!rafOn) { rafOn = true; requestAnimationFrame(tick); }
     };
     return () => window.removeEventListener("resize", resize);
@@ -417,10 +431,8 @@ export default function Game() {
     }
     else if (card.media === "audio") media = <audio className="curio-audio" controls src={body} />;
     else media = <div className="curio-text">{body}</div>;
-    const showEmoji = card.media === "texto" || card.media === "audio";
     const node = (
       <div className="curio">
-        {showEmoji ? <div className="curio-emoji">{mediaIcon(card.media)}</div> : null}
         {card.title ? <h2 className="curio-title">{card.title}</h2> : null}
         {media}
       </div>

@@ -230,9 +230,13 @@ select option{color:#1b1030;}
 .senha-where{font-size:1.35rem;font-weight:800;color:#fff;margin-top:8px;}
 .senha-where b{color:var(--milho);}
 .senha-hint{color:#aac3de;margin-top:16px;font-weight:700;font-size:1.05rem;}
+/* Topo do cartão com respiro (não cola na bandeirinha) */
+#view-card{padding-top:34px;}
+#view-card .kicker{text-align:center;margin:0 auto;font-size:.78rem;letter-spacing:.3em;}
+#view-card .kicker::after{content:"";display:block;width:46px;height:3px;border-radius:3px;margin:10px auto 0;
+  background:linear-gradient(90deg,transparent,var(--milho),transparent);opacity:.8;}
 .curio{margin-top:6px;}
-.curio-emoji{font-size:3rem;text-align:center;line-height:1;}
-.curio-title{font-family:"Fredoka",cursive;color:var(--milho);text-align:center;font-size:1.6rem;margin:.25em 0 .1em;text-shadow:0 2px 0 #b85c00;}
+.curio-title{font-family:"Fredoka",cursive;color:var(--milho);text-align:center;font-size:1.6rem;margin:.1em 0 .1em;text-shadow:0 2px 0 #b85c00;}
 .curio-text{background:var(--papel);color:var(--tinta);border-radius:16px;padding:20px 22px;font-size:1.15rem;line-height:1.55;font-weight:600;margin-top:14px;box-shadow:var(--sombra);white-space:pre-wrap;}
 .curio-img{width:100%;border-radius:16px;margin-top:14px;box-shadow:var(--sombra);display:block;}
 .curio-yt{position:relative;width:100%;padding-top:56.25%;border-radius:16px;overflow:hidden;margin-top:14px;box-shadow:var(--sombra);}
