@@ -228,7 +228,7 @@ export default function Game() {
   useEffect(() => {
     const cvs = confettiRef.current; if (!cvs) return;
     const ctx = cvs.getContext("2d")!; let parts: any[] = []; let rafOn = false;
-    const COLORS = ["#ff4d6d", "#ffc93c", "#21bf8f", "#4cc9f0", "#ff7a18", "#ffffff"];
+    const COLORS = ["#e23b2e", "#f9c21a", "#e84c97", "#28a8e0", "#6e5ba6", "#ffffff"];
     const resize = () => { cvs.width = window.innerWidth; cvs.height = window.innerHeight; };
     resize(); window.addEventListener("resize", resize);
     const tick = () => {
@@ -605,9 +605,11 @@ export default function Game() {
 
         {/* SPLASH */}
         <section id="view-splash" className={v("splash")}>
-          <div className="kicker">São João · 2026</div>
+          <div className="kicker">Colégio Marista de Brasília</div>
           <h1 className="title">Arraiá<br />do Tesouro</h1>
-          <p className="lead">Encontre os cartões escondidos pelo arraiá. Alguns revelam a senha de um <b>cadeado</b> com premiação — o resto são curiosidades juninas. Bora?</p>
+          <p className="festa">Festa Junina 2026</p>
+          <p className="lead">Encontre os cartões escondidos pela festa. Alguns revelam a senha de um <b>cadeado</b> com premiação — o resto são curiosidades juninas. Bora?</p>
+          <p className="evento">📅 27/06 · 📍 Maristinha · 🕗 8h30–19h30</p>
           <div className="bonfire" aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
             <div className="logs"><span /><span /></div>

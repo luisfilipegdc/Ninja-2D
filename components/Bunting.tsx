@@ -4,7 +4,8 @@ import { memo } from "react";
 // só na montagem e nunca reage aos re-renders do jogo (cronômetro etc.) —
 // evita a animação de entrada reiniciar em loop.
 function buntingSvg() {
-  const cols = ["#ff4d6d", "#ffc93c", "#21bf8f", "#4cc9f0", "#ff7a18"];
+  // cores do convite Festa Junina Marista 2026: vermelho, amarelo, rosa, ciano, roxo
+  const cols = ["#e23b2e", "#f9c21a", "#e84c97", "#28a8e0", "#6e5ba6"];
   const W = 520, H = 48, n = 12, gap = W / n, top = 5, sag = 15;
   const yAt = (x: number) => { const t = x / W; return top + sag * 4 * t * (1 - t); };
   let cord = "M0 " + top.toFixed(1);
