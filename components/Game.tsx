@@ -14,8 +14,19 @@ const LS_SESS = "arraia.session.v2";
 const LS_RANK = "arraia.ranking.v1";
 const LS_CARDS = "arraia.cardcache.v1";
 const LS_MESTRE = "arraia.mestre";
+const LS_MESTRE_KEY = "arraia.mestre.key";
 const LS_EGGS = "arraia.eggs.v1";
 const EGGS_TOTAL = 4;
+
+// Cada nome mágico tem sua própria referência e selo único
+const MAGIC: Record<string, { chip: string; toast: string }> = {
+  "marista": { chip: "🔵🟡 Espírito Marista", toast: "🔵🟡 Espírito Marista ativado! Champagnat aprova — Modo Mestre liberado 👑" },
+  "sao joao": { chip: "🔥 Fogueira de São João", toast: "🔥🎆 São João acendeu a fogueira do arraiá! Modo Mestre liberado 👑" },
+  "festa junina": { chip: "💃 Rei do Arraiá", toast: "💃🕺 A festa em pessoa! Puxe a quadrilha — Modo Mestre liberado 👑" },
+  "ze do milho": { chip: "🌽 Zé do Milho", toast: "🌽 Pamonha, curau e canjica! Zé do Milho liberou o Modo Mestre 👑" },
+};
+const FOGUEIRA_CHIP = "🔥 Mestre da Fogueira";
+function mestreChipLabel(key: string) { return MAGIC[key]?.chip || (key === "fogueira" ? FOGUEIRA_CHIP : "👑 Modo Mestre"); }
 
 function fmt(ms: number) {
   const t = Math.max(0, Math.floor(ms / 1000));
@@ -56,12 +67,13 @@ function localRows(L: number): ScoreRow[] {
 export default function Game() {
   const [view, setView] = useState<ViewId>("splash");
   const [game, setGame] = useState<GameState | null>(null);
-  const [activeLock, setActiveLock] = useState<number>(1);
+  const activeLock = 1; // cadeado único
   const [elapsed, setElapsed] = useState(0);
   const [name, setName] = useState("");
   const [splashMsg, setSplashMsg] = useState("");
   const [toast, setToast] = useState("");
   const [mestre, setMestre] = useState(false);
+  const [mestreKey, setMestreKey] = useState("");
   const [eggOpen, setEggOpen] = useState(false);
   const [festaHoje, setFestaHoje] = useState(false);
   const [foundEggs, setFoundEggs] = useState<string[]>([]);
@@ -88,11 +100,9 @@ export default function Game() {
 
   // ranking
   const [rank1, setRank1] = useState<ScoreRow[]>([]);
-  const [rank2, setRank2] = useState<ScoreRow[]>([]);
 
   // refs (latest values em callbacks async)
   const gameRef = useRef<GameState | null>(null);
-  const activeLockRef = useRef(1);
   const scanActiveRef = useRef(false);
   const myScoreId = useRef<string | null>(null);
   const ambientRef = useRef<HTMLCanvasElement | null>(null);
@@ -103,11 +113,12 @@ export default function Game() {
   const burstRef = useRef<() => void>(() => {});
   const rainRef = useRef<() => void>(() => {});
   const fireworksRef = useRef<() => void>(() => {});
+  const heartsRef = useRef<() => void>(() => {});
+  const balloonsRef = useRef<() => void>(() => {});
   const lastErrRef = useRef(0);
   const toastT = useRef<any>(null);
 
   useEffect(() => { gameRef.current = game; }, [game]);
-  useEffect(() => { activeLockRef.current = activeLock; }, [activeLock]);
 
   const sb = useMemo(() => getSupabase(), []);
 
@@ -159,7 +170,7 @@ export default function Game() {
   /* ---------- estado dos cadeados ---------- */
   const lockFilled = (g: GameState, L: number) => { let n = 0; for (let p = 1; p <= 3; p++) if (g.locks[L]?.[p] != null) n++; return n; };
   const lockComplete = (g: GameState, L: number) => lockFilled(g, L) >= 3;
-  const bothDone = (g: GameState) => lockComplete(g, 1) && lockComplete(g, 2);
+  const bothDone = (g: GameState) => lockComplete(g, 1);
 
   /* ---------- cartões (Supabase + cache) ---------- */
   const cacheCard = (c: Card) => { try { const m = JSON.parse(localStorage.getItem(LS_CARDS) || "{}"); m[c.code] = c; localStorage.setItem(LS_CARDS, JSON.stringify(m)); } catch {} };
@@ -197,23 +208,6 @@ export default function Game() {
     set(rows ?? localRows(L));
   }, [sbTop]);
 
-  /* ---------- período ativo (game_state) ---------- */
-  useEffect(() => {
-    if (!sb) return;
-    let alive = true;
-    (async () => {
-      try {
-        const { data } = await sb.from("game_state").select("active_lock").eq("game_id", EVENT).maybeSingle();
-        if (alive && data && (data as any).active_lock) setActiveLock((data as any).active_lock);
-      } catch {}
-    })();
-    const ch = sb.channel("gs_" + EVENT)
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_state", filter: "game_id=eq." + EVENT },
-        (payload: any) => { const al = payload?.new?.active_lock; if (al) setActiveLock(al); })
-      .subscribe();
-    return () => { alive = false; try { sb.removeChannel(ch); } catch {} };
-  }, [sb]);
-
   /* ---------- timer ---------- */
   useEffect(() => {
     if (!game) return;
@@ -224,6 +218,7 @@ export default function Game() {
   /* ---------- launch (?c=) ---------- */
   useEffect(() => {
     try { if (localStorage.getItem(LS_MESTRE) === "1") setMestre(true); } catch {}
+    try { const mk = localStorage.getItem(LS_MESTRE_KEY); if (mk) setMestreKey(mk); } catch {}
     try { const fe = JSON.parse(localStorage.getItem(LS_EGGS) || "[]"); if (Array.isArray(fe)) { foundEggsRef.current = fe; setFoundEggs(fe); } } catch {}
     const c = new URLSearchParams(window.location.search).get("c");
     if (c) {
@@ -248,7 +243,7 @@ export default function Game() {
     if (d.getMonth() === 5 && (d.getDate() === 27 || d.getDate() === 24)) {
       setFestaHoje(true);
       markEgg("festa");
-      setTimeout(() => fireworksRef.current(), 700);
+      setTimeout(() => burstRef.current(), 700);
     }
     let last = 0, lx = 0, ly = 0, lz = 0, primed = false;
     const onMotion = (e: DeviceMotionEvent) => {
@@ -275,7 +270,7 @@ export default function Game() {
     resize(); window.addEventListener("resize", resize);
     const tick = () => {
       ctx.clearRect(0, 0, cvs.width, cvs.height);
-      parts.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life++;
+      parts.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life++; if (p.sw) p.sway += p.sw;
         if (p.kind === "rain") {
           ctx.strokeStyle = p.c; ctx.lineWidth = p.s; ctx.lineCap = "round"; ctx.globalAlpha = p.a;
           ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .6, p.y - p.vy * 1.1); ctx.stroke(); ctx.globalAlpha = 1;
@@ -283,9 +278,23 @@ export default function Game() {
           p.vx *= 0.97; p.vy *= 0.97;
           const fade = 1 - p.life / p.max;
           ctx.globalAlpha = Math.max(0, fade); ctx.fillStyle = p.c;
-          ctx.shadowColor = p.c; ctx.shadowBlur = 8;
           ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, 6.28); ctx.fill();
-          ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+          ctx.globalAlpha = 1;
+        } else if (p.kind === "heart") {
+          const fade = p.life > p.max * 0.7 ? Math.max(0, 1 - (p.life - p.max * 0.7) / (p.max * 0.3)) : 1;
+          ctx.globalAlpha = fade; ctx.font = p.s + "px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(p.e, p.x + Math.sin(p.sway) * 12, p.y); ctx.globalAlpha = 1;
+        } else if (p.kind === "balloon") {
+          const fade = p.life > p.max * 0.78 ? Math.max(0, 1 - (p.life - p.max * 0.78) / (p.max * 0.22)) : 1;
+          ctx.globalAlpha = fade;
+          const bx = p.x + Math.sin(p.sway) * 14, by = p.y, rx = p.s * 0.52, ry = p.s * 0.66;
+          ctx.strokeStyle = "rgba(190,205,230,.45)"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(bx, by + ry); ctx.quadraticCurveTo(bx + 7, by + ry + p.s * 0.5, bx, by + ry + p.s); ctx.stroke();
+          const g2 = ctx.createRadialGradient(bx - rx * 0.35, by - ry * 0.45, 1, bx, by, ry * 1.5);
+          g2.addColorStop(0, p.hl); g2.addColorStop(1, p.c);
+          ctx.fillStyle = g2; ctx.beginPath(); ctx.ellipse(bx, by, rx, ry, 0, 0, 6.28); ctx.fill();
+          ctx.fillStyle = p.c; ctx.beginPath(); ctx.moveTo(bx - 3, by + ry); ctx.lineTo(bx + 3, by + ry); ctx.lineTo(bx, by + ry + 5); ctx.closePath(); ctx.fill();
+          ctx.globalAlpha = 1;
         } else {
           p.rot += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); ctx.restore();
         }
@@ -309,13 +318,13 @@ export default function Game() {
     const FIRE = ["#f9c21a", "#ffd84a", "#e23b2e", "#e84c97", "#28a8e0", "#ffffff"];
     const shell = (cx: number, cy: number) => {
       const c = FIRE[(Math.random() * FIRE.length) | 0];
-      const n = 34 + (Math.random() * 14 | 0);
-      const spd = 4 + Math.random() * 2.4;
+      const n = 22 + (Math.random() * 10 | 0);
+      const spd = 4 + Math.random() * 2.2;
       for (let i = 0; i < n; i++) {
         const ang = (i / n) * 6.28 + Math.random() * 0.2;
         const v = spd * (0.6 + Math.random() * 0.5);
         parts.push({ kind: "spark", x: cx, y: cy, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v,
-          g: 0.05, s: 1.6 + Math.random() * 1.8, c, life: 0, max: 55 + (Math.random() * 30 | 0) });
+          g: 0.05, s: 1.8 + Math.random() * 1.8, c, life: 0, max: 50 + (Math.random() * 26 | 0) });
       }
     };
     fireworksRef.current = () => {
@@ -323,10 +332,27 @@ export default function Game() {
         for (let i = 0; i < n; i++) shell(innerWidth * (0.2 + Math.random() * 0.6), innerHeight * (0.18 + Math.random() * 0.32));
         if (!rafOn) { rafOn = true; requestAnimationFrame(tick); }
       };
-      launch(3);
-      setTimeout(() => launch(3), 280);
-      setTimeout(() => launch(4), 620);
+      launch(2);
+      setTimeout(() => launch(2), 300);
+      setTimeout(() => launch(3), 660);
     };
+    const HEARTS = ["❤️", "💖", "💗", "💕", "🤍", "💞"];
+    const floatUp = (mk: (i: number) => any, n: number, waves: number) => {
+      const wave = () => { for (let i = 0; i < n; i++) parts.push(mk(i)); if (!rafOn) { rafOn = true; requestAnimationFrame(tick); } };
+      wave(); for (let w = 1; w < waves; w++) setTimeout(wave, w * 380);
+    };
+    heartsRef.current = () => floatUp(() => ({
+      kind: "heart", x: innerWidth * (0.08 + Math.random() * 0.84), y: innerHeight + 12 + Math.random() * 22,
+      vx: 0, vy: -(1.5 + Math.random() * 1.7), g: 0, s: 20 + Math.random() * 22,
+      sway: Math.random() * 6.28, sw: 0.03 + Math.random() * 0.03, e: HEARTS[(Math.random() * HEARTS.length) | 0],
+      life: 0, max: 150 + (Math.random() * 90 | 0) }), 9, 3);
+    balloonsRef.current = () => floatUp(() => {
+      const navy = ["#15375d", "#1b3a6b", "#0f2c4d", "#21487f"][(Math.random() * 4) | 0];
+      return { kind: "balloon", x: innerWidth * (0.1 + Math.random() * 0.8), y: innerHeight + 16 + Math.random() * 26,
+        vx: 0, vy: -(1.2 + Math.random() * 1.4), g: 0, s: 34 + Math.random() * 20,
+        sway: Math.random() * 6.28, sw: 0.02 + Math.random() * 0.022, c: navy, hl: "#5b86c4",
+        life: 0, max: 170 + (Math.random() * 90 | 0) };
+    }, 7, 3);
     return () => window.removeEventListener("resize", resize);
   }, []);
   const burst = useCallback(() => burstRef.current(), []);
@@ -397,13 +423,21 @@ export default function Game() {
     goFullscreen();
     // easter egg: nome mágico
     const magic = nm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (["marista", "sao joao", "festa junina", "ze do milho"].includes(magic)) {
-      setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {}
+    const spell = MAGIC[magic];
+    if (spell) {
+      setMestre(true); setMestreKey(magic);
+      try { localStorage.setItem(LS_MESTRE, "1"); localStorage.setItem(LS_MESTRE_KEY, magic); } catch {}
       markEgg("nome");
       vibrate([30, 40, 30, 40, 140]); fireworks();
-      showToast("✨ Nome mágico! Modo Mestre liberado 🔥👑");
+      showToast(spell.toast);
+    } else if (["emanuela bastos", "ester bastos"].includes(magic)) {
+      vibrate([20, 40, 20, 40, 20]); heartsRef.current();
+      showToast("💖 " + nm + ", um arraiá cheio de amor! 💕");
+    } else if (["luis bezaleu", "estevao bastos"].includes(magic)) {
+      vibrate([20, 40, 20, 40, 20]); balloonsRef.current();
+      showToast("🎈 Balões pra você, " + nm + "! Voa alto 💙");
     }
-    const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {}, 2: {} }, seen: [], doneLocks: [], active: true };
+    const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {} }, seen: [], doneLocks: [], active: true };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
     setView("game");
   }, [name, goFullscreen, persist, fireworks, markEgg, showToast]);
@@ -444,12 +478,12 @@ export default function Game() {
     const node = (
       <div className="senha-reveal">
         <div className="senha-digit">{digit}</div>
-        <div className="senha-where">entra na <b>casa {pos}</b> do <b>Cadeado {L}</b></div>
+        <div className="senha-where">entra na <b>casa {pos}</b> do <b>cadeado</b></div>
         {card.hint ? <p className="senha-hint">💬 {card.hint}</p> : null}
       </div>
     );
     afterCardRef.current = complete ? () => completeLock(L) : renderHub;
-    setCardView({ kind: "senha", node, kicker: already ? "Você já tinha esse número 😉" : "Achou um número da senha!", cta: complete ? `Ver a senha do Cadeado ${L} 🔐` : "Continuar a caçada 📡" });
+    setCardView({ kind: "senha", node, kicker: already ? "Você já tinha esse número 😉" : "Achou um número da senha!", cta: complete ? "Ver a senha do cadeado 🔐" : "Continuar a caçada 📡" });
     setView("card");
   }, [persist, syncGame, burst, completeLock, renderHub]);
 
@@ -491,14 +525,8 @@ export default function Game() {
     showToast("Lendo cartão…");
     const card = await fetchCard(code);
     if (!card) { flashErr("Cartão não encontrado. Veja a conexão e tente de novo."); setView("game"); return; }
-    if (card.kind === "senha") {
-      const L = card.lock || 1;
-      if (L !== activeLockRef.current) {
-        showToast(`Esse cartão é do Cadeado ${L}. Agora vale o Cadeado ${activeLockRef.current} ⏳`);
-        setView("game"); return;
-      }
-      revealSenha(card);
-    } else revealCuriosidade(card);
+    if (card.kind === "senha") revealSenha(card);
+    else revealCuriosidade(card);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCard, flashErr, showToast, revealSenha, revealCuriosidade]);
 
@@ -557,15 +585,13 @@ export default function Game() {
   /* ===================== ranking view ===================== */
   const openRanking = useCallback(() => {
     unsubAll();
-    setRank1(localRows(1)); setRank2(localRows(2));
-    loadLockBoard(1, setRank1); loadLockBoard(2, setRank2);
+    setRank1(localRows(1));
+    loadLockBoard(1, setRank1);
     if (sb) {
-      [1, 2].forEach(L => {
-        const gid = lockGameId(L);
-        const ch = sb.channel("rk_" + gid).on("postgres_changes", { event: "INSERT", schema: "public", table: "scores", filter: "game_id=eq." + gid },
-          () => loadLockBoard(L, L === 1 ? setRank1 : setRank2)).subscribe();
-        channelsRef.current.push(ch);
-      });
+      const gid = lockGameId(1);
+      const ch = sb.channel("rk_" + gid).on("postgres_changes", { event: "INSERT", schema: "public", table: "scores", filter: "game_id=eq." + gid },
+        () => loadLockBoard(1, setRank1)).subscribe();
+      channelsRef.current.push(ch);
     }
     setView("ranking");
   }, [sb, unsubAll, loadLockBoard]);
@@ -574,10 +600,10 @@ export default function Game() {
   const eggTaps = useRef(0); const eggLast = useRef(0);
   const bonfireTap = useCallback(() => {
     vibrate(8);
-    if (mestre) { fireworks(); return; }
+    if (mestre) { burst(); return; }
     const now = Date.now(); if (now - eggLast.current > 1200) eggTaps.current = 0; eggLast.current = now;
-    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {} markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); fireworks(); setEggOpen(true); }
-  }, [mestre, fireworks, markEgg]);
+    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); setMestreKey("fogueira"); try { localStorage.setItem(LS_MESTRE, "1"); localStorage.setItem(LS_MESTRE_KEY, "fogueira"); } catch {} markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
+  }, [mestre, burst, markEgg]);
 
   /* ===================== admin ===================== */
   const [admEmail, setAdmEmail] = useState(""); const [admPass, setAdmPass] = useState("");
@@ -634,23 +660,41 @@ export default function Game() {
 
   const doLogout = useCallback(async () => { if (sb) { try { await sb.auth.signOut(); } catch {} } setAuthed(false); }, [sb]);
 
-  const setActivePeriod = useCallback(async (L: number) => {
-    if (!sb) return;
-    setActiveLock(L);
-    try { await sb.from("game_state").upsert({ game_id: EVENT, active_lock: L, updated_at: new Date().toISOString() }, { onConflict: "game_id" }); } catch {}
-  }, [sb]);
+  const randomizeSenhas = useCallback(async () => {
+    if (!sb || !cards) return;
+    const senhas = cards.filter(c => c.kind === "senha");
+    if (senhas.length < 2) { showToast("Cadastre as tags de senha primeiro 🔐"); return; }
+    // os pares (posição, dígito) são a combinação do cadeado — só mudamos QUAL tag mostra cada um
+    const pairs = senhas.map(c => ({ position: c.position!, digit: c.digit! }));
+    let changed = false;
+    for (let i = pairs.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); if (i !== j) changed = true; [pairs[i], pairs[j]] = [pairs[j], pairs[i]]; }
+    if (!changed && senhas.length > 1) { const t = pairs[0]; pairs[0] = pairs[1]; pairs[1] = t; }
+    try {
+      // fase 1: posições temporárias (4..6, válidas e únicas) p/ não colidir no índice único
+      for (let i = 0; i < senhas.length; i++) {
+        const { error } = await sb.from("cards").update({ position: 4 + i }).eq("code", senhas[i].code);
+        if (error) throw error;
+      }
+      // fase 2: distribuição final remanejada entre as tags
+      for (let i = 0; i < senhas.length; i++) {
+        const { error } = await sb.from("cards").update({ position: pairs[i].position, digit: pairs[i].digit, lock: 1 }).eq("code", senhas[i].code);
+        if (error) throw error;
+      }
+      vibrate([30, 40, 30]); showToast("🎲 Senhas embaralhadas entre as tags!");
+      loadCards();
+    } catch (e: any) { showToast("Não consegui randomizar: " + (e?.message || "erro")); }
+  }, [sb, cards, loadCards, showToast]);
 
   const saveCard = useCallback(async () => {
     if (!sb || !form) return; setFormErr("");
     const code = (form.code || "").trim();
     if (!/^[A-Za-z0-9_-]{4,40}$/.test(code)) { setFormErr("Código inválido (4–40 letras/números)."); return; }
-    const payload: any = { code, game_id: EVENT, kind: form.kind, lock: null, position: null, digit: null, hint: null, media: null, title: null, body: null };
+    const payload: any = { code, game_id: EVENT, kind: form.kind, lock: null, position: null, digit: null, hint: null, media: null, title: null, body: null, location: (form.location || "").trim() || null };
     if (form.kind === "senha") {
-      const lock = Number(form.lock), pos = Number(form.position), dig = Number(form.digit);
-      if (lock !== 1 && lock !== 2) { setFormErr("Escolha o cadeado (1 ou 2)."); return; }
+      const pos = Number(form.position), dig = Number(form.digit);
       if (!(pos >= 1 && pos <= 3)) { setFormErr("A casa precisa ser de 1 a 3."); return; }
       if (!(dig >= 0 && dig <= 9)) { setFormErr("Dígito precisa ser de 0 a 9."); return; }
-      payload.lock = lock; payload.position = pos; payload.digit = dig; payload.hint = (form.hint || "").trim() || null;
+      payload.lock = 1; payload.position = pos; payload.digit = dig; payload.hint = (form.hint || "").trim() || null;
     } else {
       payload.media = form.media || "texto"; payload.title = (form.title || "").trim() || null; payload.body = (form.body || "").trim();
       if (!payload.body) { setFormErr("Coloque o conteúdo (texto ou URL)."); return; }
@@ -727,6 +771,7 @@ export default function Game() {
           <div className="kicker">Colégio Marista de Brasília</div>
           <h1 className="title">Arraiá<br />do Tesouro</h1>
           <p className="festa">Festa Junina <span className="ano">2026</span></p>
+          {mestre ? <div className="mestre-chip">{mestreChipLabel(mestreKey)}</div> : null}
           <p className="lead">Ache os cartões escondidos pela festa. Alguns abrem um <b>cadeado</b> com premiação; o resto são curiosidades. Bora?</p>
           <div className="bonfire" aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
@@ -758,14 +803,14 @@ export default function Game() {
           <p className="anyorder">🔀 Ache os cartões em <b>qualquer ordem</b> — cada número já vai pro lugar certo.</p>
           {g ? (
             <div className={"lockpanel" + (lockDone ? " done" : "")}>
-              <div className="lockhead"><span>🔓 Senha de agora <span className="lock-tag">Cadeado {activeLock}</span></span>{lockDone ? <span className="ok">✓ pronta!</span> : <span className="cnt">{filled === 0 ? "Faltam 3 números" : "Falta" + (3 - filled === 1 ? "" : "m") + " " + (3 - filled) + " número" + (3 - filled === 1 ? "" : "s")}</span>}</div>
+              <div className="lockhead"><span>🔓 Senha do cadeado</span>{lockDone ? <span className="ok">✓ pronta!</span> : <span className="cnt">{filled === 0 ? "Faltam 3 números" : "Falta" + (3 - filled === 1 ? "" : "m") + " " + (3 - filled) + " número" + (3 - filled === 1 ? "" : "s")}</span>}</div>
               <div className="cofre">
                 {[1, 2, 3].map(pos => {
                   const val = g.locks[activeLock]?.[pos];
                   return <div key={pos} className={"slot" + (val != null ? " filled" : "")}><span className="pos">{pos}ª</span>{val != null ? val : "🔒"}</div>;
                 })}
               </div>
-              {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => completeLock(activeLock)}>Ver a senha do Cadeado {activeLock} 🔐</button> : null}
+              {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => completeLock(activeLock)}>Ver a senha do cadeado 🔐</button> : null}
             </div>
           ) : null}
           <div className="spacer" />
@@ -796,7 +841,7 @@ export default function Game() {
         {/* CHEST */}
         <section id="view-chest" className={v("chest") + " celebrate"}>
           <div className="chest">🧰</div>
-          <div className="big">Senha do Cadeado {chest?.lock}!</div>
+          <div className="big">Senha do cadeado!</div>
           <p className="lead" style={{ textAlign: "center" }}>Gire o cadeado para:</p>
           <div className="combo">{chest?.combo.map((d, i) => <div key={i} className="d">{d}</div>)}</div>
           <p className="lead" style={{ textAlign: "center", marginTop: 14 }}>Boa, <b>{g?.name}</b>! Mostre a senha pro organizador e abra o baú deste cadeado. 🎁</p>
@@ -809,14 +854,9 @@ export default function Game() {
         <section id="view-ranking" className={v("ranking")}>
           <div className="kicker">Quem montou as senhas mais rápido</div>
           <h1 className="title" style={{ fontSize: "2.4rem" }}>Ranking 🏆</h1>
-          {[{ L: 1, rows: rank1 }, { L: 2, rows: rank2 }].map(({ L, rows }) => (
-            <div key={L}>
-              <h3 className="ranklock">🔒 Cadeado {L}</h3>
-              {rows.length ? (
-                <ul className="rank">{rows.slice(0, 12).map((e, i) => <li key={e.id} className={e.id === myScoreId.current ? "me" : ""}><span className="pos">{["🥇", "🥈", "🥉"][i] || i + 1}</span><span className="nm">{e.name}</span><span className="tm">{fmt(e.ms)}</span></li>)}</ul>
-              ) : <p className="empty">Ninguém abriu o Cadeado {L} ainda.</p>}
-            </div>
-          ))}
+          {rank1.length ? (
+            <ul className="rank">{rank1.slice(0, 12).map((e, i) => <li key={e.id} className={e.id === myScoreId.current ? "me" : ""}><span className="pos">{["🥇", "🥈", "🥉"][i] || i + 1}</span><span className="nm">{e.name}</span><span className="tm">{fmt(e.ms)}</span></li>)}</ul>
+          ) : <p className="empty">Ninguém abriu o cadeado ainda. Seja o primeiro! 🔥</p>}
           <div className="spacer" />
           <button className="btn" onClick={() => { unsubAll(); setView(g ? "game" : "splash"); }}>Voltar</button>
         </section>
@@ -837,20 +877,21 @@ export default function Game() {
             </div>
           ) : (
             <div>
-              <div className="note noprint">Período ativo agora: <b>Cadeado {activeLock}</b>. Só esse cadeado vale pros jogadores.</div>
-              <div className="activebar noprint">
-                <button className={activeLock === 1 ? "sel" : ""} onClick={() => setActivePeriod(1)}>🔒 Ativar Cadeado 1</button>
-                <button className={activeLock === 2 ? "sel" : ""} onClick={() => setActivePeriod(2)}>🔒 Ativar Cadeado 2</button>
-              </div>
-              <button className="btn noprint" style={{ marginTop: 14 }} onClick={() => setForm({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto" })}>+ Novo cartão</button>
+              <div className="note noprint">🔐 <b>Cadeado único.</b> As 3 tags de senha ficam fixas no lugar — use <b>Randomizar</b> pra trocar qual tag revela qual dígito, sem precisar mexer nelas.</div>
+              {cards && cards.some(c => c.kind === "senha") ? (
+                <button className="btn fire noprint" style={{ marginTop: 12 }} onClick={randomizeSenhas}>🎲 Randomizar senhas</button>
+              ) : null}
+              <button className="btn noprint" style={{ marginTop: 12 }} onClick={() => setForm({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto", location: "" })}>+ Nova tag</button>
 
               {form ? (
                 <div className="admin-row noprint">
-                  <label className="field" htmlFor="fCode">Código do cartão</label>
+                  <label className="field" htmlFor="fCode">ID da tag (código gravado)</label>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <input id="fCode" type="text" value={form.code || ""} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+                    <input id="fCode" type="text" value={form.code || ""} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="ex: 53bfb8a3500001 (serial do leitor) ou aleatório" />
                     <button className="nfc-btn" style={{ flex: "none" }} onClick={() => setForm({ ...form, code: randCode() })}>🎲</button>
                   </div>
+                  <label className="field" htmlFor="fLoc">📍 Localização física</label>
+                  <input id="fLoc" type="text" value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex: atrás da barraca da pescaria" />
                   <label className="field" htmlFor="fKind">Tipo</label>
                   <select id="fKind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as any })}>
                     <option value="senha">🔐 Senha (1 número do cadeado)</option>
@@ -858,10 +899,6 @@ export default function Game() {
                   </select>
                   {form.kind === "senha" ? (
                     <>
-                      <label className="field" htmlFor="fLock">Cadeado (1 ou 2)</label>
-                      <select id="fLock" value={String(form.lock ?? 1)} onChange={(e) => setForm({ ...form, lock: Number(e.target.value) })}>
-                        <option value="1">🔒 Cadeado 1</option><option value="2">🔒 Cadeado 2</option>
-                      </select>
                       <label className="field" htmlFor="fPos">Casa na senha (1 a 3)</label>
                       <input id="fPos" type="number" min={1} max={3} value={String(form.position ?? 1)} onChange={(e) => setForm({ ...form, position: Number(e.target.value) })} />
                       <label className="field" htmlFor="fDigit">Dígito (0 a 9)</label>
@@ -921,8 +958,9 @@ export default function Game() {
                     cards.map((c) => (
                       <div key={c.code} className="admin-row">
                         <div className="rh">{c.code}</div>
+                        {c.location ? <div style={{ color: "#9fc3e8", marginTop: 4, fontSize: ".85rem", fontWeight: 700 }}>📍 {c.location}</div> : null}
                         <div style={{ color: "#e9def7", marginTop: 6 }}>
-                          {c.kind === "senha" ? <>🔐 Cadeado <b>{c.lock}</b> · casa <b>{c.position}</b> = <b>{c.digit}</b>{c.hint ? ` · dica: ${c.hint}` : ""}</> : <>{mediaIcon(c.media)} {c.title || "Curiosidade"}</>}
+                          {c.kind === "senha" ? <>🔐 casa <b>{c.position}</b> = <b>{c.digit}</b>{c.hint ? ` · dica: ${c.hint}` : ""}</> : <>{mediaIcon(c.media)} {c.title || "Curiosidade"}</>}
                         </div>
                         {qrMap[c.code] ? <div className="qbox-mini"><img src={qrMap[c.code]} alt={c.code} /></div> : null}
                         <div className="card-actions noprint">

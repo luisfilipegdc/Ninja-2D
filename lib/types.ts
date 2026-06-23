@@ -5,13 +5,14 @@ export interface Card {
   code: string;
   game_id: string;
   kind: CardKind;
-  lock: number | null;       // 1 | 2 (senha)
+  lock: number | null;       // sempre 1 (cadeado único)
   position: number | null;   // 1..3 (senha)
   digit: number | null;      // 0..9 (senha)
   hint: string | null;
   media: Media | null;       // curiosidade
   title: string | null;
   body: string | null;
+  location: string | null;   // localização física da tag (admin)
 }
 
 export interface ScoreRow {
