@@ -248,7 +248,7 @@ export default function Game() {
     if (d.getMonth() === 5 && (d.getDate() === 27 || d.getDate() === 24)) {
       setFestaHoje(true);
       markEgg("festa");
-      setTimeout(() => fireworksRef.current(), 700);
+      setTimeout(() => burstRef.current(), 700);
     }
     let last = 0, lx = 0, ly = 0, lz = 0, primed = false;
     const onMotion = (e: DeviceMotionEvent) => {
@@ -283,9 +283,8 @@ export default function Game() {
           p.vx *= 0.97; p.vy *= 0.97;
           const fade = 1 - p.life / p.max;
           ctx.globalAlpha = Math.max(0, fade); ctx.fillStyle = p.c;
-          ctx.shadowColor = p.c; ctx.shadowBlur = 8;
           ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, 6.28); ctx.fill();
-          ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+          ctx.globalAlpha = 1;
         } else {
           p.rot += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); ctx.restore();
         }
@@ -309,13 +308,13 @@ export default function Game() {
     const FIRE = ["#f9c21a", "#ffd84a", "#e23b2e", "#e84c97", "#28a8e0", "#ffffff"];
     const shell = (cx: number, cy: number) => {
       const c = FIRE[(Math.random() * FIRE.length) | 0];
-      const n = 34 + (Math.random() * 14 | 0);
-      const spd = 4 + Math.random() * 2.4;
+      const n = 22 + (Math.random() * 10 | 0);
+      const spd = 4 + Math.random() * 2.2;
       for (let i = 0; i < n; i++) {
         const ang = (i / n) * 6.28 + Math.random() * 0.2;
         const v = spd * (0.6 + Math.random() * 0.5);
         parts.push({ kind: "spark", x: cx, y: cy, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v,
-          g: 0.05, s: 1.6 + Math.random() * 1.8, c, life: 0, max: 55 + (Math.random() * 30 | 0) });
+          g: 0.05, s: 1.8 + Math.random() * 1.8, c, life: 0, max: 50 + (Math.random() * 26 | 0) });
       }
     };
     fireworksRef.current = () => {
@@ -323,9 +322,9 @@ export default function Game() {
         for (let i = 0; i < n; i++) shell(innerWidth * (0.2 + Math.random() * 0.6), innerHeight * (0.18 + Math.random() * 0.32));
         if (!rafOn) { rafOn = true; requestAnimationFrame(tick); }
       };
-      launch(3);
-      setTimeout(() => launch(3), 280);
-      setTimeout(() => launch(4), 620);
+      launch(2);
+      setTimeout(() => launch(2), 300);
+      setTimeout(() => launch(3), 660);
     };
     return () => window.removeEventListener("resize", resize);
   }, []);
@@ -574,10 +573,10 @@ export default function Game() {
   const eggTaps = useRef(0); const eggLast = useRef(0);
   const bonfireTap = useCallback(() => {
     vibrate(8);
-    if (mestre) { fireworks(); return; }
+    if (mestre) { burst(); return; }
     const now = Date.now(); if (now - eggLast.current > 1200) eggTaps.current = 0; eggLast.current = now;
-    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {} markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); fireworks(); setEggOpen(true); }
-  }, [mestre, fireworks, markEgg]);
+    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {} markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
+  }, [mestre, burst, markEgg]);
 
   /* ===================== admin ===================== */
   const [admEmail, setAdmEmail] = useState(""); const [admPass, setAdmPass] = useState("");
