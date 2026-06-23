@@ -9,7 +9,7 @@ export default function Cartaz() {
   const [url, setUrl] = useState("");
 
   useEffect(() => {
-    const u = window.location.origin + "/";
+    const u = "https://festajuninamarista.vercel.app/";
     setUrl(u);
     QRCode.toDataURL(u, { width: 1000, margin: 1, errorCorrectionLevel: "M", color: { dark: "#15375d", light: "#ffffff" } })
       .then(setQr).catch(() => {});
