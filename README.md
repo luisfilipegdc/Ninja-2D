@@ -1,18 +1,18 @@
 # 🔥 Arraiá do Tesouro — PWA de caça ao tesouro pra festa junina
 
 Caça ao tesouro gamificada com **tags NFC** (e QR Code como reserva), feita
-como **PWA** que roda no **Android (Chrome) e iOS (Safari)**. Funciona offline
-e **não precisa de servidor**.
+como **PWA** (Next.js) que roda no **Android (Chrome) e iOS (Safari)**, com
+**Supabase** guardando cartões, ranking e o período ativo.
 
 ## Como funciona
 
 Há **vários cartões** (tags NFC, com QR de reserva) escondidos pelo arraiá. Cada
 cartão tem um **código** (ex: `af6a49c5`) e é de um de dois tipos:
 
-- **Senha:** são **2 cadeados independentes, cada um com senha de 3 dígitos**
-  (6 cartões no total). Cada cartão revela **1 dígito + a casa (1–3)** do seu
-  cadeado. Cada cadeado abre um **baú/cadeado físico** — dá pra usar em momentos
-  diferentes da festa.
+- **Senha:** há **2 cadeados, cada um com senha de 3 dígitos**. **Só um fica
+  ativo por vez** (o organizador escolhe o período no admin — nunca os dois
+  juntos). Cada cartão de senha revela **1 dígito + a casa (1–3)** do seu
+  cadeado, e cada cadeado abre um baú/cadeado físico.
 - **Curiosidade** (os demais): conteúdo sobre festa junina — **texto, imagem,
   vídeo do YouTube, áudio ou link**. Servem pra manter o jogo divertido.
 
@@ -66,35 +66,47 @@ aparelho e retoma de onde parou.
   inicial mostra como **instalar** (Compartilhar → *Adicionar à Tela de Início*).
   Aberto pela Tela de Início, roda em modo standalone, sem barras do navegador.
 
-## Arquivos
+## Stack & arquivos
 
-| Arquivo | Função |
+App em **Next.js (App Router) + TypeScript** + **Supabase** (cartões, ranking,
+período ativo). O jogo todo é client-side (PWA, NFC, câmera).
+
+| Caminho | Função |
 |---|---|
-| `index.html` | App inteiro (telas, scanner NFC/QR, admin, confete) |
-| `manifest.json` | Metadados do PWA |
-| `sw.js` | Service worker (cache offline) |
-| `icons/` | Ícones (fogueira) |
-| `make_icons.py` | Script que gera os ícones |
+| `app/` | layout, página e `globals.css` (o visual bespoke) |
+| `components/Game.tsx` | o app inteiro (telas, scanner NFC/QR, cofres, admin) |
+| `lib/supabase.ts` | cliente Supabase (lê `NEXT_PUBLIC_SUPABASE_*`) |
+| `public/` | `manifest.json`, `sw.js`, `icons/` |
+| `supabase/migrations/` | SQL (scores, cards, 2 cadeados, período ativo) |
 
-## Como publicar (HTTPS é obrigatório pra PWA, NFC e câmera)
+## Rodar localmente
 
-O app vive na **raiz do repositório**:
+```bash
+npm install
+# crie .env.local com as credenciais do Supabase:
+#   NEXT_PUBLIC_SUPABASE_URL=...
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+npm run dev      # http://localhost:3000
+npm run build    # build de produção
+```
 
-- **Vercel**: já conectado — cada push faz deploy automático.
-- **Netlify / Cloudflare Pages**: arraste a pasta e está no ar.
-- **GitHub Pages**: ative Pages apontando pra branch.
+## Publicar (Vercel)
+
+O Vercel detecta o Next.js automaticamente — cada push faz deploy. As
+credenciais vêm das **env vars** (`NEXT_PUBLIC_SUPABASE_URL` e
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`), idealmente via a **integração Supabase ↔
+Vercel** (sincronize ao menos em *Production*). HTTPS é obrigatório pra PWA,
+NFC e câmera.
 
 ## Como montar a caçada (organizador)
 
-1. Abra o app → **⚙️ Organizador**.
-2. Defina a quantidade de tesouros (2 a 20), escreva a pista e escolha o emoji
-   de cada um.
-3. **Gerar QR de início + tags**:
-   - **QR de Início** → imprima e cole na entrada. Ele carrega a caçada inteira
-     na URL, então qualquer celular que escaneia abre o jogo já configurado.
-   - **Cada tesouro** → no Android, toque em **📡 Gravar tag NFC** e encoste numa
-     tag NTAG para gravá-la; para iPhones, **imprima o QR de reserva** do tesouro.
-4. Esconda cada tag/QR no local descrito pela sua pista.
+1. Abra o app → **⚙️ Organizador** → entre com o usuário admin do Supabase.
+2. **Período ativo:** escolha qual cadeado vale agora (**1 ou 2** — só um por vez).
+3. **+ Novo cartão**:
+   - **senha** → cadeado (1/2) + casa (1–3) + dígito (+ dica);
+   - **curiosidade** → texto, imagem, YouTube, áudio ou link.
+4. Em cada cartão: **📡 Gravar tag NFC** (Android) e/ou imprima o **QR**.
+5. Esconda os cartões pelo arraiá. Troque o período ativo conforme a festa.
 
 > Quer testar rápido? Abra a URL do app **sem QR**: ele entra em **modo
 > demonstração** com 3 tesouros de exemplo.
@@ -115,7 +127,7 @@ Como funciona:
 
 Setup do Supabase (uma vez), no **SQL Editor**:
 1. Rode `supabase/migrations/0001_scores.sql` — ranking (tabela `scores` + RLS + Realtime).
-2. Rode `supabase/migrations/0002_cards.sql` e `0003_two_locks.sql` — cartões da
-   caçada (tabela `cards` + RLS + 2 cadeados de 3 dígitos).
+2. Rode `0002_cards.sql`, `0003_two_locks.sql` e `0004_game_state.sql` — cartões
+   da caçada (2 cadeados de 3 dígitos) e o período ativo (qual cadeado vale agora).
 3. Crie o **usuário admin**: Authentication → Add user → e-mail + senha (marque
    "Auto Confirm"). É com ele que o painel do organizador entra pra gerenciar os cartões.
