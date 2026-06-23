@@ -571,10 +571,23 @@ export default function Game() {
   const writeTag = useCallback(async (url: string, btn: HTMLButtonElement) => {
     if (!flags.NFC_OK) { alert("Gravar tag NFC só funciona no Chrome do Android. Grave num Android — depois funciona no iPhone."); return; }
     const orig = btn.textContent; btn.textContent = "Aproxime a tag…";
-    try { const w = new (window as any).NDEFReader(); await w.write({ records: [{ recordType: "url", data: url }] }); btn.textContent = "✔ Gravada!"; vibrate([40, 30, 120]); }
-    catch { btn.textContent = "Falhou — toque de novo"; }
-    setTimeout(() => { btn.textContent = orig; }, 2500);
-  }, [flags.NFC_OK]);
+    try {
+      const w = new (window as any).NDEFReader();
+      await w.write({ records: [{ recordType: "url", data: url }] });
+      btn.textContent = "✔ Gravada!"; vibrate([40, 30, 120]);
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e: any) {
+      const n = e?.name || "";
+      let msg: string;
+      if (n === "NotSupportedError") msg = "Essa tag não aceita gravação web — provável Mifare Classic. Use tags NTAG213/215/216 (ou imprima o QR do cartão).";
+      else if (n === "NotAllowedError") msg = "Ligue o NFC e permita o acesso, depois toque de novo.";
+      else if (n === "NetworkError" || n === "AbortError") msg = "Tirou a tag cedo demais — encoste e segure até aparecer ✔ Gravada.";
+      else msg = "Não gravou (" + (n || e?.message || "erro") + "). Tente NTAG213/215/216 — ou use o QR do cartão.";
+      btn.textContent = "Falhou — toque de novo";
+      showToast(msg);
+      setTimeout(() => { btn.textContent = orig; }, 3000);
+    }
+  }, [flags.NFC_OK, showToast]);
 
   /* ===================== render ===================== */
   const g = game;
