@@ -83,10 +83,22 @@ O app vive na **raiz do repositório**:
 > Quer testar rápido? Abra a URL do app **sem QR**: ele entra em **modo
 > demonstração** com 3 tesouros de exemplo.
 
-## Sobre o ranking
+## Ranking ao vivo (Supabase)
 
-O ranking é salvo **por aparelho** (localStorage). Para um **ranking ao vivo
-compartilhado entre todos os celulares**, é preciso um backend — dá pra plugar
-o Supabase (já disponível no projeto): uma tabela `scores` + insert no fim do
-jogo + leitura ordenada por tempo. É o próximo passo natural se quiser
-competição em tempo real de verdade.
+O ranking é **compartilhado entre todos os celulares e atualiza ao vivo** via
+Supabase. Cada caçada tem seu próprio placar (chave `game_id` derivada da
+configuração), então hunts diferentes não se misturam. Se o aparelho estiver
+offline (ou o Supabase indisponível), o jogo cai pro ranking local por aparelho.
+
+Como funciona:
+- No fim do jogo o app insere `{game_id, name, ms, total}` na tabela `scores`.
+- As telas de resultado e de ranking leem o top por tempo e **assinam** as novas
+  pontuações (Realtime), atualizando sozinhas quando outra pessoa termina.
+- A **URL** do projeto e a **chave publishable** ficam no front-end (é seguro —
+  protegido por Row Level Security). A senha do banco **nunca** entra no código.
+
+Setup do Supabase (uma vez), no **SQL Editor**:
+1. Rode `supabase/migrations/0001_scores.sql` — ranking (tabela `scores` + RLS + Realtime).
+2. Rode `supabase/migrations/0002_cards.sql` — cartões da caçada (tabela `cards` + RLS).
+3. Crie o **usuário admin**: Authentication → Add user → e-mail + senha (marque
+   "Auto Confirm"). É com ele que o painel do organizador entra pra gerenciar os cartões.

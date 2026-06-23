@@ -1,7 +1,7 @@
 // Service Worker do Arraiá do Tesouro.
 // Cache "app shell" + bibliotecas de CDN para o jogo funcionar offline
 // (importante numa festa onde o sinal costuma falhar).
-const CACHE = "arraia-tesouro-v6";
+const CACHE = "arraia-tesouro-v7";
 
 const APP_SHELL = [
   "./",
@@ -12,6 +12,7 @@ const APP_SHELL = [
   "./icons/apple-touch-icon.png",
   "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js",
   "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js",
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js",
 ];
 
 self.addEventListener("install", (event) => {
@@ -50,6 +51,9 @@ function isHtmlRequest(request) {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET") return;
+
+  // Supabase (ranking ao vivo): sempre rede, nunca cache (evita ranking velho)
+  if (/supabase\.(co|in)$/.test(new URL(request.url).hostname)) return;
 
   if (isHtmlRequest(request)) {
     event.respondWith(
