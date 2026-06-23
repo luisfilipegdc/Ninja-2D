@@ -34,7 +34,11 @@ function ytId(url: string): string | null {
   return m ? m[1] : null;
 }
 function mediaIcon(m: Media | null) {
-  return ({ texto: "📝", imagem: "🖼️", youtube: "▶️", audio: "🎵", link: "🔗" } as Record<string, string>)[m || ""] || "📜";
+  return ({ texto: "📝", imagem: "🖼️", youtube: "▶️", spotify: "🎵", audio: "🔊" } as Record<string, string>)[m || ""] || "📜";
+}
+function spotifyEmbed(url: string): string | null {
+  const m = String(url).match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist|episode|show|artist)\/([A-Za-z0-9]+)/);
+  return m ? `https://open.spotify.com/embed/${m[1]}/${m[2]}` : null;
 }
 function randCode() { let s = ""; const h = "0123456789abcdef"; for (let i = 0; i < 8; i++) s += h[(Math.random() * 16) | 0]; return s; }
 function vibrate(p: number | number[]) { if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(p); }
@@ -57,6 +61,7 @@ export default function Game() {
   const [toast, setToast] = useState("");
   const [mestre, setMestre] = useState(false);
   const [eggOpen, setEggOpen] = useState(false);
+  const [festaHoje, setFestaHoje] = useState(false);
 
   // scanner
   const [scanErr, setScanErr] = useState("");
@@ -224,6 +229,29 @@ export default function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------- easter eggs: data da festa + chacoalhar ---------- */
+  useEffect(() => {
+    const d = new Date();
+    if (d.getMonth() === 5 && (d.getDate() === 27 || d.getDate() === 24)) {
+      setFestaHoje(true);
+      setTimeout(() => burstRef.current(), 700);
+    }
+    let last = 0, lx = 0, ly = 0, lz = 0, primed = false;
+    const onMotion = (e: DeviceMotionEvent) => {
+      const a = e.accelerationIncludingGravity; if (!a) return;
+      const x = a.x || 0, y = a.y || 0, z = a.z || 0;
+      const delta = Math.abs(x - lx) + Math.abs(y - ly) + Math.abs(z - lz);
+      lx = x; ly = y; lz = z;
+      if (!primed) { primed = true; return; }
+      if (delta > 45) {
+        const now = Date.now(); if (now - last < 4000) return; last = now;
+        vibrate([20, 30, 20]); burstRef.current(); showToast("☔ Olha a chuva… é mentira! 😄");
+      }
+    };
+    window.addEventListener("devicemotion", onMotion);
+    return () => window.removeEventListener("devicemotion", onMotion);
+  }, [showToast]);
+
   /* ---------- confete ---------- */
   useEffect(() => {
     const cvs = confettiRef.current; if (!cvs) return;
@@ -311,10 +339,17 @@ export default function Game() {
     const nm = name.trim();
     if (!nm) return;
     goFullscreen();
+    // easter egg: nome mágico
+    const magic = nm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (["marista", "sao joao", "festa junina", "ze do milho"].includes(magic)) {
+      setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {}
+      vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 250);
+      showToast("✨ Nome mágico! Modo Mestre liberado 🔥👑");
+    }
     const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {}, 2: {} }, seen: [], doneLocks: [], active: true };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
     setView("game");
-  }, [name, goFullscreen, persist]);
+  }, [name, goFullscreen, persist, burst, showToast]);
 
   const completeLock = useCallback((L: number) => {
     const g = gameRef.current!; const combo: (number | string)[] = [];
@@ -339,10 +374,6 @@ export default function Game() {
     setChestBoth(bothDone(g));
     setView("chest");
   }, [persist, syncGame, burst, sbInsert, sbTop, sb, unsubAll]);
-
-  const linkNode = (url: string, label: string) => (
-    <a className="btn" style={{ marginTop: 16, display: "block", textAlign: "center", textDecoration: "none" }} href={url} target="_blank" rel="noopener noreferrer">{label}</a>
-  );
 
   const revealSenha = useCallback((card: Card) => {
     const g = gameRef.current!; const L = card.lock || 1, pos = card.position!, digit = card.digit!;
@@ -372,9 +403,20 @@ export default function Game() {
     let media: React.ReactNode;
     if (card.media === "texto") media = <div className="curio-text">{body}</div>;
     else if (card.media === "imagem") media = <img className="curio-img" src={body} alt={card.title || "imagem"} />;
-    else if (card.media === "youtube") { const id = ytId(body); media = id ? <div className="curio-yt"><iframe src={"https://www.youtube.com/embed/" + id} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div> : linkNode(body, "Abrir vídeo ▶️"); }
+    else if (card.media === "youtube") {
+      const id = ytId(body);
+      media = id
+        ? <div className="curio-yt"><iframe src={"https://www.youtube.com/embed/" + id} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
+        : <div className="curio-text">Não consegui carregar o vídeo. Confira o link no painel.</div>;
+    }
+    else if (card.media === "spotify") {
+      const e = spotifyEmbed(body);
+      media = e
+        ? <iframe className="curio-spotify" src={e} allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" />
+        : <div className="curio-text">Não consegui carregar a música. Confira o link do Spotify no painel.</div>;
+    }
     else if (card.media === "audio") media = <audio className="curio-audio" controls src={body} />;
-    else media = linkNode(body, "Abrir conteúdo 🔗");
+    else media = <div className="curio-text">{body}</div>;
     const node = (
       <div className="curio">
         <div className="curio-emoji">{mediaIcon(card.media)}</div>
@@ -488,6 +530,24 @@ export default function Game() {
   const [qrMap, setQrMap] = useState<Record<string, string>>({});
   const [form, setForm] = useState<Partial<Card> | null>(null);
   const [formErr, setFormErr] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  const uploadFile = useCallback(async (file: File) => {
+    if (!sb) { setFormErr("Supabase não configurado."); return; }
+    if (file.size > 25 * 1024 * 1024) { setFormErr("Arquivo grande demais (máx. 25 MB)."); return; }
+    setFormErr(""); setUploading(true);
+    try {
+      const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const path = Date.now() + "-" + Math.random().toString(36).slice(2, 8) + "." + ext;
+      const { error } = await sb.storage.from("curiosidades").upload(path, file, { upsert: true, contentType: file.type || undefined });
+      if (error) { setFormErr("Falha no upload: " + error.message + " (rodou a migration 0005?)"); }
+      else {
+        const { data } = sb.storage.from("curiosidades").getPublicUrl(path);
+        setForm((f) => (f ? { ...f, body: data.publicUrl } : f));
+      }
+    } catch { setFormErr("Erro no upload."); }
+    setUploading(false);
+  }, [sb]);
 
   const cardUrl = (code: string) => (typeof window !== "undefined" ? window.location.origin + window.location.pathname : "") + "?c=" + encodeURIComponent(code);
 
@@ -613,6 +673,7 @@ export default function Game() {
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
             <div className="logs"><span /><span /></div>
           </div>
+          {festaHoje ? <div className="festa-hoje">🎉 É hoje! Festa Junina do Marista. Boa caçada!</div> : null}
           <span className="badge" id="gameBadge">🔓 Vale a senha do Cadeado {activeLock} agora</span>
           <div className="install" style={{ display: "block" }}>{nfcNotice}</div>
           {splashMsg ? <div className="install warn" style={{ display: "block" }}>{splashMsg}</div> : null}
@@ -753,14 +814,40 @@ export default function Game() {
                     <>
                       <label className="field" htmlFor="fMedia">Tipo de conteúdo</label>
                       <select id="fMedia" value={form.media || "texto"} onChange={(e) => setForm({ ...form, media: e.target.value as Media })}>
-                        <option value="texto">📝 Texto</option><option value="imagem">🖼️ Imagem (URL)</option>
-                        <option value="youtube">▶️ Vídeo do YouTube (URL)</option><option value="audio">🎵 Áudio/música (URL)</option>
-                        <option value="link">🔗 Link</option>
+                        <option value="texto">📝 Texto</option>
+                        <option value="imagem">🖼️ Imagem (URL ou upload)</option>
+                        <option value="youtube">▶️ Vídeo do YouTube (link)</option>
+                        <option value="spotify">🎵 Música do Spotify (link)</option>
+                        <option value="audio">🔊 Áudio (URL ou upload)</option>
                       </select>
                       <label className="field" htmlFor="fTitle">Título</label>
                       <input id="fTitle" type="text" value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex: Por que tem fogueira?" />
-                      <label className="field" htmlFor="fBody">Conteúdo (texto ou URL)</label>
-                      <textarea id="fBody" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Cole o texto, ou a URL da imagem/vídeo/áudio/link" />
+                      {form.media === "texto" ? (
+                        <>
+                          <label className="field" htmlFor="fBody">Texto da curiosidade</label>
+                          <textarea id="fBody" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Escreva o textinho aqui" />
+                        </>
+                      ) : (
+                        <>
+                          <label className="field" htmlFor="fBody">
+                            {form.media === "youtube" ? "Link do YouTube" : form.media === "spotify" ? "Link do Spotify" : "URL do arquivo"}
+                          </label>
+                          <input id="fBody" type="text" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })}
+                            placeholder={form.media === "youtube" ? "https://youtu.be/..." : form.media === "spotify" ? "https://open.spotify.com/..." : "cole a URL ou use o upload abaixo"} />
+                          {(form.media === "imagem" || form.media === "audio") ? (
+                            <div className="uploadbox">
+                              <label className="nfc-btn" style={{ display: "inline-block", cursor: "pointer" }}>
+                                {uploading ? "Enviando…" : "📤 Enviar arquivo"}
+                                <input type="file" accept={form.media === "imagem" ? "image/*" : "audio/*"} style={{ display: "none" }}
+                                  disabled={uploading}
+                                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); e.currentTarget.value = ""; }} />
+                              </label>
+                              {form.body ? <span className="upload-ok">✔ pronto</span> : null}
+                            </div>
+                          ) : null}
+                          {form.media === "imagem" && form.body ? <img className="upload-prev" src={form.body} alt="prévia" /> : null}
+                        </>
+                      )}
                     </>
                   )}
                   {formErr ? <div className="scan-err">{formErr}</div> : null}

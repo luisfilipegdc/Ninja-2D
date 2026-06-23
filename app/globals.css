@@ -125,7 +125,9 @@ select option{color:#1b1030;}
 .btn::after{content:"";position:absolute;inset:0;z-index:-1;opacity:0;
   background:radial-gradient(120% 90% at 50% -20%, rgba(255,255,255,.85), transparent 60%);transition:opacity .12s ease;}
 .btn:active::after{opacity:1;}
-.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #c8860f, var(--sombra);filter:saturate(1.2) brightness(1.05);}
+.btn::before{content:"";position:absolute;inset:0 0 auto 0;height:45%;border-radius:16px 16px 40% 40%;
+  background:linear-gradient(rgba(255,255,255,.35),transparent);opacity:.5;pointer-events:none;}
+.btn:active{transform:translateY(4px) scale(.992);box-shadow:0 2px 0 #c8860f, var(--sombra);filter:saturate(1.2) brightness(1.05);}
 .btn.fire{background:linear-gradient(180deg,#ff9a4a,var(--fogueira));color:#3a1500;box-shadow:0 6px 0 #b8470a, var(--sombra);}
 .btn.fire::after{background:radial-gradient(120% 90% at 50% -20%, rgba(255,224,150,.95), transparent 62%);}
 .btn.fire:active{box-shadow:0 2px 0 #b8470a, var(--sombra);}
@@ -141,6 +143,9 @@ select option{color:#1b1030;}
 .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);
   border:1.5px solid rgba(255,201,60,.4);color:var(--milho);font-weight:800;font-size:.85rem;
   padding:7px 14px;border-radius:999px;margin-top:14px;align-self:flex-start;}
+.festa-hoje{margin-top:14px;align-self:flex-start;background:rgba(249,194,26,.14);border:1.5px solid rgba(249,194,26,.5);
+  color:#ffe9a8;font-weight:800;border-radius:14px;padding:11px 15px;font-size:.95rem;line-height:1.4;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);}
 .install{background:rgba(76,201,240,.12);border:1.5px solid rgba(76,201,240,.4);
   color:#cdeafe;border-radius:16px;padding:13px 15px;margin-top:14px;font-weight:700;font-size:.92rem;line-height:1.45;
   -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 8px 22px -16px rgba(0,0,0,.55);}
@@ -211,6 +216,10 @@ select option{color:#1b1030;}
 .curio-yt{position:relative;width:100%;padding-top:56.25%;border-radius:16px;overflow:hidden;margin-top:14px;box-shadow:var(--sombra);}
 .curio-yt iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
 audio.curio-audio{width:100%;margin-top:18px;}
+.curio-spotify{width:100%;height:152px;border:0;border-radius:14px;margin-top:14px;box-shadow:var(--sombra);}
+.uploadbox{display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;}
+.upload-ok{color:var(--verde);font-weight:800;font-size:.9rem;}
+.upload-prev{width:100%;border-radius:12px;margin-top:10px;box-shadow:var(--sombra);max-height:200px;object-fit:cover;}
 
 /* Celebração / baú */
 .celebrate{align-items:center;text-align:center;justify-content:center;}
