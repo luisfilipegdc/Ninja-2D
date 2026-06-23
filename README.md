@@ -97,5 +97,8 @@ Como funciona:
 - A **URL** do projeto e a **chave publishable** ficam no front-end (é seguro —
   protegido por Row Level Security). A senha do banco **nunca** entra no código.
 
-Setup (uma vez): rode `supabase/migrations/0001_scores.sql` no **SQL Editor** do
-Supabase. Ele cria a tabela, as políticas de RLS e habilita o Realtime.
+Setup do Supabase (uma vez), no **SQL Editor**:
+1. Rode `supabase/migrations/0001_scores.sql` — ranking (tabela `scores` + RLS + Realtime).
+2. Rode `supabase/migrations/0002_cards.sql` — cartões da caçada (tabela `cards` + RLS).
+3. Crie o **usuário admin**: Authentication → Add user → e-mail + senha (marque
+   "Auto Confirm"). É com ele que o painel do organizador entra pra gerenciar os cartões.
