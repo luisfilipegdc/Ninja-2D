@@ -67,7 +67,7 @@ function localRows(L: number): ScoreRow[] {
 export default function Game() {
   const [view, setView] = useState<ViewId>("splash");
   const [game, setGame] = useState<GameState | null>(null);
-  const [activeLock, setActiveLock] = useState<number>(1);
+  const activeLock = 1; // cadeado único
   const [elapsed, setElapsed] = useState(0);
   const [name, setName] = useState("");
   const [splashMsg, setSplashMsg] = useState("");
@@ -100,11 +100,9 @@ export default function Game() {
 
   // ranking
   const [rank1, setRank1] = useState<ScoreRow[]>([]);
-  const [rank2, setRank2] = useState<ScoreRow[]>([]);
 
   // refs (latest values em callbacks async)
   const gameRef = useRef<GameState | null>(null);
-  const activeLockRef = useRef(1);
   const scanActiveRef = useRef(false);
   const myScoreId = useRef<string | null>(null);
   const ambientRef = useRef<HTMLCanvasElement | null>(null);
@@ -121,7 +119,6 @@ export default function Game() {
   const toastT = useRef<any>(null);
 
   useEffect(() => { gameRef.current = game; }, [game]);
-  useEffect(() => { activeLockRef.current = activeLock; }, [activeLock]);
 
   const sb = useMemo(() => getSupabase(), []);
 
@@ -173,7 +170,7 @@ export default function Game() {
   /* ---------- estado dos cadeados ---------- */
   const lockFilled = (g: GameState, L: number) => { let n = 0; for (let p = 1; p <= 3; p++) if (g.locks[L]?.[p] != null) n++; return n; };
   const lockComplete = (g: GameState, L: number) => lockFilled(g, L) >= 3;
-  const bothDone = (g: GameState) => lockComplete(g, 1) && lockComplete(g, 2);
+  const bothDone = (g: GameState) => lockComplete(g, 1);
 
   /* ---------- cartões (Supabase + cache) ---------- */
   const cacheCard = (c: Card) => { try { const m = JSON.parse(localStorage.getItem(LS_CARDS) || "{}"); m[c.code] = c; localStorage.setItem(LS_CARDS, JSON.stringify(m)); } catch {} };
@@ -210,23 +207,6 @@ export default function Game() {
     const rows = await sbTop(lockGameId(L));
     set(rows ?? localRows(L));
   }, [sbTop]);
-
-  /* ---------- período ativo (game_state) ---------- */
-  useEffect(() => {
-    if (!sb) return;
-    let alive = true;
-    (async () => {
-      try {
-        const { data } = await sb.from("game_state").select("active_lock").eq("game_id", EVENT).maybeSingle();
-        if (alive && data && (data as any).active_lock) setActiveLock((data as any).active_lock);
-      } catch {}
-    })();
-    const ch = sb.channel("gs_" + EVENT)
-      .on("postgres_changes", { event: "*", schema: "public", table: "game_state", filter: "game_id=eq." + EVENT },
-        (payload: any) => { const al = payload?.new?.active_lock; if (al) setActiveLock(al); })
-      .subscribe();
-    return () => { alive = false; try { sb.removeChannel(ch); } catch {} };
-  }, [sb]);
 
   /* ---------- timer ---------- */
   useEffect(() => {
@@ -457,7 +437,7 @@ export default function Game() {
       vibrate([20, 40, 20, 40, 20]); balloonsRef.current();
       showToast("🎈 Balões pra você, " + nm + "! Voa alto 💙");
     }
-    const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {}, 2: {} }, seen: [], doneLocks: [], active: true };
+    const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {} }, seen: [], doneLocks: [], active: true };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
     setView("game");
   }, [name, goFullscreen, persist, fireworks, markEgg, showToast]);
@@ -498,12 +478,12 @@ export default function Game() {
     const node = (
       <div className="senha-reveal">
         <div className="senha-digit">{digit}</div>
-        <div className="senha-where">entra na <b>casa {pos}</b> do <b>Cadeado {L}</b></div>
+        <div className="senha-where">entra na <b>casa {pos}</b> do <b>cadeado</b></div>
         {card.hint ? <p className="senha-hint">💬 {card.hint}</p> : null}
       </div>
     );
     afterCardRef.current = complete ? () => completeLock(L) : renderHub;
-    setCardView({ kind: "senha", node, kicker: already ? "Você já tinha esse número 😉" : "Achou um número da senha!", cta: complete ? `Ver a senha do Cadeado ${L} 🔐` : "Continuar a caçada 📡" });
+    setCardView({ kind: "senha", node, kicker: already ? "Você já tinha esse número 😉" : "Achou um número da senha!", cta: complete ? "Ver a senha do cadeado 🔐" : "Continuar a caçada 📡" });
     setView("card");
   }, [persist, syncGame, burst, completeLock, renderHub]);
 
@@ -545,14 +525,8 @@ export default function Game() {
     showToast("Lendo cartão…");
     const card = await fetchCard(code);
     if (!card) { flashErr("Cartão não encontrado. Veja a conexão e tente de novo."); setView("game"); return; }
-    if (card.kind === "senha") {
-      const L = card.lock || 1;
-      if (L !== activeLockRef.current) {
-        showToast(`Esse cartão é do Cadeado ${L}. Agora vale o Cadeado ${activeLockRef.current} ⏳`);
-        setView("game"); return;
-      }
-      revealSenha(card);
-    } else revealCuriosidade(card);
+    if (card.kind === "senha") revealSenha(card);
+    else revealCuriosidade(card);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCard, flashErr, showToast, revealSenha, revealCuriosidade]);
 
@@ -611,15 +585,13 @@ export default function Game() {
   /* ===================== ranking view ===================== */
   const openRanking = useCallback(() => {
     unsubAll();
-    setRank1(localRows(1)); setRank2(localRows(2));
-    loadLockBoard(1, setRank1); loadLockBoard(2, setRank2);
+    setRank1(localRows(1));
+    loadLockBoard(1, setRank1);
     if (sb) {
-      [1, 2].forEach(L => {
-        const gid = lockGameId(L);
-        const ch = sb.channel("rk_" + gid).on("postgres_changes", { event: "INSERT", schema: "public", table: "scores", filter: "game_id=eq." + gid },
-          () => loadLockBoard(L, L === 1 ? setRank1 : setRank2)).subscribe();
-        channelsRef.current.push(ch);
-      });
+      const gid = lockGameId(1);
+      const ch = sb.channel("rk_" + gid).on("postgres_changes", { event: "INSERT", schema: "public", table: "scores", filter: "game_id=eq." + gid },
+        () => loadLockBoard(1, setRank1)).subscribe();
+      channelsRef.current.push(ch);
     }
     setView("ranking");
   }, [sb, unsubAll, loadLockBoard]);
@@ -688,23 +660,41 @@ export default function Game() {
 
   const doLogout = useCallback(async () => { if (sb) { try { await sb.auth.signOut(); } catch {} } setAuthed(false); }, [sb]);
 
-  const setActivePeriod = useCallback(async (L: number) => {
-    if (!sb) return;
-    setActiveLock(L);
-    try { await sb.from("game_state").upsert({ game_id: EVENT, active_lock: L, updated_at: new Date().toISOString() }, { onConflict: "game_id" }); } catch {}
-  }, [sb]);
+  const randomizeSenhas = useCallback(async () => {
+    if (!sb || !cards) return;
+    const senhas = cards.filter(c => c.kind === "senha");
+    if (senhas.length < 2) { showToast("Cadastre as tags de senha primeiro 🔐"); return; }
+    // os pares (posição, dígito) são a combinação do cadeado — só mudamos QUAL tag mostra cada um
+    const pairs = senhas.map(c => ({ position: c.position!, digit: c.digit! }));
+    let changed = false;
+    for (let i = pairs.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); if (i !== j) changed = true; [pairs[i], pairs[j]] = [pairs[j], pairs[i]]; }
+    if (!changed && senhas.length > 1) { const t = pairs[0]; pairs[0] = pairs[1]; pairs[1] = t; }
+    try {
+      // fase 1: posições temporárias (4..6, válidas e únicas) p/ não colidir no índice único
+      for (let i = 0; i < senhas.length; i++) {
+        const { error } = await sb.from("cards").update({ position: 4 + i }).eq("code", senhas[i].code);
+        if (error) throw error;
+      }
+      // fase 2: distribuição final remanejada entre as tags
+      for (let i = 0; i < senhas.length; i++) {
+        const { error } = await sb.from("cards").update({ position: pairs[i].position, digit: pairs[i].digit, lock: 1 }).eq("code", senhas[i].code);
+        if (error) throw error;
+      }
+      vibrate([30, 40, 30]); showToast("🎲 Senhas embaralhadas entre as tags!");
+      loadCards();
+    } catch (e: any) { showToast("Não consegui randomizar: " + (e?.message || "erro")); }
+  }, [sb, cards, loadCards, showToast]);
 
   const saveCard = useCallback(async () => {
     if (!sb || !form) return; setFormErr("");
     const code = (form.code || "").trim();
     if (!/^[A-Za-z0-9_-]{4,40}$/.test(code)) { setFormErr("Código inválido (4–40 letras/números)."); return; }
-    const payload: any = { code, game_id: EVENT, kind: form.kind, lock: null, position: null, digit: null, hint: null, media: null, title: null, body: null };
+    const payload: any = { code, game_id: EVENT, kind: form.kind, lock: null, position: null, digit: null, hint: null, media: null, title: null, body: null, location: (form.location || "").trim() || null };
     if (form.kind === "senha") {
-      const lock = Number(form.lock), pos = Number(form.position), dig = Number(form.digit);
-      if (lock !== 1 && lock !== 2) { setFormErr("Escolha o cadeado (1 ou 2)."); return; }
+      const pos = Number(form.position), dig = Number(form.digit);
       if (!(pos >= 1 && pos <= 3)) { setFormErr("A casa precisa ser de 1 a 3."); return; }
       if (!(dig >= 0 && dig <= 9)) { setFormErr("Dígito precisa ser de 0 a 9."); return; }
-      payload.lock = lock; payload.position = pos; payload.digit = dig; payload.hint = (form.hint || "").trim() || null;
+      payload.lock = 1; payload.position = pos; payload.digit = dig; payload.hint = (form.hint || "").trim() || null;
     } else {
       payload.media = form.media || "texto"; payload.title = (form.title || "").trim() || null; payload.body = (form.body || "").trim();
       if (!payload.body) { setFormErr("Coloque o conteúdo (texto ou URL)."); return; }
@@ -813,14 +803,14 @@ export default function Game() {
           <p className="anyorder">🔀 Ache os cartões em <b>qualquer ordem</b> — cada número já vai pro lugar certo.</p>
           {g ? (
             <div className={"lockpanel" + (lockDone ? " done" : "")}>
-              <div className="lockhead"><span>🔓 Senha de agora <span className="lock-tag">Cadeado {activeLock}</span></span>{lockDone ? <span className="ok">✓ pronta!</span> : <span className="cnt">{filled === 0 ? "Faltam 3 números" : "Falta" + (3 - filled === 1 ? "" : "m") + " " + (3 - filled) + " número" + (3 - filled === 1 ? "" : "s")}</span>}</div>
+              <div className="lockhead"><span>🔓 Senha do cadeado</span>{lockDone ? <span className="ok">✓ pronta!</span> : <span className="cnt">{filled === 0 ? "Faltam 3 números" : "Falta" + (3 - filled === 1 ? "" : "m") + " " + (3 - filled) + " número" + (3 - filled === 1 ? "" : "s")}</span>}</div>
               <div className="cofre">
                 {[1, 2, 3].map(pos => {
                   const val = g.locks[activeLock]?.[pos];
                   return <div key={pos} className={"slot" + (val != null ? " filled" : "")}><span className="pos">{pos}ª</span>{val != null ? val : "🔒"}</div>;
                 })}
               </div>
-              {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => completeLock(activeLock)}>Ver a senha do Cadeado {activeLock} 🔐</button> : null}
+              {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => completeLock(activeLock)}>Ver a senha do cadeado 🔐</button> : null}
             </div>
           ) : null}
           <div className="spacer" />
@@ -851,7 +841,7 @@ export default function Game() {
         {/* CHEST */}
         <section id="view-chest" className={v("chest") + " celebrate"}>
           <div className="chest">🧰</div>
-          <div className="big">Senha do Cadeado {chest?.lock}!</div>
+          <div className="big">Senha do cadeado!</div>
           <p className="lead" style={{ textAlign: "center" }}>Gire o cadeado para:</p>
           <div className="combo">{chest?.combo.map((d, i) => <div key={i} className="d">{d}</div>)}</div>
           <p className="lead" style={{ textAlign: "center", marginTop: 14 }}>Boa, <b>{g?.name}</b>! Mostre a senha pro organizador e abra o baú deste cadeado. 🎁</p>
@@ -864,14 +854,9 @@ export default function Game() {
         <section id="view-ranking" className={v("ranking")}>
           <div className="kicker">Quem montou as senhas mais rápido</div>
           <h1 className="title" style={{ fontSize: "2.4rem" }}>Ranking 🏆</h1>
-          {[{ L: 1, rows: rank1 }, { L: 2, rows: rank2 }].map(({ L, rows }) => (
-            <div key={L}>
-              <h3 className="ranklock">🔒 Cadeado {L}</h3>
-              {rows.length ? (
-                <ul className="rank">{rows.slice(0, 12).map((e, i) => <li key={e.id} className={e.id === myScoreId.current ? "me" : ""}><span className="pos">{["🥇", "🥈", "🥉"][i] || i + 1}</span><span className="nm">{e.name}</span><span className="tm">{fmt(e.ms)}</span></li>)}</ul>
-              ) : <p className="empty">Ninguém abriu o Cadeado {L} ainda.</p>}
-            </div>
-          ))}
+          {rank1.length ? (
+            <ul className="rank">{rank1.slice(0, 12).map((e, i) => <li key={e.id} className={e.id === myScoreId.current ? "me" : ""}><span className="pos">{["🥇", "🥈", "🥉"][i] || i + 1}</span><span className="nm">{e.name}</span><span className="tm">{fmt(e.ms)}</span></li>)}</ul>
+          ) : <p className="empty">Ninguém abriu o cadeado ainda. Seja o primeiro! 🔥</p>}
           <div className="spacer" />
           <button className="btn" onClick={() => { unsubAll(); setView(g ? "game" : "splash"); }}>Voltar</button>
         </section>
@@ -892,20 +877,21 @@ export default function Game() {
             </div>
           ) : (
             <div>
-              <div className="note noprint">Período ativo agora: <b>Cadeado {activeLock}</b>. Só esse cadeado vale pros jogadores.</div>
-              <div className="activebar noprint">
-                <button className={activeLock === 1 ? "sel" : ""} onClick={() => setActivePeriod(1)}>🔒 Ativar Cadeado 1</button>
-                <button className={activeLock === 2 ? "sel" : ""} onClick={() => setActivePeriod(2)}>🔒 Ativar Cadeado 2</button>
-              </div>
-              <button className="btn noprint" style={{ marginTop: 14 }} onClick={() => setForm({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto" })}>+ Novo cartão</button>
+              <div className="note noprint">🔐 <b>Cadeado único.</b> As 3 tags de senha ficam fixas no lugar — use <b>Randomizar</b> pra trocar qual tag revela qual dígito, sem precisar mexer nelas.</div>
+              {cards && cards.some(c => c.kind === "senha") ? (
+                <button className="btn fire noprint" style={{ marginTop: 12 }} onClick={randomizeSenhas}>🎲 Randomizar senhas</button>
+              ) : null}
+              <button className="btn noprint" style={{ marginTop: 12 }} onClick={() => setForm({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto", location: "" })}>+ Nova tag</button>
 
               {form ? (
                 <div className="admin-row noprint">
-                  <label className="field" htmlFor="fCode">Código do cartão</label>
+                  <label className="field" htmlFor="fCode">ID da tag (código gravado)</label>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <input id="fCode" type="text" value={form.code || ""} onChange={(e) => setForm({ ...form, code: e.target.value })} />
+                    <input id="fCode" type="text" value={form.code || ""} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="ex: 53bfb8a3500001 (serial do leitor) ou aleatório" />
                     <button className="nfc-btn" style={{ flex: "none" }} onClick={() => setForm({ ...form, code: randCode() })}>🎲</button>
                   </div>
+                  <label className="field" htmlFor="fLoc">📍 Localização física</label>
+                  <input id="fLoc" type="text" value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex: atrás da barraca da pescaria" />
                   <label className="field" htmlFor="fKind">Tipo</label>
                   <select id="fKind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as any })}>
                     <option value="senha">🔐 Senha (1 número do cadeado)</option>
@@ -913,10 +899,6 @@ export default function Game() {
                   </select>
                   {form.kind === "senha" ? (
                     <>
-                      <label className="field" htmlFor="fLock">Cadeado (1 ou 2)</label>
-                      <select id="fLock" value={String(form.lock ?? 1)} onChange={(e) => setForm({ ...form, lock: Number(e.target.value) })}>
-                        <option value="1">🔒 Cadeado 1</option><option value="2">🔒 Cadeado 2</option>
-                      </select>
                       <label className="field" htmlFor="fPos">Casa na senha (1 a 3)</label>
                       <input id="fPos" type="number" min={1} max={3} value={String(form.position ?? 1)} onChange={(e) => setForm({ ...form, position: Number(e.target.value) })} />
                       <label className="field" htmlFor="fDigit">Dígito (0 a 9)</label>
@@ -976,8 +958,9 @@ export default function Game() {
                     cards.map((c) => (
                       <div key={c.code} className="admin-row">
                         <div className="rh">{c.code}</div>
+                        {c.location ? <div style={{ color: "#9fc3e8", marginTop: 4, fontSize: ".85rem", fontWeight: 700 }}>📍 {c.location}</div> : null}
                         <div style={{ color: "#e9def7", marginTop: 6 }}>
-                          {c.kind === "senha" ? <>🔐 Cadeado <b>{c.lock}</b> · casa <b>{c.position}</b> = <b>{c.digit}</b>{c.hint ? ` · dica: ${c.hint}` : ""}</> : <>{mediaIcon(c.media)} {c.title || "Curiosidade"}</>}
+                          {c.kind === "senha" ? <>🔐 casa <b>{c.position}</b> = <b>{c.digit}</b>{c.hint ? ` · dica: ${c.hint}` : ""}</> : <>{mediaIcon(c.media)} {c.title || "Curiosidade"}</>}
                         </div>
                         {qrMap[c.code] ? <div className="qbox-mini"><img src={qrMap[c.code]} alt={c.code} /></div> : null}
                         <div className="card-actions noprint">
