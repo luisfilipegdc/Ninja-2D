@@ -36,8 +36,9 @@ body{
 .bunting svg{display:block;width:100%;height:100%;
   transform-origin:top center;animation:buntingDrop .7s cubic-bezier(.34,1.4,.5,1) both;}
 @keyframes buntingDrop{from{transform:translateY(-48px);opacity:0;}to{transform:none;opacity:1;}}
-.bunting .flag{animation:sway 4.5s ease-in-out infinite;}
-@keyframes sway{0%,100%{transform:rotate(-1.6deg);}50%{transform:rotate(1.6deg);}}
+/* bandeirinhas paradas: o balanco por-bandeira distorcia com o SVG esticado
+   (preserveAspectRatio=none). Mantemos so a entrada. */
+.bunting .flag{transform-box:fill-box;transform-origin:50% 0;}
 
 /* Entrada orquestrada da splash */
 #view-splash.active .kicker{animation:riseIn .6s ease both .15s;}
