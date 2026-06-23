@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import Bunting from "@/components/Bunting";
 import { getSupabase, EVENT } from "@/lib/supabase";
-import type { Card, GameState, Media, ScoreRow } from "@/lib/types";
+import type { Card, EventRow, GameState, Media, ScoreRow } from "@/lib/types";
 
 /* ===================== helpers puros ===================== */
 type ViewId = "splash" | "game" | "scan" | "card" | "chest" | "ranking" | "admin";
@@ -82,7 +82,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (foundEggsRef.current.includes(id)) return;
     const next = [...foundEggsRef.current, id];
     foundEggsRef.current = next; setFoundEggs(next);
-    try { localStorage.setItem(LS_EGGS, JSON.stringify(next)); } catch {}
+  }, []);
+  const resetEggs = useCallback(() => {
+    foundEggsRef.current = [];
+    setFoundEggs([]); setMestre(false); setMestreKey("");
   }, []);
 
   // scanner
@@ -121,6 +124,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   useEffect(() => { gameRef.current = game; }, [game]);
 
   const sb = useMemo(() => getSupabase(), []);
+
+  const logEvent = useCallback((kind: "scan" | "complete" | "admin", info: { actor?: string | null; code?: string | null; detail?: string | null }) => {
+    if (!sb) return;
+    try { sb.from("events").insert({ game_id: EVENT, kind, actor: info.actor ?? null, code: info.code ?? null, detail: info.detail ?? null }).then(() => {}, () => {}); } catch {}
+  }, [sb]);
 
   // device flags (client)
   const flags = useMemo(() => {
@@ -217,9 +225,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
   /* ---------- launch (?c=) ---------- */
   useEffect(() => {
-    try { if (localStorage.getItem(LS_MESTRE) === "1") setMestre(true); } catch {}
-    try { const mk = localStorage.getItem(LS_MESTRE_KEY); if (mk) setMestreKey(mk); } catch {}
-    try { const fe = JSON.parse(localStorage.getItem(LS_EGGS) || "[]"); if (Array.isArray(fe)) { foundEggsRef.current = fe; setFoundEggs(fe); } } catch {}
+    // Modo Mestre / segredos são EFÊMEROS: reiniciam a cada atualização da página.
+    // Limpa qualquer estado antigo que tenha ficado salvo.
+    try { localStorage.removeItem(LS_MESTRE); localStorage.removeItem(LS_MESTRE_KEY); localStorage.removeItem(LS_EGGS); } catch {}
+    try { sessionStorage.removeItem(LS_MESTRE); sessionStorage.removeItem(LS_MESTRE_KEY); sessionStorage.removeItem(LS_EGGS); } catch {}
     const c = new URLSearchParams(window.location.search).get("c");
     if (c) {
       let sess: GameState | null = null;
@@ -427,7 +436,6 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const spell = MAGIC[magic];
     if (spell) {
       setMestre(true); setMestreKey(magic);
-      try { localStorage.setItem(LS_MESTRE, "1"); localStorage.setItem(LS_MESTRE_KEY, magic); } catch {}
       markEgg("nome");
       vibrate([30, 40, 30, 40, 140]); fireworks();
       showToast(spell.toast);
@@ -451,6 +459,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (!g.doneLocks.includes(L)) {
       g.doneLocks.push(L); persist(); syncGame();
       const ms = Date.now() - g.startedAt;
+      logEvent("complete", { actor: g.name, detail: "concluiu o cadeado em " + fmt(ms) });
       const list = loadRank(); list.push({ name: g.name, ms, at: Date.now(), total: 3, lock: L }); list.sort((a, b) => a.ms - b.ms); saveRank(list);
       myScoreId.current = "local_" + list.find(e => e.lock === L && e.name === g.name)!.at;
       setChestRank(localRows(L));
@@ -464,8 +473,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       setChestRank(localRows(L));
     }
     setChestBoth(bothDone(g));
+    resetEggs(); // easter eggs desligam ao concluir a senha
     setView("chest");
-  }, [persist, syncGame, burst, sbInsert, sbTop, sb, unsubAll]);
+  }, [persist, syncGame, burst, sbInsert, sbTop, sb, unsubAll, resetEggs, logEvent]);
 
   const revealSenha = useCallback((card: Card) => {
     const g = gameRef.current!; const L = card.lock || 1, pos = card.position!, digit = card.digit!;
@@ -526,10 +536,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     showToast("Lendo cartão…");
     const card = await fetchCard(code);
     if (!card) { flashErr("Cartão não encontrado. Veja a conexão e tente de novo."); setView("game"); return; }
+    logEvent("scan", { actor: gameRef.current?.name, code: card.code, detail: card.kind === "senha" ? `senha · casa ${card.position} = ${card.digit}` : `curiosidade · ${card.title || card.media || ""}` });
     if (card.kind === "senha") revealSenha(card);
     else revealCuriosidade(card);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchCard, flashErr, showToast, revealSenha, revealCuriosidade]);
+  }, [fetchCard, flashErr, showToast, revealSenha, revealCuriosidade, logEvent]);
 
   /* ===================== scanner (apenas NFC) ===================== */
   const defaultMethod = (): Method => flags.NFC_OK ? "nfc" : (flags.isIOS ? "nfctap" : "none");
@@ -603,7 +614,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     vibrate(8);
     if (mestre) { burst(); return; }
     const now = Date.now(); if (now - eggLast.current > 1200) eggTaps.current = 0; eggLast.current = now;
-    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); setMestreKey("fogueira"); try { localStorage.setItem(LS_MESTRE, "1"); localStorage.setItem(LS_MESTRE_KEY, "fogueira"); } catch {} markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
+    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); setMestreKey("fogueira"); markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
   }, [mestre, burst, markEgg]);
 
   /* ===================== admin ===================== */
@@ -614,6 +625,17 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [form, setForm] = useState<Partial<Card> | null>(null);
   const [formErr, setFormErr] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [adminUser, setAdminUser] = useState("");
+  const [logs, setLogs] = useState<EventRow[] | null>(null);
+  const [showLogs, setShowLogs] = useState(false);
+  const [logFilter, setLogFilter] = useState<"tudo" | "scan" | "admin">("tudo");
+
+  const loadLogs = useCallback(async () => {
+    if (!sb) return;
+    setLogs(null);
+    const { data } = await sb.from("events").select("*").eq("game_id", EVENT).order("at", { ascending: false }).limit(1000);
+    setLogs((data || []) as EventRow[]);
+  }, [sb]);
 
   const uploadFile = useCallback(async (file: File) => {
     if (!sb) { setFormErr("Supabase não configurado."); return; }
@@ -660,7 +682,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const openAdmin = useCallback(async () => {
     setView("admin");
     if (!sb) return;
-    try { const { data } = await sb.auth.getSession(); if (data?.session) { setAuthed(true); loadCards(); } else setAuthed(false); } catch { setAuthed(false); }
+    try { const { data } = await sb.auth.getSession(); if (data?.session) { setAuthed(true); setAdminUser(data.session.user?.email || ""); loadCards(); } else setAuthed(false); } catch { setAuthed(false); }
   }, [sb, loadCards]);
 
   const startedAdmin = useRef(false);
@@ -671,8 +693,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (!admEmail.trim() || !admPass) { setAdmErr("Preencha e-mail e senha."); return; }
     const { error } = await sb.auth.signInWithPassword({ email: admEmail.trim(), password: admPass });
     if (error) { setAdmErr("Não entrou: " + error.message); return; }
-    setAuthed(true); loadCards();
-  }, [sb, admEmail, admPass, loadCards]);
+    setAuthed(true); setAdminUser(admEmail.trim()); logEvent("admin", { actor: admEmail.trim(), detail: "entrou no painel" }); loadCards();
+  }, [sb, admEmail, admPass, loadCards, logEvent]);
 
   const doLogout = useCallback(async () => { if (sb) { try { await sb.auth.signOut(); } catch {} } setAuthed(false); }, [sb]);
 
@@ -712,9 +734,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         }
       }
       vibrate([30, 40, 30]); showToast("🎲 Conteúdo embaralhado entre todas as tags!");
+      logEvent("admin", { actor: adminUser, detail: `randomizou ${tags.length} tags` });
       loadCards();
     } catch (e: any) { showToast("Não consegui randomizar: " + (e?.message || "erro")); }
-  }, [sb, cards, loadCards, showToast]);
+  }, [sb, cards, loadCards, showToast, logEvent, adminUser]);
 
   const saveCard = useCallback(async () => {
     if (!sb || !form) return; setFormErr("");
@@ -730,15 +753,18 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       payload.media = form.media || "texto"; payload.title = (form.title || "").trim() || null; payload.body = (form.body || "").trim();
       if (!payload.body) { setFormErr("Coloque o conteúdo (texto ou URL)."); return; }
     }
+    const existed = !!(cards && cards.some(c => c.code === code));
     const { error } = await sb.from("cards").upsert(payload, { onConflict: "code" });
     if (error) { setFormErr("Erro: " + error.message + ((error as any).code === "23505" ? " (já existe um cartão nessa casa do cadeado)" : "")); return; }
+    logEvent("admin", { actor: adminUser, code, detail: (existed ? "editou tag " : "criou tag ") + (form.kind === "senha" ? `(senha casa ${payload.position})` : "(curiosidade)") });
     setForm(null); loadCards();
-  }, [sb, form, loadCards]);
+  }, [sb, form, cards, loadCards, logEvent, adminUser]);
 
   const delCard = useCallback(async (code: string) => {
     if (!sb) return; if (!confirm("Apagar o cartão " + code + "?")) return;
-    const { error } = await sb.from("cards").delete().eq("code", code); if (error) { alert(error.message); return; } loadCards();
-  }, [sb, loadCards]);
+    const { error } = await sb.from("cards").delete().eq("code", code); if (error) { alert(error.message); return; }
+    logEvent("admin", { actor: adminUser, code, detail: "apagou a tag" }); loadCards();
+  }, [sb, loadCards, logEvent, adminUser]);
 
   const writeTag = useCallback(async (url: string, btn: HTMLButtonElement) => {
     if (!flags.NFC_OK) { alert("Gravar tag NFC só funciona no Chrome do Android. Grave num Android — depois funciona no iPhone."); return; }
@@ -766,6 +792,25 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const v = (id: ViewId) => "view" + (view === id ? " active" : "");
   const filled = g ? lockFilled(g, activeLock) : 0;
   const lockDone = g ? lockComplete(g, activeLock) : false;
+
+  const logStats = useMemo(() => {
+    const list = logs || [];
+    const scans = list.filter(e => e.kind === "scan");
+    const players = new Set<string>();
+    list.forEach(e => { if ((e.kind === "scan" || e.kind === "complete") && e.actor) players.add(e.actor); });
+    const completes = list.filter(e => e.kind === "complete").length;
+    const byTag: Record<string, number> = {};
+    scans.forEach(e => { if (e.code) byTag[e.code] = (byTag[e.code] || 0) + 1; });
+    let topTag = "—", topN = 0;
+    for (const code of Object.keys(byTag)) if (byTag[code] > topN) { topN = byTag[code]; topTag = code; }
+    return { players: players.size, scans: scans.length, completes, topTag, topN };
+  }, [logs]);
+  const logsFiltered = useMemo(() => {
+    const list = logs || [];
+    if (logFilter === "admin") return list.filter(e => e.kind === "admin");
+    if (logFilter === "scan") return list.filter(e => e.kind === "scan" || e.kind === "complete");
+    return list;
+  }, [logs, logFilter]);
 
   const nfcNotice = flags.NFC_OK
     ? <>📡 Pra ler os cartões por aproximação, <b>ligue o NFC</b> do celular (puxe a barra de cima → ícone <b>NFC</b>). Sem NFC? Use a câmera no QR.</>
@@ -912,7 +957,39 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               {cards && cards.length >= 2 ? (
                 <button className="btn fire noprint" style={{ marginTop: 12 }} onClick={randomizeTags}>🎲 Randomizar tags</button>
               ) : null}
-              <button className="btn noprint" style={{ marginTop: 12 }} onClick={() => setForm({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto", location: "" })}>+ Nova tag</button>
+              <div className="admin-toolbar noprint">
+                <button className="btn ghost" onClick={() => setForm({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto", location: "" })}>+ Nova tag</button>
+                <button className={"btn ghost" + (showLogs ? " on" : "")} onClick={() => { const ns = !showLogs; setShowLogs(ns); if (ns) loadLogs(); }}>📋 Logs</button>
+              </div>
+
+              {showLogs ? (
+                <div className="logs-panel noprint">
+                  <div className="logs-metrics">
+                    <div className="metric"><b>{logStats.players}</b><span>jogadores</span></div>
+                    <div className="metric"><b>{logStats.scans}</b><span>leituras</span></div>
+                    <div className="metric"><b>{logStats.completes}</b><span>concluíram</span></div>
+                    <div className="metric"><b style={{ fontSize: ".82rem", wordBreak: "break-all" }}>{logStats.topTag}</b><span>tag + achada{logStats.topN ? ` (${logStats.topN})` : ""}</span></div>
+                  </div>
+                  <div className="logs-filter">
+                    {([["tudo", "Tudo"], ["scan", "Jogadores"], ["admin", "Admin"]] as const).map(([k, lbl]) => (
+                      <button key={k} className={logFilter === k ? "on" : ""} onClick={() => setLogFilter(k)}>{lbl}</button>
+                    ))}
+                    <button className="logs-refresh" onClick={loadLogs}>↻</button>
+                  </div>
+                  {logs === null ? <p className="empty">Carregando…</p> :
+                    logsFiltered.length === 0 ? <p className="empty">Sem registros ainda. (Rodou a migration 0007?)</p> : (
+                      <ul className="logs-list">
+                        {logsFiltered.slice(0, 200).map(e => (
+                          <li key={e.id} className={"log-" + e.kind}>
+                            <span className="log-ico">{e.kind === "admin" ? "⚙️" : e.kind === "complete" ? "🏆" : "📡"}</span>
+                            <span className="log-main"><b>{e.actor || "—"}</b> {e.detail || (e.kind === "scan" ? "leu uma tag" : "")}{e.code ? <span className="log-code"> · {e.code}</span> : null}</span>
+                            <span className="log-time">{new Date(e.at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                </div>
+              ) : null}
 
               {form ? (
                 <div className="admin-row noprint">

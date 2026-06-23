@@ -21,6 +21,18 @@ export interface ScoreRow {
   ms: number;
 }
 
+export type EventKind = "scan" | "complete" | "admin";
+
+export interface EventRow {
+  id: number;
+  game_id: string;
+  at: string;            // ISO timestamp
+  kind: EventKind;
+  actor: string | null;  // nome do jogador OU e-mail do admin
+  code: string | null;   // tag envolvida
+  detail: string | null; // descrição
+}
+
 // Estado de jogo persistido no localStorage
 export interface GameState {
   name: string;
