@@ -293,15 +293,32 @@ audio.curio-audio{width:100%;margin-top:18px;}
 .card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
 .qbox-mini{margin-top:12px;display:flex;justify-content:center;}
 .qbox-mini img{border-radius:8px;background:#fff;padding:6px;width:130px;height:130px;}
-.nfc-btn{display:inline-block;background:#241544;color:#fff;border:1.5px solid rgba(255,255,255,.18);
-  font-weight:800;border-radius:10px;padding:9px 14px;cursor:pointer;font-family:inherit;font-size:.9rem;}
+.nfc-btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;background:#241544;color:#fff;border:1.5px solid rgba(255,255,255,.18);
+  font-weight:800;border-radius:10px;padding:9px 14px;cursor:pointer;font-family:inherit;font-size:.9rem;
+  transition:transform .08s ease, background .15s ease, border-color .15s ease;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.nfc-btn:hover{background:#2e1c54;border-color:rgba(255,255,255,.32);}
+.nfc-btn:active{transform:scale(.96);}
 .nfc-btn.danger{border-color:rgba(255,77,109,.5);color:#ffd3dc;}
+.nfc-btn.danger:hover{background:rgba(255,77,109,.16);}
 .activebar{display:flex;gap:8px;margin-top:12px;}
 .activebar button{flex:1;padding:12px;border-radius:12px;border:2px solid rgba(255,255,255,.18);
   background:rgba(255,255,255,.06);color:#d8e6f4;font-weight:900;font-family:inherit;font-size:1rem;cursor:pointer;}
 .activebar button.sel{border-color:var(--milho);background:rgba(255,201,60,.16);color:var(--milho);}
 .note{font-size:.85rem;color:#aac3de;line-height:1.5;margin-top:14px;background:rgba(255,255,255,.05);padding:12px 14px;border-radius:12px;}
 .note b{color:var(--milho);}
+
+/* Admin — desktop mais largo + lista em grade */
+.app.admin-wide{max-width:980px;transition:max-width .25s ease;}
+@media (min-width:760px){
+  .app.admin-wide #cardList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;}
+  .app.admin-wide #cardList .empty{grid-column:1/-1;}
+  .app.admin-wide .admin-row{margin-top:0;}
+  .app.admin-wide .card-actions .nfc-btn{flex:1;}
+}
+@media (min-width:1040px){
+  .app.admin-wide #cardList{grid-template-columns:repeat(3,minmax(0,1fr));}
+}
+.admin-row .rh{word-break:break-all;}
 
 /* ---------- Cartaz A4 (QR de entrada) ---------- */
 .cartaz{max-width:780px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;align-items:center;

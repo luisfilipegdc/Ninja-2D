@@ -64,7 +64,7 @@ function localRows(L: number): ScoreRow[] {
 }
 
 /* ===================== Componente principal ===================== */
-export default function Game() {
+export default function Game({ start }: { start?: "admin" } = {}) {
   const [view, setView] = useState<ViewId>("splash");
   const [game, setGame] = useState<GameState | null>(null);
   const activeLock = 1; // cadeado único
@@ -380,6 +380,7 @@ export default function Game() {
     document.addEventListener("visibilitychange", onVis);
     function loop() {
       if (!running) return;
+      if (viewRef.current === "admin") { ctx.clearRect(0, 0, W, H); raf = requestAnimationFrame(loop); return; }
       ctx.clearRect(0, 0, W, H);
       for (const fl of flies) {
         fl.t += 1; fl.ph += fl.pSpeed; fl.x += fl.dx + Math.sin(fl.t * .01) * .12; fl.y += fl.dy + Math.cos(fl.t * .013) * .12;
@@ -638,9 +639,21 @@ export default function Game() {
     const { data, error } = await sb.from("cards").select("*").eq("game_id", EVENT).order("kind").order("lock", { nullsFirst: false }).order("position", { nullsFirst: false });
     if (error) { setCards([]); return; }
     const list = (data || []) as Card[]; setCards(list);
-    const map: Record<string, string> = {};
-    for (const c of list) { try { map[c.code] = await QRCode.toDataURL(cardUrl(c.code), { width: 130, margin: 1, color: { dark: "#241544", light: "#ffffff" } }); } catch {} }
-    setQrMap(map);
+    // QR é determinístico pelo código — só gera o que falta (evita travar o admin a cada save)
+    setQrMap(prev => {
+      const codes = new Set(list.map(c => c.code));
+      const kept: Record<string, string> = {};
+      for (const code of Array.from(codes)) if (prev[code]) kept[code] = prev[code];
+      const missing = list.filter(c => !kept[c.code]);
+      if (missing.length) {
+        (async () => {
+          for (const c of missing) {
+            try { const u = await QRCode.toDataURL(cardUrl(c.code), { width: 130, margin: 1, color: { dark: "#241544", light: "#ffffff" } }); setQrMap(m => ({ ...m, [c.code]: u })); } catch {}
+          }
+        })();
+      }
+      return kept;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sb]);
 
@@ -649,6 +662,9 @@ export default function Game() {
     if (!sb) return;
     try { const { data } = await sb.auth.getSession(); if (data?.session) { setAuthed(true); loadCards(); } else setAuthed(false); } catch { setAuthed(false); }
   }, [sb, loadCards]);
+
+  const startedAdmin = useRef(false);
+  useEffect(() => { if (start === "admin" && !startedAdmin.current) { startedAdmin.current = true; openAdmin(); } }, [start, openAdmin]);
 
   const doLogin = useCallback(async () => {
     setAdmErr(""); if (!sb) { setAdmErr("Supabase não configurado."); return; }
@@ -660,27 +676,42 @@ export default function Game() {
 
   const doLogout = useCallback(async () => { if (sb) { try { await sb.auth.signOut(); } catch {} } setAuthed(false); }, [sb]);
 
-  const randomizeSenhas = useCallback(async () => {
+  const randomizeTags = useCallback(async () => {
     if (!sb || !cards) return;
-    const senhas = cards.filter(c => c.kind === "senha");
-    if (senhas.length < 2) { showToast("Cadastre as tags de senha primeiro 🔐"); return; }
-    // os pares (posição, dígito) são a combinação do cadeado — só mudamos QUAL tag mostra cada um
-    const pairs = senhas.map(c => ({ position: c.position!, digit: c.digit! }));
-    let changed = false;
-    for (let i = pairs.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); if (i !== j) changed = true; [pairs[i], pairs[j]] = [pairs[j], pairs[i]]; }
-    if (!changed && senhas.length > 1) { const t = pairs[0]; pairs[0] = pairs[1]; pairs[1] = t; }
+    const tags = cards.slice();
+    if (tags.length < 2) { showToast("Cadastre as tags primeiro 🏷️"); return; }
+    // o conteúdo (senha OU curiosidade) é remanejado entre as tags;
+    // cada tag física fica no lugar (code + location não mudam)
+    const orig = tags.map(c => ({ kind: c.kind, position: c.position, digit: c.digit, hint: c.hint, media: c.media, title: c.title, body: c.body }));
+    const next = orig.slice();
+    for (let i = next.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [next[i], next[j]] = [next[j], next[i]]; }
+    if (next.every((c, i) => c === orig[i]) && next.length > 1) { const t = next[0]; next[0] = next[1]; next[1] = t; }
     try {
-      // fase 1: posições temporárias (4..6, válidas e únicas) p/ não colidir no índice único
-      for (let i = 0; i < senhas.length; i++) {
-        const { error } = await sb.from("cards").update({ position: 4 + i }).eq("code", senhas[i].code);
+      // fase 1: grava o novo conteúdo; as senhas vão "estacionadas" no lock 2
+      // (evita colisão no índice único de senha do lock 1 durante a troca)
+      for (let i = 0; i < tags.length; i++) {
+        const ct = next[i]; const isSenha = ct.kind === "senha";
+        const payload = {
+          kind: ct.kind,
+          lock: isSenha ? 2 : null,
+          position: isSenha ? ct.position : null,
+          digit: isSenha ? ct.digit : null,
+          hint: isSenha ? ct.hint : null,
+          media: isSenha ? null : ct.media,
+          title: isSenha ? null : ct.title,
+          body: isSenha ? null : ct.body,
+        };
+        const { error } = await sb.from("cards").update(payload).eq("code", tags[i].code);
         if (error) throw error;
       }
-      // fase 2: distribuição final remanejada entre as tags
-      for (let i = 0; i < senhas.length; i++) {
-        const { error } = await sb.from("cards").update({ position: pairs[i].position, digit: pairs[i].digit, lock: 1 }).eq("code", senhas[i].code);
-        if (error) throw error;
+      // fase 2: traz as senhas de volta pro lock 1 (cadeado ativo)
+      for (let i = 0; i < tags.length; i++) {
+        if (next[i].kind === "senha") {
+          const { error } = await sb.from("cards").update({ lock: 1 }).eq("code", tags[i].code);
+          if (error) throw error;
+        }
       }
-      vibrate([30, 40, 30]); showToast("🎲 Senhas embaralhadas entre as tags!");
+      vibrate([30, 40, 30]); showToast("🎲 Conteúdo embaralhado entre todas as tags!");
       loadCards();
     } catch (e: any) { showToast("Não consegui randomizar: " + (e?.message || "erro")); }
   }, [sb, cards, loadCards, showToast]);
@@ -760,7 +791,7 @@ export default function Game() {
         </div>
       ) : null}
 
-      <div className={"app" + (mestre ? " mestre" : "")}>
+      <div className={"app" + (mestre ? " mestre" : "") + (view === "admin" ? " admin-wide" : "")}>
         <Bunting />
 
         {/* SPLASH */}
@@ -799,7 +830,7 @@ export default function Game() {
 
         {/* HUB */}
         <section id="view-game" className={v("game")}>
-          <div className="statline"><span>🤠 {g?.name || "—"}</span><span className="timer">{fmt(elapsed)}</span></div>
+          <div className="statline"><span>{mestre ? "👑 " : "🤠 "}{g?.name || "—"}</span><span className="timer">{fmt(elapsed)}</span></div>
           <p className="anyorder">🔀 Ache os cartões em <b>qualquer ordem</b> — cada número já vai pro lugar certo.</p>
           {g ? (
             <div className={"lockpanel" + (lockDone ? " done" : "")}>
@@ -877,9 +908,9 @@ export default function Game() {
             </div>
           ) : (
             <div>
-              <div className="note noprint">🔐 <b>Cadeado único.</b> As 3 tags de senha ficam fixas no lugar — use <b>Randomizar</b> pra trocar qual tag revela qual dígito, sem precisar mexer nelas.</div>
-              {cards && cards.some(c => c.kind === "senha") ? (
-                <button className="btn fire noprint" style={{ marginTop: 12 }} onClick={randomizeSenhas}>🎲 Randomizar senhas</button>
+              <div className="note noprint">🔐 <b>Cadeado único.</b> As tags ficam fixas no lugar — use <b>Randomizar</b> pra embaralhar qual tag mostra qual conteúdo (senhas e curiosidades), sem precisar mexer nelas.</div>
+              {cards && cards.length >= 2 ? (
+                <button className="btn fire noprint" style={{ marginTop: 12 }} onClick={randomizeTags}>🎲 Randomizar tags</button>
               ) : null}
               <button className="btn noprint" style={{ marginTop: 12 }} onClick={() => setForm({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto", location: "" })}>+ Nova tag</button>
 
