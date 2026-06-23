@@ -4,18 +4,31 @@ Caça ao tesouro gamificada com **tags NFC** (e QR Code como reserva), feita
 como **PWA** que roda no **Android (Chrome) e iOS (Safari)**. Funciona offline
 e **não precisa de servidor**.
 
+## Como funciona
+
+Há **vários cartões** (tags NFC, com QR de reserva) escondidos pelo arraiá. Cada
+cartão tem um **código** (ex: `af6a49c5`) e é de um de dois tipos:
+
+- **Senha** (são 6): cada um revela **1 dígito + a posição** dele na senha de 6
+  números que abre o **baú da premiação** (cadeado físico de verdade).
+- **Curiosidade** (os demais): conteúdo sobre festa junina — **texto, imagem,
+  vídeo do YouTube, áudio ou link**. Servem pra manter o jogo divertido.
+
 ## Fluxo do jogo
 
-1. **QR de Início** (na entrada) → abre o app já configurado, **em tela cheia**,
-   e pede o nome do jogador
-2. Jogador digita o nome → **inicia a caçada** (cronômetro começa)
-3. **Pista na tela** → o jogador procura o local e **encosta o celular na tag NFC**
-   (ou aponta a câmera no QR de reserva)
-4. Tesouro desenterrado → confete + próxima pista
-5. Repete até o último tesouro → **tempo final + ranking**
+1. **QR de entrada** → abre o app **em tela cheia** e pede o nome do jogador.
+2. **Iniciar caçada** (cronômetro começa) → vai pro **hub**.
+3. **Hub:** o **cofre da senha** (6 casinhas) fica sempre visível e um botão
+   **Escanear cartão**.
+4. Escaneia → o app busca o cartão pelo código e revela:
+   - **senha** → preenche uma casinha do cofre (momento épico, com fogos);
+   - **curiosidade** → mostra o conteúdo (texto/imagem/vídeo/áudio/link).
+5. Volta pro hub (loop). Ao completar os **6 números** → o app mostra a senha
+   montada pra abrir o **cadeado do baú** e registra o tempo no **ranking ao vivo**.
 
-A ordem é obrigatória: ler um tesouro fora de sequência não conta, e o
-conteúdo das tags/QR tem checksum, então não dá pra forjar.
+O design segue princípios de **design comportamental** (cofre sempre visível =
+meta-gradiente; cada scan é uma recompensa variável; loop de 1 toque) pra ficar
+rápido e não enjoar.
 
 ## NFC no iPhone E no Android (a sacada)
 
