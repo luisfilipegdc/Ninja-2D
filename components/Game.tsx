@@ -281,9 +281,9 @@ export default function Game() {
     };
     const RAIN = ["#9fd6f5", "#bfe3ff", "#d6ecff", "#8ecbf0"];
     rainRef.current = () => {
-      for (let i = 0; i < 150; i++) parts.push({ kind: "rain", x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * 0.8,
-        vx: 2 + Math.random() * 1.5, vy: 13 + Math.random() * 9, g: 0.12, s: 1.3 + Math.random() * 1.6,
-        a: 0.4 + Math.random() * 0.45, c: RAIN[(Math.random() * RAIN.length) | 0], life: 0 });
+      for (let i = 0; i < 240; i++) parts.push({ kind: "rain", x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * 1.1,
+        vx: 2.4 + Math.random() * 1.8, vy: 15 + Math.random() * 11, g: 0.12, s: 1.8 + Math.random() * 2.2,
+        a: 0.45 + Math.random() * 0.45, c: RAIN[(Math.random() * RAIN.length) | 0], life: 0 });
       if (!rafOn) { rafOn = true; requestAnimationFrame(tick); }
     };
     return () => window.removeEventListener("resize", resize);
