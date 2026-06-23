@@ -108,11 +108,13 @@ body.mestre .bonfire .halo{animation-duration:1.5s;filter:blur(4px) brightness(1
 /* Inputs e botões */
 label.field{display:block;margin-top:18px;font-weight:800;color:#d8e6f4;font-size:.95rem;}
 input[type=text],input[type=number],input[type=password],textarea,select{
-  width:100%;margin-top:8px;padding:14px 16px;border-radius:14px;border:2px solid rgba(255,255,255,.16);
-  background:rgba(255,255,255,.07);color:#fff;font-family:inherit;font-size:1.05rem;font-weight:700;
-  outline:none;transition:border-color .15s,background .15s;}
-input::placeholder,textarea::placeholder{color:rgba(255,255,255,.45);font-weight:600;}
-input:focus,textarea:focus,select:focus{border-color:var(--milho);background:rgba(255,255,255,.12);}
+  width:100%;margin-top:8px;padding:17px 18px;border-radius:16px;border:1.5px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.06);color:#fff;font-family:inherit;font-size:1.05rem;font-weight:700;outline:none;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 8px 20px -14px rgba(0,0,0,.65);
+  transition:border-color .18s, background .18s, box-shadow .18s, transform .18s;}
+input::placeholder,textarea::placeholder{color:rgba(255,255,255,.42);font-weight:600;}
+input:focus,textarea:focus,select:focus{border-color:var(--milho);background:rgba(255,255,255,.10);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 4px rgba(249,194,26,.18), 0 10px 24px -16px rgba(0,0,0,.75);}
 textarea{resize:vertical;min-height:64px;}
 select option{color:#1b1030;}
 
@@ -140,19 +142,25 @@ select option{color:#1b1030;}
   border:1.5px solid rgba(255,201,60,.4);color:var(--milho);font-weight:800;font-size:.85rem;
   padding:7px 14px;border-radius:999px;margin-top:14px;align-self:flex-start;}
 .install{background:rgba(76,201,240,.12);border:1.5px solid rgba(76,201,240,.4);
-  color:#cdeafe;border-radius:14px;padding:12px 14px;margin-top:14px;font-weight:700;font-size:.92rem;line-height:1.45;}
+  color:#cdeafe;border-radius:16px;padding:13px 15px;margin-top:14px;font-weight:700;font-size:.92rem;line-height:1.45;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 8px 22px -16px rgba(0,0,0,.55);}
 .install b{color:#fff;}
 .install.warn{background:rgba(255,77,109,.12);border-color:rgba(255,77,109,.4);color:#ffd3dc;}
 
 /* Cofres / cadeados */
 .anyorder{margin-top:18px;text-align:center;color:#cdeafe;font-weight:700;font-size:.95rem;line-height:1.45;
-  background:rgba(76,201,240,.1);border:1.5px solid rgba(76,201,240,.35);border-radius:14px;padding:11px 14px;}
+  background:rgba(76,201,240,.1);border:1.5px solid rgba(76,201,240,.35);border-radius:16px;padding:12px 15px;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:0 8px 22px -16px rgba(0,0,0,.6);}
 .anyorder b{color:#fff;}
-.lockpanel{background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.12);border-radius:18px;padding:16px 14px 18px;margin-top:16px;}
+.lockpanel{background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.14);border-radius:20px;padding:18px 16px 20px;margin-top:16px;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 12px 34px -20px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.07);}
 .lockpanel.done{border-color:var(--verde);background:rgba(33,191,143,.1);}
 .lockhead{display:flex;align-items:center;justify-content:space-between;font-weight:900;color:var(--milho);font-size:1.05rem;padding:0 4px;}
-.lockhead .cnt{font-size:.85rem;color:#aac3de;font-weight:800;}
+.lockhead .cnt{font-size:.82rem;color:#aac3de;font-weight:800;white-space:nowrap;}
 .lockhead .ok{font-size:.85rem;color:var(--verde);font-weight:900;}
+.lock-tag{display:inline-block;font-size:.62rem;font-weight:900;letter-spacing:.04em;text-transform:uppercase;
+  color:#0f2c4a;background:var(--milho);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle;}
+.scanhint-sm{text-align:center;margin-top:10px;color:#aac3de;font-weight:700;font-size:.88rem;}
 .cofre{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
 .slot{width:54px;height:64px;border-radius:12px;border:2px solid rgba(255,255,255,.18);
   background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;

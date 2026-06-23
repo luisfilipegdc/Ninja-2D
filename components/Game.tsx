@@ -580,7 +580,7 @@ export default function Game() {
     ? <>📡 Pra ler os cartões por aproximação, <b>ligue o NFC</b> do celular (puxe a barra de cima → ícone <b>NFC</b>). Sem NFC? Use a câmera no QR.</>
     : flags.isIOS
       ? <>📡 Encoste o <b>topo do iPhone</b> no cartão pra ler. Não rolou? Use a câmera no QR.</>
-      : <>📷 Este aparelho vai usar a <b>câmera</b> (QR Code) pra ler os cartões.</>;
+      : <>📷 Este aparelho não tem NFC. No celular, aponte a <b>câmera</b> no <b>QR do cartão</b> — ele abre o jogo sozinho.</>;
 
   return (
     <>
@@ -609,12 +609,11 @@ export default function Game() {
           <h1 className="title">Arraiá<br />do Tesouro</h1>
           <p className="festa">Festa Junina 2026</p>
           <p className="lead">Encontre os cartões escondidos pela festa. Alguns revelam a senha de um <b>cadeado</b> com premiação — o resto são curiosidades juninas. Bora?</p>
-          <p className="evento">📅 27/06 · 📍 Maristinha · 🕗 8h30–19h30</p>
           <div className="bonfire" aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
             <div className="logs"><span /><span /></div>
           </div>
-          <span className="badge" id="gameBadge">🔐 Cadeado {activeLock} ativo agora</span>
+          <span className="badge" id="gameBadge">🔓 Vale a senha do Cadeado {activeLock} agora</span>
           <div className="install" style={{ display: "block" }}>{nfcNotice}</div>
           {splashMsg ? <div className="install warn" style={{ display: "block" }}>{splashMsg}</div> : null}
           <label className="field" htmlFor="playerName">Seu nome de caipira</label>
@@ -636,10 +635,10 @@ export default function Game() {
         {/* HUB */}
         <section id="view-game" className={v("game")}>
           <div className="statline"><span>🤠 {g?.name || "—"}</span><span className="timer">{fmt(elapsed)}</span></div>
-          <p className="anyorder">🔀 Ache os cartões em <b>qualquer ordem</b> — cada número já sabe a sua casinha.</p>
+          <p className="anyorder">🔀 Ache os cartões em <b>qualquer ordem</b> — cada número já vai pro lugar certo.</p>
           {g ? (
             <div className={"lockpanel" + (lockDone ? " done" : "")}>
-              <div className="lockhead">🔒 Cadeado {activeLock} (período ativo){lockDone ? <span className="ok">✓ senha pronta</span> : <span className="cnt">{filled} de 3</span>}</div>
+              <div className="lockhead"><span>🔓 Senha de agora <span className="lock-tag">Cadeado {activeLock}</span></span>{lockDone ? <span className="ok">✓ pronta!</span> : <span className="cnt">{filled === 0 ? "Faltam 3 números" : "Falta" + (3 - filled === 1 ? "" : "m") + " " + (3 - filled) + " número" + (3 - filled === 1 ? "" : "s")}</span>}</div>
               <div className="cofre">
                 {[1, 2, 3].map(pos => {
                   const val = g.locks[activeLock]?.[pos];
@@ -650,7 +649,8 @@ export default function Game() {
             </div>
           ) : null}
           <div className="spacer" />
-          <button className="btn fire" onClick={openScanner}>Escanear cartão 📡</button>
+          <button className="btn fire" onClick={openScanner}>Procurar próximo cartão 🔦</button>
+          <p className="scanhint-sm">Pode ser um número da senha… ou uma curiosidade! 🎁</p>
           <button className="btn ghost noprint" style={{ marginTop: 12 }} onClick={() => { gameRef.current = null; setGame(null); clearSession(); setName(""); setSplashMsg(""); setView("splash"); }}>Sair da caçada</button>
         </section>
 
