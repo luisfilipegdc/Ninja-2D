@@ -417,9 +417,10 @@ export default function Game() {
     }
     else if (card.media === "audio") media = <audio className="curio-audio" controls src={body} />;
     else media = <div className="curio-text">{body}</div>;
+    const showEmoji = card.media === "texto" || card.media === "audio";
     const node = (
       <div className="curio">
-        <div className="curio-emoji">{mediaIcon(card.media)}</div>
+        {showEmoji ? <div className="curio-emoji">{mediaIcon(card.media)}</div> : null}
         {card.title ? <h2 className="curio-title">{card.title}</h2> : null}
         {media}
       </div>
@@ -665,16 +666,18 @@ export default function Game() {
 
         {/* SPLASH */}
         <section id="view-splash" className={v("splash")}>
+          <div className="splash-deco" aria-hidden>
+            <span className="d1">🌵</span><span className="d2">🪗</span><span className="d3">🌻</span><span className="d4">🌽</span>
+          </div>
           <div className="kicker">Colégio Marista de Brasília</div>
           <h1 className="title">Arraiá<br />do Tesouro</h1>
-          <p className="festa">Festa Junina 2026</p>
-          <p className="lead">Encontre os cartões escondidos pela festa. Alguns revelam a senha de um <b>cadeado</b> com premiação — o resto são curiosidades juninas. Bora?</p>
+          <p className="festa">Festa Junina <span className="ano">2026</span></p>
+          <p className="lead">Ache os cartões escondidos pela festa. Alguns abrem um <b>cadeado</b> com premiação; o resto são curiosidades. Bora?</p>
           <div className="bonfire" aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
             <div className="logs"><span /><span /></div>
           </div>
           {festaHoje ? <div className="festa-hoje">🎉 É hoje! Festa Junina do Marista. Boa caçada!</div> : null}
-          <span className="badge" id="gameBadge">🔓 Vale a senha do Cadeado {activeLock} agora</span>
           <div className="install" style={{ display: "block" }}>{nfcNotice}</div>
           {splashMsg ? <div className="install warn" style={{ display: "block" }}>{splashMsg}</div> : null}
           <label className="field" htmlFor="playerName">Seu nome de caipira</label>
