@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#241544",
+  themeColor: "#15375d",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Rye&family=Caveat:wght@500;700&family=Nunito:wght@500;700;900&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Pacifico&family=Caveat:wght@500;700&family=Nunito:wght@500;700;900&display=swap"
           rel="stylesheet"
         />
         <meta name="mobile-web-app-capable" content="yes" />

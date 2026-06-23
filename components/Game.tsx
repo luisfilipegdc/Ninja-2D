@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
+import Bunting from "@/components/Bunting";
 import { getSupabase, EVENT } from "@/lib/supabase";
 import type { Card, GameState, Media, ScoreRow } from "@/lib/types";
 
 /* ===================== helpers puros ===================== */
 type ViewId = "splash" | "game" | "scan" | "card" | "chest" | "ranking" | "admin";
-type Method = "nfc" | "nfctap" | "qr";
+type Method = "nfc" | "nfctap" | "none";
 
 const LS_SESS = "arraia.session.v2";
 const LS_RANK = "arraia.ranking.v1";
@@ -45,31 +46,6 @@ function localRows(L: number): ScoreRow[] {
   return loadRank().filter(e => e.lock === L).sort((a, b) => a.ms - b.ms).map(e => ({ id: "local_" + e.at, name: e.name, ms: e.ms }));
 }
 
-/* ===================== Bandeirinhas ===================== */
-function buntingSvg() {
-  const cols = ["#ff4d6d", "#ffc93c", "#21bf8f", "#4cc9f0", "#ff7a18"];
-  const W = 520, H = 48, n = 12, gap = W / n, top = 5, sag = 15;
-  const yAt = (x: number) => { const t = x / W; return top + sag * 4 * t * (1 - t); };
-  let cord = "M0 " + top.toFixed(1);
-  for (let x = 0; x <= W; x += 24) cord += " L" + x + " " + yAt(x).toFixed(1);
-  cord += " L" + W + " " + top.toFixed(1);
-  const fw = gap * 0.84, fh = 27, notch = 9;
-  let flags = "";
-  for (let i = 0; i < n; i++) {
-    const ax = gap * (i + 0.5), ay = yAt(ax);
-    const l = (ax - fw / 2).toFixed(1), r = (ax + fw / 2).toFixed(1);
-    const t = ay.toFixed(1), b = (ay + fh).toFixed(1), nb = (ay + fh - notch).toFixed(1);
-    const c = cols[i % cols.length];
-    flags += `<g class="flag" style="animation-delay:${(i * 0.11).toFixed(2)}s;transform-origin:${ax.toFixed(1)}px ${t}px">
-      <path d="M${l} ${t} L${r} ${t} L${r} ${b} L${ax.toFixed(1)} ${nb} L${l} ${b} Z" fill="${c}" stroke="rgba(0,0,0,.16)" stroke-width="1"/>
-      <path d="M${l} ${t} L${r} ${t} L${r} ${(ay + 4).toFixed(1)} L${l} ${(ay + 4).toFixed(1)} Z" fill="rgba(255,255,255,.30)"/>
-      <path d="M${ax.toFixed(1)} ${t} L${r} ${t} L${r} ${b} L${ax.toFixed(1)} ${nb} Z" fill="rgba(0,0,0,.10)"/>
-    </g>`;
-  }
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <path d="${cord}" stroke="#d9b85a" stroke-width="2.2" fill="none" stroke-linecap="round"/>${flags}</svg>`;
-}
-
 /* ===================== Componente principal ===================== */
 export default function Game() {
   const [view, setView] = useState<ViewId>("splash");
@@ -83,7 +59,6 @@ export default function Game() {
   const [eggOpen, setEggOpen] = useState(false);
 
   // scanner
-  const [scanMethod, setScanMethod] = useState<Method>("qr");
   const [scanErr, setScanErr] = useState("");
   const [scanHint, setScanHint] = useState("");
 
@@ -108,7 +83,6 @@ export default function Game() {
   const ambientRef = useRef<HTMLCanvasElement | null>(null);
   const confettiRef = useRef<HTMLCanvasElement | null>(null);
   const hotRef = useRef<HTMLDivElement | null>(null);
-  const html5QrRef = useRef<any>(null);
   const nfcAbortRef = useRef<AbortController | null>(null);
   const channelsRef = useRef<any[]>([]);
   const burstRef = useRef<() => void>(() => {});
@@ -254,7 +228,7 @@ export default function Game() {
   useEffect(() => {
     const cvs = confettiRef.current; if (!cvs) return;
     const ctx = cvs.getContext("2d")!; let parts: any[] = []; let rafOn = false;
-    const COLORS = ["#ff4d6d", "#ffc93c", "#21bf8f", "#4cc9f0", "#ff7a18", "#ffffff"];
+    const COLORS = ["#e23b2e", "#f9c21a", "#e84c97", "#28a8e0", "#6e5ba6", "#ffffff"];
     const resize = () => { cvs.width = window.innerWidth; cvs.height = window.innerHeight; };
     resize(); window.addEventListener("resize", resize);
     const tick = () => {
@@ -430,8 +404,8 @@ export default function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCard, flashErr, showToast, revealSenha, revealCuriosidade]);
 
-  /* ===================== scanner ===================== */
-  const defaultMethod = (): Method => flags.NFC_OK ? "nfc" : (flags.isIOS ? "nfctap" : "qr");
+  /* ===================== scanner (apenas NFC) ===================== */
+  const defaultMethod = (): Method => flags.NFC_OK ? "nfc" : (flags.isIOS ? "nfctap" : "none");
 
   const onScanText = useCallback((text: string) => {
     if (!scanActiveRef.current) return;
@@ -455,47 +429,30 @@ export default function Game() {
       };
     } catch (err: any) {
       const n = err?.name || "";
-      if (n === "NotSupportedError" || n === "TypeError") setScanErr("Este celular não tem NFC disponível no navegador. Toque em “Usar a câmera (QR)”.");
+      if (n === "NotSupportedError" || n === "TypeError") setScanErr("Este celular não tem NFC disponível no navegador.");
       else if (n === "NotAllowedError") setScanErr("Precisa permitir o NFC. Toque de novo e aceite — e confira se o NFC está LIGADO (barra de cima → ícone NFC).");
-      else setScanErr("Ligue o NFC do celular: puxe a barra de cima e toque no ícone NFC. Depois tente de novo — ou use a câmera (QR).");
+      else setScanErr("Ligue o NFC do celular: puxe a barra de cima e toque no ícone NFC. Depois tente de novo.");
     }
   }, [flashErr, onScanText]);
-
-  const startQR = useCallback(async () => {
-    try {
-      const mod = await import("html5-qrcode");
-      const q = new mod.Html5Qrcode("reader", { verbose: false } as any);
-      html5QrRef.current = q;
-      await q.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1 }, onScanText, () => {});
-    } catch { setScanErr("Não consegui abrir a câmera. Toque para permitir o acesso e tente de novo."); }
-  }, [onScanText]);
 
   const startMethod = useCallback(async (m: Method) => {
     setScanErr("");
     if (m === "nfc") { setScanHint("Aproxime a parte de trás do celular do cartão. Mantenha o NFC ligado."); await startNFC(); }
     else if (m === "nfctap") { setScanHint("Encoste o topo do iPhone no cartão — o jogo abre sozinho. Não precisa apertar nada."); }
-    else { setScanHint("Aponte a câmera pro QR Code do cartão escondido."); await startQR(); }
-  }, [startNFC, startQR]);
+    else { setScanHint("Este aparelho não lê NFC. Use o QR do cartão pela câmera do próprio celular — ele abre o jogo sozinho."); }
+  }, [startNFC]);
 
   const stopScan = useCallback(async () => {
     scanActiveRef.current = false;
     if (nfcAbortRef.current) { try { nfcAbortRef.current.abort(); } catch {} nfcAbortRef.current = null; }
-    if (html5QrRef.current) { try { await html5QrRef.current.stop(); await html5QrRef.current.clear(); } catch {} html5QrRef.current = null; }
   }, []);
 
   const openScanner = useCallback(() => {
     scanActiveRef.current = true; tryFullscreen();
-    const m = defaultMethod(); setScanMethod(m); setScanErr(""); setView("scan");
+    const m = defaultMethod(); setScanErr(""); setView("scan");
     setTimeout(() => startMethod(m), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tryFullscreen, startMethod]);
-
-  const switchMethod = useCallback(async () => {
-    await stopScan(); scanActiveRef.current = true;
-    const m: Method = scanMethod === "qr" ? defaultMethod() : "qr"; setScanMethod(m);
-    setTimeout(() => startMethod(m), 50);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanMethod, stopScan, startMethod]);
 
   const cancelScan = useCallback(async () => { await stopScan(); setView("game"); }, [stopScan]);
 
@@ -595,10 +552,23 @@ export default function Game() {
   const writeTag = useCallback(async (url: string, btn: HTMLButtonElement) => {
     if (!flags.NFC_OK) { alert("Gravar tag NFC só funciona no Chrome do Android. Grave num Android — depois funciona no iPhone."); return; }
     const orig = btn.textContent; btn.textContent = "Aproxime a tag…";
-    try { const w = new (window as any).NDEFReader(); await w.write({ records: [{ recordType: "url", data: url }] }); btn.textContent = "✔ Gravada!"; vibrate([40, 30, 120]); }
-    catch { btn.textContent = "Falhou — toque de novo"; }
-    setTimeout(() => { btn.textContent = orig; }, 2500);
-  }, [flags.NFC_OK]);
+    try {
+      const w = new (window as any).NDEFReader();
+      await w.write({ records: [{ recordType: "url", data: url }] });
+      btn.textContent = "✔ Gravada!"; vibrate([40, 30, 120]);
+      setTimeout(() => { btn.textContent = orig; }, 2500);
+    } catch (e: any) {
+      const n = e?.name || "";
+      let msg: string;
+      if (n === "NotSupportedError") msg = "Essa tag não aceita gravação web — provável Mifare Classic. Use tags NTAG213/215/216 (ou imprima o QR do cartão).";
+      else if (n === "NotAllowedError") msg = "Ligue o NFC e permita o acesso, depois toque de novo.";
+      else if (n === "NetworkError" || n === "AbortError") msg = "Tirou a tag cedo demais — encoste e segure até aparecer ✔ Gravada.";
+      else msg = "Não gravou (" + (n || e?.message || "erro") + "). Tente NTAG213/215/216 — ou use o QR do cartão.";
+      btn.textContent = "Falhou — toque de novo";
+      showToast(msg);
+      setTimeout(() => { btn.textContent = orig; }, 3000);
+    }
+  }, [flags.NFC_OK, showToast]);
 
   /* ===================== render ===================== */
   const g = game;
@@ -631,13 +601,15 @@ export default function Game() {
       ) : null}
 
       <div className={"app" + (mestre ? " mestre" : "")}>
-        <div className="bunting noprint" dangerouslySetInnerHTML={{ __html: buntingSvg() }} />
+        <Bunting />
 
         {/* SPLASH */}
         <section id="view-splash" className={v("splash")}>
-          <div className="kicker">São João · 2026</div>
+          <div className="kicker">Colégio Marista de Brasília</div>
           <h1 className="title">Arraiá<br />do Tesouro</h1>
-          <p className="lead">Encontre os cartões escondidos pelo arraiá. Alguns revelam a senha de um <b>cadeado</b> com premiação — o resto são curiosidades juninas. Bora?</p>
+          <p className="festa">Festa Junina 2026</p>
+          <p className="lead">Encontre os cartões escondidos pela festa. Alguns revelam a senha de um <b>cadeado</b> com premiação — o resto são curiosidades juninas. Bora?</p>
+          <p className="evento">📅 27/06 · 📍 Maristinha · 🕗 8h30–19h30</p>
           <div className="bonfire" aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
             <div className="logs"><span /><span /></div>
@@ -682,17 +654,13 @@ export default function Game() {
           <button className="btn ghost noprint" style={{ marginTop: 12 }} onClick={() => { gameRef.current = null; setGame(null); clearSession(); setName(""); setSplashMsg(""); setView("splash"); }}>Sair da caçada</button>
         </section>
 
-        {/* SCAN */}
+        {/* SCAN (apenas NFC) */}
         <section id="view-scan" className={v("scan")}>
-          <div className="kicker">{scanMethod === "qr" ? "Mire no QR do cartão" : "Encoste na tag NFC"}</div>
+          <div className="kicker">Encoste na tag NFC</div>
           <h1 className="title" style={{ fontSize: "2.2rem" }}>Procurando…</h1>
-          {scanMethod !== "qr" ? (
-            <div className="nfcpanel"><div className="nfc-stage"><div className="ring" /><div className="ring" /><div className="ring" /><div className="nfc-phone">📱</div></div></div>
-          ) : null}
-          <div id="reader" style={{ display: scanMethod === "qr" ? "block" : "none" }} />
+          <div className="nfcpanel"><div className="nfc-stage"><div className="ring" /><div className="ring" /><div className="ring" /><div className="nfc-phone">📱</div></div></div>
           {scanErr ? <div className="scan-err">{scanErr}</div> : null}
           <p className="scan-hint">{scanHint}</p>
-          <div className="scan-switch"><a onClick={switchMethod}>{scanMethod === "qr" ? (flags.NFC_OK || flags.isIOS ? "Voltar pro NFC" : "Tentar a câmera de novo") : "Sem NFC? Usar a câmera (QR)"}</a></div>
           <div className="spacer" />
           <button className="btn ghost" onClick={cancelScan}>Cancelar</button>
         </section>

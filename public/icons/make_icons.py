@@ -13,9 +13,9 @@ def draw_icon(size, maskable=False):
     d = ImageDraw.Draw(img)
     S = size
 
-    # céu noturno em gradiente vertical (roxo-noite -> roxo-2)
-    top = (36, 21, 68)
-    bot = (58, 31, 99)
+    # céu noturno navy Marista (gradiente vertical)
+    top = (16, 42, 74)
+    bot = (38, 90, 146)
     for y in range(S):
         d.line([(0, y), (S, y)], fill=lerp(top, bot, y / S))
 
