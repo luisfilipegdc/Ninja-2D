@@ -82,7 +82,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (foundEggsRef.current.includes(id)) return;
     const next = [...foundEggsRef.current, id];
     foundEggsRef.current = next; setFoundEggs(next);
-    try { localStorage.setItem(LS_EGGS, JSON.stringify(next)); } catch {}
+  }, []);
+  const resetEggs = useCallback(() => {
+    foundEggsRef.current = [];
+    setFoundEggs([]); setMestre(false); setMestreKey("");
   }, []);
 
   // scanner
@@ -217,9 +220,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
   /* ---------- launch (?c=) ---------- */
   useEffect(() => {
-    try { if (localStorage.getItem(LS_MESTRE) === "1") setMestre(true); } catch {}
-    try { const mk = localStorage.getItem(LS_MESTRE_KEY); if (mk) setMestreKey(mk); } catch {}
-    try { const fe = JSON.parse(localStorage.getItem(LS_EGGS) || "[]"); if (Array.isArray(fe)) { foundEggsRef.current = fe; setFoundEggs(fe); } } catch {}
+    // Modo Mestre / segredos são EFÊMEROS: reiniciam a cada atualização da página.
+    // Limpa qualquer estado antigo que tenha ficado salvo.
+    try { localStorage.removeItem(LS_MESTRE); localStorage.removeItem(LS_MESTRE_KEY); localStorage.removeItem(LS_EGGS); } catch {}
+    try { sessionStorage.removeItem(LS_MESTRE); sessionStorage.removeItem(LS_MESTRE_KEY); sessionStorage.removeItem(LS_EGGS); } catch {}
     const c = new URLSearchParams(window.location.search).get("c");
     if (c) {
       let sess: GameState | null = null;
@@ -427,7 +431,6 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const spell = MAGIC[magic];
     if (spell) {
       setMestre(true); setMestreKey(magic);
-      try { localStorage.setItem(LS_MESTRE, "1"); localStorage.setItem(LS_MESTRE_KEY, magic); } catch {}
       markEgg("nome");
       vibrate([30, 40, 30, 40, 140]); fireworks();
       showToast(spell.toast);
@@ -464,8 +467,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       setChestRank(localRows(L));
     }
     setChestBoth(bothDone(g));
+    resetEggs(); // easter eggs desligam ao concluir a senha
     setView("chest");
-  }, [persist, syncGame, burst, sbInsert, sbTop, sb, unsubAll]);
+  }, [persist, syncGame, burst, sbInsert, sbTop, sb, unsubAll, resetEggs]);
 
   const revealSenha = useCallback((card: Card) => {
     const g = gameRef.current!; const L = card.lock || 1, pos = card.position!, digit = card.digit!;
@@ -603,7 +607,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     vibrate(8);
     if (mestre) { burst(); return; }
     const now = Date.now(); if (now - eggLast.current > 1200) eggTaps.current = 0; eggLast.current = now;
-    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); setMestreKey("fogueira"); try { localStorage.setItem(LS_MESTRE, "1"); localStorage.setItem(LS_MESTRE_KEY, "fogueira"); } catch {} markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
+    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); setMestreKey("fogueira"); markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
   }, [mestre, burst, markEgg]);
 
   /* ===================== admin ===================== */
