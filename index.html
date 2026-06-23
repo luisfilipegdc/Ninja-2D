@@ -495,6 +495,7 @@ body.mestre #view-splash .bonfire .halo{animation-duration:1.5s;filter:blur(4px)
 
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 "use strict";
 
@@ -619,17 +620,22 @@ const DEMO = [
 ];
 let config = null;   // {treasures:[{text,emoji}], demo:bool}
 
+function hashStr(s){
+  let h = 0x811c9dc5 >>> 0;
+  for(let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+  return (h >>> 0).toString(36);
+}
 function parseConfig(){
   const m = location.hash.match(/[#&]g=([^&]+)/);
   if(m){
     try{
       const obj = JSON.parse(b64urlDecode(m[1]));
       if(obj && Array.isArray(obj.t) && obj.t.length>=2){
-        return { treasures: obj.t.map(x => ({ text:x[0], emoji:x[1] })), demo:false };
+        return { treasures: obj.t.map(x => ({ text:x[0], emoji:x[1] })), demo:false, gameId: "g" + hashStr(m[1]) };
       }
     }catch(e){}
   }
-  return { treasures: DEMO.slice(), demo:true };
+  return { treasures: DEMO.slice(), demo:true, gameId: "demo" };
 }
 function configToHash(treasures){
   const obj = { v:1, t: treasures.map(t => [t.text, t.emoji]) };
@@ -785,6 +791,7 @@ $("#startBtn").addEventListener("click", () => {
     idx: 1,
     startedAt: Date.now(),
     clues: config.treasures.slice(),
+    gameId: config.gameId || "demo",
   };
   saveSession();
   if(navigator.vibrate) navigator.vibrate([40,40,120]);
@@ -1034,21 +1041,86 @@ function finishGame(){
   clearInterval(timerInt);
   clearSession();
   const elapsed = Date.now() - game.startedAt;
+  const gameId = (game && game.gameId) || "demo";
   $("#finalTime").textContent = fmt(elapsed);
-  const list = loadRank();
+
+  // salva local (fallback offline) e mostra imediatamente
   const entry = { name:game.name, ms:elapsed, at:Date.now(), total:game.total };
-  list.push(entry);
-  list.sort((a,b) => a.ms - b.ms);
-  saveRank(list);
-  renderRankInto("#finishRank", list, entry.at);
+  const list = loadRank(); list.push(entry); list.sort((a,b) => a.ms - b.ms); saveRank(list);
+  myScoreId = "local_" + entry.at;
+  renderRows("#finishRank", localRows(), myScoreId);
   burstConfetti(); setTimeout(burstConfetti, 350);
   show("view-finish");
+
+  // publica no ranking ao vivo e passa a ouvir atualizações
+  (async () => {
+    const id = await sbInsert({ gameId, name:entry.name, ms:elapsed, total:entry.total });
+    if(id) myScoreId = id;
+    await showLeaderboard("#finishRank", gameId, null);
+    subscribeRank("#finishRank", gameId, null);
+  })();
 }
-function renderRankInto(sel, list, highlightAt){
-  const ul = $(sel); ul.innerHTML = "";
-  list.slice(0,10).forEach((e,i) => {
+$("#playAgain").addEventListener("click", () => {
+  unsubscribeRank();
+  game = null; clearSession(); splashNote(""); $("#playerName").value=""; show("view-splash");
+});
+$("#toRanking").addEventListener("click", () => {
+  const gameId = (game && game.gameId) || (config && config.gameId) || "demo";
+  renderRows("#rankList", localRows(), myScoreId);
+  $("#rankEmpty").style.display = loadRank().length ? "none" : "block";
+  show("view-ranking");
+  showLeaderboard("#rankList", gameId, $("#rankEmpty"));
+  subscribeRank("#rankList", gameId, $("#rankEmpty"));
+});
+$("#rankBack").addEventListener("click", () => { unsubscribeRank(); show("view-splash"); });
+$("#clearRank").addEventListener("click", () => {
+  if(confirm("Apagar o ranking SALVO NESTE APARELHO? (o ranking ao vivo do arraiá não é afetado)")){
+    saveRank([]); renderRows("#rankList", [], null); $("#rankEmpty").style.display="block";
+  }
+});
+
+/* ============================================================
+   Ranking ao vivo (Supabase) — opcional, com fallback local.
+   A chave publishable e a URL podem ficar no front (protegido por RLS).
+============================================================ */
+const SB_URL = "https://wlmbsqjiphzojcvnzjvd.supabase.co";
+const SB_KEY = "sb_publishable_Z1Qhe3x54_wFY7bV2onjvg_1akx83CU";
+let sb = null;
+try{
+  if(window.supabase && window.supabase.createClient){
+    sb = window.supabase.createClient(SB_URL, SB_KEY);
+  }
+}catch(e){ sb = null; }
+
+let rankChannel = null;
+let myScoreId = null;   // id da minha pontuação (pra destacar no ranking)
+
+async function sbInsert(entry){
+  if(!sb) return null;
+  try{
+    const { data, error } = await sb.from("scores")
+      .insert({ game_id: entry.gameId, name: entry.name.slice(0,40), ms: entry.ms, total: entry.total })
+      .select("id").single();
+    return (!error && data) ? data.id : null;
+  }catch(e){ return null; }
+}
+async function sbTop(gameId){
+  if(!sb) return null;
+  try{
+    const { data, error } = await sb.from("scores")
+      .select("id,name,ms").eq("game_id", gameId)
+      .order("ms", { ascending:true }).limit(20);
+    return error ? null : (data || []);
+  }catch(e){ return null; }
+}
+function localRows(){
+  return loadRank().map(e => ({ id:"local_"+e.at, name:e.name, ms:e.ms }));
+}
+function renderRows(sel, rows, highlightId){
+  const ul = $(sel); if(!ul) return; ul.innerHTML = "";
+  rows.slice(0,12).forEach((e,i) => {
     const li = document.createElement("li");
-    if(highlightAt && e.at===highlightAt) li.className = "me";
+    if(highlightId && e.id === highlightId) li.className = "me";
     const medal = ["🥇","🥈","🥉"][i] || (i+1);
     li.innerHTML = `<span class="pos">${medal}</span>
       <span class="nm">${escapeHtml(e.name)}</span>
@@ -1056,21 +1128,31 @@ function renderRankInto(sel, list, highlightAt){
     ul.appendChild(li);
   });
 }
-$("#playAgain").addEventListener("click", () => {
-  game = null; clearSession(); splashNote(""); $("#playerName").value=""; show("view-splash");
-});
-$("#toRanking").addEventListener("click", () => {
-  const list = loadRank();
-  renderRankInto("#rankList", list, null);
-  $("#rankEmpty").style.display = list.length ? "none" : "block";
-  show("view-ranking");
-});
-$("#rankBack").addEventListener("click", () => show("view-splash"));
-$("#clearRank").addEventListener("click", () => {
-  if(confirm("Apagar todo o ranking deste aparelho?")){
-    saveRank([]); $("#rankList").innerHTML=""; $("#rankEmpty").style.display="block";
+async function showLeaderboard(sel, gameId, emptyEl){
+  const rows = await sbTop(gameId);
+  if(rows){                                   // online: ranking global ao vivo
+    renderRows(sel, rows, myScoreId);
+    if(emptyEl) emptyEl.style.display = rows.length ? "none" : "block";
+  }else{                                      // offline: cai pro local
+    renderRows(sel, localRows(), myScoreId);
+    if(emptyEl) emptyEl.style.display = loadRank().length ? "none" : "block";
   }
-});
+}
+function subscribeRank(sel, gameId, emptyEl){
+  if(!sb) return;
+  unsubscribeRank();
+  try{
+    rankChannel = sb.channel("scores_" + gameId)
+      .on("postgres_changes",
+        { event:"INSERT", schema:"public", table:"scores", filter:"game_id=eq."+gameId },
+        () => showLeaderboard(sel, gameId, emptyEl))
+      .subscribe();
+  }catch(e){ rankChannel = null; }
+}
+function unsubscribeRank(){
+  if(rankChannel && sb){ try{ sb.removeChannel(rankChannel); }catch(e){} }
+  rankChannel = null;
+}
 
 /* ============================================================
    Admin
