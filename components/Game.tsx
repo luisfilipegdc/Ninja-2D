@@ -14,19 +14,16 @@ const LS_SESS = "arraia.session.v2";
 const LS_RANK = "arraia.ranking.v1";
 const LS_CARDS = "arraia.cardcache.v1";
 const LS_MESTRE = "arraia.mestre";
-const LS_MESTRE_KEY = "arraia.mestre.key";
 const LS_EGGS = "arraia.eggs.v1";
-const EGGS_TOTAL = 4;
+const EGGS_TOTAL = 3; // chuva, sopro, nome mágico
 
-// Cada nome mágico tem sua própria referência e selo único
-const MAGIC: Record<string, { chip: string; toast: string }> = {
-  "marista": { chip: "🔵🟡 Espírito Marista", toast: "🔵🟡 Espírito Marista ativado! Champagnat aprova — Modo Mestre liberado 👑" },
-  "sao joao": { chip: "🔥 Fogueira de São João", toast: "🔥🎆 São João acendeu a fogueira do arraiá! Modo Mestre liberado 👑" },
-  "festa junina": { chip: "💃 Rei do Arraiá", toast: "💃🕺 A festa em pessoa! Puxe a quadrilha — Modo Mestre liberado 👑" },
-  "ze do milho": { chip: "🌽 Zé do Milho", toast: "🌽 Pamonha, curau e canjica! Zé do Milho liberou o Modo Mestre 👑" },
+// Nomes mágicos: cada um dispara uma animação temática correlata ao nome
+const MAGIC_NAMES: Record<string, { anim: "catolica" | "saojoao" | "festa" | "milho"; toast: string }> = {
+  "marcelino": { anim: "catolica", toast: "🕊️ Paz e bem! O espírito de Marcelino Champagnat te abençoa ✝️" },
+  "sao joao":  { anim: "saojoao",  toast: "🎆 Viva São João! A festa junina é dele — e a fogueira também 🔥" },
+  "festa junina": { anim: "festa", toast: "💃🕺 É arraiá! Puxa a quadrilha que a festa começou 🎪" },
+  "ze do milho": { anim: "milho",  toast: "🌽 Pamonha, curau e canjica! Zé do Milho passou por aqui" },
 };
-const FOGUEIRA_CHIP = "🔥 Mestre da Fogueira";
-function mestreChipLabel(key: string) { return MAGIC[key]?.chip || (key === "fogueira" ? FOGUEIRA_CHIP : "👑 Modo Mestre"); }
 
 function fmt(ms: number) {
   const t = Math.max(0, Math.floor(ms / 1000));
@@ -73,9 +70,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [splashMsg, setSplashMsg] = useState("");
   const [toast, setToast] = useState("");
   const [mestre, setMestre] = useState(false);
-  const [mestreKey, setMestreKey] = useState("");
-  const [eggOpen, setEggOpen] = useState(false);
-  const [festaHoje, setFestaHoje] = useState(false);
+  const [fogueiraOut, setFogueiraOut] = useState(false);
+  const [blowOn, setBlowOn] = useState(false);
   const [foundEggs, setFoundEggs] = useState<string[]>([]);
   const foundEggsRef = useRef<string[]>([]);
   const markEgg = useCallback((id: string) => {
@@ -85,7 +81,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   }, []);
   const resetEggs = useCallback(() => {
     foundEggsRef.current = [];
-    setFoundEggs([]); setMestre(false); setMestreKey("");
+    setFoundEggs([]); setMestre(false);
   }, []);
 
   // scanner
@@ -118,6 +114,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const fireworksRef = useRef<() => void>(() => {});
   const heartsRef = useRef<() => void>(() => {});
   const balloonsRef = useRef<() => void>(() => {});
+  const catolicaRef = useRef<() => void>(() => {});
+  const milhoRef = useRef<() => void>(() => {});
+  const blowRef = useRef<{ stop: () => void } | null>(null);
   const lastErrRef = useRef(0);
   const toastT = useRef<any>(null);
 
@@ -227,8 +226,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   useEffect(() => {
     // Modo Mestre / segredos são EFÊMEROS: reiniciam a cada atualização da página.
     // Limpa qualquer estado antigo que tenha ficado salvo.
-    try { localStorage.removeItem(LS_MESTRE); localStorage.removeItem(LS_MESTRE_KEY); localStorage.removeItem(LS_EGGS); } catch {}
-    try { sessionStorage.removeItem(LS_MESTRE); sessionStorage.removeItem(LS_MESTRE_KEY); sessionStorage.removeItem(LS_EGGS); } catch {}
+    try { localStorage.removeItem(LS_MESTRE); localStorage.removeItem(LS_EGGS); } catch {}
+    try { sessionStorage.removeItem(LS_MESTRE); sessionStorage.removeItem(LS_EGGS); } catch {}
     const c = new URLSearchParams(window.location.search).get("c");
     if (c) {
       let sess: GameState | null = null;
@@ -246,14 +245,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ---------- easter eggs: data da festa + chacoalhar ---------- */
+  /* ---------- easter egg: chacoalhar → chuva ---------- */
   useEffect(() => {
-    const d = new Date();
-    if (d.getMonth() === 5 && (d.getDate() === 27 || d.getDate() === 24)) {
-      setFestaHoje(true);
-      markEgg("festa");
-      setTimeout(() => burstRef.current(), 700);
-    }
     let last = 0, lx = 0, ly = 0, lz = 0, primed = false;
     const onMotion = (e: DeviceMotionEvent) => {
       const a = e.accelerationIncludingGravity; if (!a) return;
@@ -362,10 +355,16 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         sway: Math.random() * 6.28, sw: 0.02 + Math.random() * 0.022, c: navy, hl: "#5b86c4",
         life: 0, max: 170 + (Math.random() * 90 | 0) };
     }, 7, 3);
+    const floatEmoji = (emojis: string[], sMin: number, sRange: number, n: number) => floatUp(() => ({
+      kind: "heart", x: innerWidth * (0.08 + Math.random() * 0.84), y: innerHeight + 12 + Math.random() * 24,
+      vx: 0, vy: -(1.3 + Math.random() * 1.5), g: 0, s: sMin + Math.random() * sRange,
+      sway: Math.random() * 6.28, sw: 0.022 + Math.random() * 0.03, e: emojis[(Math.random() * emojis.length) | 0],
+      life: 0, max: 165 + (Math.random() * 90 | 0) }), n, 3);
+    catolicaRef.current = () => floatEmoji(["✝️", "🕊️", "🙏", "✨", "🤍"], 22, 18, 8);
+    milhoRef.current = () => floatEmoji(["🌽"], 26, 14, 9);
     return () => window.removeEventListener("resize", resize);
   }, []);
   const burst = useCallback(() => burstRef.current(), []);
-  const fireworks = useCallback(() => fireworksRef.current(), []);
 
   /* ---------- ambiente (brasas + vaga-lumes) ---------- */
   useEffect(() => {
@@ -433,11 +432,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     goFullscreen();
     // easter egg: nome mágico
     const magic = nm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const spell = MAGIC[magic];
+    const spell = MAGIC_NAMES[magic];
     if (spell) {
-      setMestre(true); setMestreKey(magic);
-      markEgg("nome");
-      vibrate([30, 40, 30, 40, 140]); fireworks();
+      setMestre(true); markEgg("nome"); vibrate([30, 40, 30, 40, 140]);
+      const anim = spell.anim === "catolica" ? catolicaRef : spell.anim === "saojoao" ? fireworksRef : spell.anim === "milho" ? milhoRef : burstRef;
+      anim.current();
       showToast(spell.toast);
     } else if (["emanuela bastos", "ester bastos"].includes(magic)) {
       vibrate([20, 40, 20, 40, 20]); heartsRef.current();
@@ -449,7 +448,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {} }, seen: [], doneLocks: [], active: true };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
     setView("game");
-  }, [name, goFullscreen, persist, fireworks, markEgg, showToast]);
+  }, [name, goFullscreen, persist, markEgg, showToast]);
 
   const completeLock = useCallback((L: number) => {
     const g = gameRef.current!; const combo: (number | string)[] = [];
@@ -608,14 +607,40 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setView("ranking");
   }, [sb, unsubAll, loadLockBoard]);
 
-  /* ===================== easter egg ===================== */
-  const eggTaps = useRef(0); const eggLast = useRef(0);
-  const bonfireTap = useCallback(() => {
+  /* ===================== easter egg: assoprar a fogueira ===================== */
+  const stopBlow = useCallback(() => { try { blowRef.current?.stop(); } catch {} blowRef.current = null; setBlowOn(false); }, []);
+
+  const bonfireTap = useCallback(async () => {
     vibrate(8);
-    if (mestre) { burst(); return; }
-    const now = Date.now(); if (now - eggLast.current > 1200) eggTaps.current = 0; eggLast.current = now;
-    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); setMestreKey("fogueira"); markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
-  }, [mestre, burst, markEgg]);
+    if (fogueiraOut) { setFogueiraOut(false); return; } // toca de novo → reacende
+    if (blowRef.current) { stopBlow(); return; }
+    const md: any = navigator.mediaDevices;
+    if (!md || !md.getUserMedia) { burst(); showToast("Esse aparelho não deixa eu ouvir o sopro 🙈"); return; }
+    let stream: MediaStream;
+    try { stream = await md.getUserMedia({ audio: true }); }
+    catch { showToast("Pra apagar a fogueira, é só permitir o microfone e assoprar 🌬️"); return; }
+    try {
+      const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AC(); const src = ctx.createMediaStreamSource(stream);
+      const an = ctx.createAnalyser(); an.fftSize = 512; src.connect(an);
+      const data = new Uint8Array(an.frequencyBinCount);
+      let raf = 0, hits = 0; const started = Date.now();
+      setBlowOn(true); showToast("🌬️ Assopre na fogueira!");
+      const stop = () => { cancelAnimationFrame(raf); try { stream.getTracks().forEach(t => t.stop()); ctx.close(); } catch {} };
+      blowRef.current = { stop };
+      const tick = () => {
+        an.getByteFrequencyData(data);
+        let low = 0; for (let i = 1; i < 22; i++) low += data[i]; low /= 21;
+        if (low > 95) { if (++hits >= 3) { stopBlow(); setFogueiraOut(true); markEgg("sopro"); vibrate([60, 40, 60]); showToast("🌬️ Você apagou a fogueira! 😮💨"); setTimeout(() => setFogueiraOut(false), 5000); return; } }
+        else hits = 0;
+        if (Date.now() - started > 9000) { stopBlow(); showToast("A fogueira resistiu… tenta de novo 🔥"); return; }
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    } catch { try { stream.getTracks().forEach(t => t.stop()); } catch {} setBlowOn(false); }
+  }, [fogueiraOut, stopBlow, burst, markEgg, showToast]);
+
+  useEffect(() => () => { try { blowRef.current?.stop(); } catch {} }, []);
 
   /* ===================== admin ===================== */
   const [admEmail, setAdmEmail] = useState(""); const [admPass, setAdmPass] = useState("");
@@ -825,17 +850,6 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       <div className="hot-flash" ref={hotRef} aria-hidden />
       {toast ? <div className="toast show">{toast}</div> : null}
 
-      {eggOpen ? (
-        <div className="secret-egg" onClick={(e) => { if (e.target === e.currentTarget) setEggOpen(false); }}>
-          <div className="card">
-            <div className="crown">🔥👑</div>
-            <h2>Mestre do Arraiá</h2>
-            <p>Você descobriu o segredo da fogueira! O <b>Modo Mestre</b> foi liberado — agora a fogueira solta fogos a cada toque. 🎆</p>
-            <button className="btn fire" onClick={() => { setEggOpen(false); burst(); }}>Uhul! 🎉</button>
-          </div>
-        </div>
-      ) : null}
-
       <div className={"app" + (mestre ? " mestre" : "") + (view === "admin" ? " admin-wide" : "")}>
         <Bunting />
 
@@ -847,13 +861,13 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <div className="kicker">Colégio Marista de Brasília</div>
           <h1 className="title">Arraiá<br />do Tesouro</h1>
           <p className="festa">Festa Junina <span className="ano">2026</span></p>
-          {mestre ? <div className="mestre-chip">{mestreChipLabel(mestreKey)}</div> : null}
           <p className="lead">Ache os cartões escondidos pela festa. Alguns abrem um <b>cadeado</b> com premiação; o resto são curiosidades. Bora?</p>
-          <div className="bonfire" aria-hidden onClick={bonfireTap}>
+          <div className={"bonfire" + (fogueiraOut ? " out" : "") + (blowOn ? " listening" : "")} aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
+            <div className="smoke"><span /><span /><span /></div>
             <div className="logs"><span /><span /></div>
           </div>
-          {festaHoje ? <div className="festa-hoje">🎉 É hoje! Festa Junina do Marista. Boa caçada!</div> : null}
+          {blowOn ? <div className="blow-hint">🌬️ Assopre no microfone pra apagar a fogueira…</div> : null}
           {foundEggs.length ? <div className="eggs-badge">🏅 {foundEggs.length}/{EGGS_TOTAL} segredos juninos {foundEggs.length >= EGGS_TOTAL ? "· lenda do arraiá! 👑" : "descobertos"}</div> : null}
           <div className="install" style={{ display: "block" }}>{nfcNotice}</div>
           {splashMsg ? <div className="install warn" style={{ display: "block" }}>{splashMsg}</div> : null}
@@ -875,7 +889,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
         {/* HUB */}
         <section id="view-game" className={v("game")}>
-          <div className="statline"><span>{mestre ? "👑 " : "🤠 "}{g?.name || "—"}</span><span className="timer">{fmt(elapsed)}</span></div>
+          <div className="statline"><span>🤠 {g?.name || "—"}</span><span className="timer">{fmt(elapsed)}</span></div>
           <p className="anyorder">🔀 Ache os cartões em <b>qualquer ordem</b> — cada número já vai pro lugar certo.</p>
           {g ? (
             <div className={"lockpanel" + (lockDone ? " done" : "")}>
