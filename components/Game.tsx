@@ -726,6 +726,7 @@ export default function Game() {
           <div className="kicker">Colégio Marista de Brasília</div>
           <h1 className="title">Arraiá<br />do Tesouro</h1>
           <p className="festa">Festa Junina <span className="ano">2026</span></p>
+          {mestre ? <div className="mestre-chip">👑 Modo Mestre</div> : null}
           <p className="lead">Ache os cartões escondidos pela festa. Alguns abrem um <b>cadeado</b> com premiação; o resto são curiosidades. Bora?</p>
           <div className="bonfire" aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
