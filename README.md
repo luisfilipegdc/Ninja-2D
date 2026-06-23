@@ -57,7 +57,9 @@ aparelho e retoma de onde parou.
   pra tela cheia, mas o toque na tag abre o Safari — então mantenha a partida lá.
 - As tags precisam ser **graváveis num Android** (o iPhone não grava tags por
   web). Depois de gravadas, funcionam no iPhone normalmente.
-- Botão **"Sem NFC? Usar a câmera (QR)"** sempre disponível como alternativa.
+- Sem NFC no aparelho? Aponte a **câmera nativa do celular** no **QR do cartão**
+  (impresso pelo admin) — ela abre a URL e o jogo processa igual. (O leitor de
+  QR dentro do app foi removido; quem lê o QR é a câmera do sistema.)
 
 ## Tela cheia ("tipo app")
 

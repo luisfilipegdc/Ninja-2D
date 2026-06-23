@@ -8,7 +8,7 @@ import type { Card, GameState, Media, ScoreRow } from "@/lib/types";
 
 /* ===================== helpers puros ===================== */
 type ViewId = "splash" | "game" | "scan" | "card" | "chest" | "ranking" | "admin";
-type Method = "nfc" | "nfctap" | "qr";
+type Method = "nfc" | "nfctap" | "none";
 
 const LS_SESS = "arraia.session.v2";
 const LS_RANK = "arraia.ranking.v1";
@@ -59,7 +59,6 @@ export default function Game() {
   const [eggOpen, setEggOpen] = useState(false);
 
   // scanner
-  const [scanMethod, setScanMethod] = useState<Method>("qr");
   const [scanErr, setScanErr] = useState("");
   const [scanHint, setScanHint] = useState("");
 
@@ -84,7 +83,6 @@ export default function Game() {
   const ambientRef = useRef<HTMLCanvasElement | null>(null);
   const confettiRef = useRef<HTMLCanvasElement | null>(null);
   const hotRef = useRef<HTMLDivElement | null>(null);
-  const html5QrRef = useRef<any>(null);
   const nfcAbortRef = useRef<AbortController | null>(null);
   const channelsRef = useRef<any[]>([]);
   const burstRef = useRef<() => void>(() => {});
@@ -406,8 +404,8 @@ export default function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchCard, flashErr, showToast, revealSenha, revealCuriosidade]);
 
-  /* ===================== scanner ===================== */
-  const defaultMethod = (): Method => flags.NFC_OK ? "nfc" : (flags.isIOS ? "nfctap" : "qr");
+  /* ===================== scanner (apenas NFC) ===================== */
+  const defaultMethod = (): Method => flags.NFC_OK ? "nfc" : (flags.isIOS ? "nfctap" : "none");
 
   const onScanText = useCallback((text: string) => {
     if (!scanActiveRef.current) return;
@@ -431,47 +429,30 @@ export default function Game() {
       };
     } catch (err: any) {
       const n = err?.name || "";
-      if (n === "NotSupportedError" || n === "TypeError") setScanErr("Este celular não tem NFC disponível no navegador. Toque em “Usar a câmera (QR)”.");
+      if (n === "NotSupportedError" || n === "TypeError") setScanErr("Este celular não tem NFC disponível no navegador.");
       else if (n === "NotAllowedError") setScanErr("Precisa permitir o NFC. Toque de novo e aceite — e confira se o NFC está LIGADO (barra de cima → ícone NFC).");
-      else setScanErr("Ligue o NFC do celular: puxe a barra de cima e toque no ícone NFC. Depois tente de novo — ou use a câmera (QR).");
+      else setScanErr("Ligue o NFC do celular: puxe a barra de cima e toque no ícone NFC. Depois tente de novo.");
     }
   }, [flashErr, onScanText]);
-
-  const startQR = useCallback(async () => {
-    try {
-      const mod = await import("html5-qrcode");
-      const q = new mod.Html5Qrcode("reader", { verbose: false } as any);
-      html5QrRef.current = q;
-      await q.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 240, height: 240 }, aspectRatio: 1 }, onScanText, () => {});
-    } catch { setScanErr("Não consegui abrir a câmera. Toque para permitir o acesso e tente de novo."); }
-  }, [onScanText]);
 
   const startMethod = useCallback(async (m: Method) => {
     setScanErr("");
     if (m === "nfc") { setScanHint("Aproxime a parte de trás do celular do cartão. Mantenha o NFC ligado."); await startNFC(); }
     else if (m === "nfctap") { setScanHint("Encoste o topo do iPhone no cartão — o jogo abre sozinho. Não precisa apertar nada."); }
-    else { setScanHint("Aponte a câmera pro QR Code do cartão escondido."); await startQR(); }
-  }, [startNFC, startQR]);
+    else { setScanHint("Este aparelho não lê NFC. Use o QR do cartão pela câmera do próprio celular — ele abre o jogo sozinho."); }
+  }, [startNFC]);
 
   const stopScan = useCallback(async () => {
     scanActiveRef.current = false;
     if (nfcAbortRef.current) { try { nfcAbortRef.current.abort(); } catch {} nfcAbortRef.current = null; }
-    if (html5QrRef.current) { try { await html5QrRef.current.stop(); await html5QrRef.current.clear(); } catch {} html5QrRef.current = null; }
   }, []);
 
   const openScanner = useCallback(() => {
     scanActiveRef.current = true; tryFullscreen();
-    const m = defaultMethod(); setScanMethod(m); setScanErr(""); setView("scan");
+    const m = defaultMethod(); setScanErr(""); setView("scan");
     setTimeout(() => startMethod(m), 50);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tryFullscreen, startMethod]);
-
-  const switchMethod = useCallback(async () => {
-    await stopScan(); scanActiveRef.current = true;
-    const m: Method = scanMethod === "qr" ? defaultMethod() : "qr"; setScanMethod(m);
-    setTimeout(() => startMethod(m), 50);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scanMethod, stopScan, startMethod]);
 
   const cancelScan = useCallback(async () => { await stopScan(); setView("game"); }, [stopScan]);
 
@@ -671,17 +652,13 @@ export default function Game() {
           <button className="btn ghost noprint" style={{ marginTop: 12 }} onClick={() => { gameRef.current = null; setGame(null); clearSession(); setName(""); setSplashMsg(""); setView("splash"); }}>Sair da caçada</button>
         </section>
 
-        {/* SCAN */}
+        {/* SCAN (apenas NFC) */}
         <section id="view-scan" className={v("scan")}>
-          <div className="kicker">{scanMethod === "qr" ? "Mire no QR do cartão" : "Encoste na tag NFC"}</div>
+          <div className="kicker">Encoste na tag NFC</div>
           <h1 className="title" style={{ fontSize: "2.2rem" }}>Procurando…</h1>
-          {scanMethod !== "qr" ? (
-            <div className="nfcpanel"><div className="nfc-stage"><div className="ring" /><div className="ring" /><div className="ring" /><div className="nfc-phone">📱</div></div></div>
-          ) : null}
-          <div id="reader" style={{ display: scanMethod === "qr" ? "block" : "none" }} />
+          <div className="nfcpanel"><div className="nfc-stage"><div className="ring" /><div className="ring" /><div className="ring" /><div className="nfc-phone">📱</div></div></div>
           {scanErr ? <div className="scan-err">{scanErr}</div> : null}
           <p className="scan-hint">{scanHint}</p>
-          <div className="scan-switch"><a onClick={switchMethod}>{scanMethod === "qr" ? (flags.NFC_OK || flags.isIOS ? "Voltar pro NFC" : "Tentar a câmera de novo") : "Sem NFC? Usar a câmera (QR)"}</a></div>
           <div className="spacer" />
           <button className="btn ghost" onClick={cancelScan}>Cancelar</button>
         </section>
