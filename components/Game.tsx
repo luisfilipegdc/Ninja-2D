@@ -609,7 +609,6 @@ export default function Game() {
           <h1 className="title">Arraiá<br />do Tesouro</h1>
           <p className="festa">Festa Junina 2026</p>
           <p className="lead">Encontre os cartões escondidos pela festa. Alguns revelam a senha de um <b>cadeado</b> com premiação — o resto são curiosidades juninas. Bora?</p>
-          <p className="evento">📅 27/06 · 📍 Maristinha · 🕗 8h30–19h30</p>
           <div className="bonfire" aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
             <div className="logs"><span /><span /></div>
