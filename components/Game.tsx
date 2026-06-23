@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
+import Bunting from "@/components/Bunting";
 import { getSupabase, EVENT } from "@/lib/supabase";
 import type { Card, GameState, Media, ScoreRow } from "@/lib/types";
 
@@ -43,31 +44,6 @@ function loadRank(): LocalEntry[] { try { return JSON.parse(localStorage.getItem
 function saveRank(l: LocalEntry[]) { localStorage.setItem(LS_RANK, JSON.stringify(l)); }
 function localRows(L: number): ScoreRow[] {
   return loadRank().filter(e => e.lock === L).sort((a, b) => a.ms - b.ms).map(e => ({ id: "local_" + e.at, name: e.name, ms: e.ms }));
-}
-
-/* ===================== Bandeirinhas ===================== */
-function buntingSvg() {
-  const cols = ["#ff4d6d", "#ffc93c", "#21bf8f", "#4cc9f0", "#ff7a18"];
-  const W = 520, H = 48, n = 12, gap = W / n, top = 5, sag = 15;
-  const yAt = (x: number) => { const t = x / W; return top + sag * 4 * t * (1 - t); };
-  let cord = "M0 " + top.toFixed(1);
-  for (let x = 0; x <= W; x += 24) cord += " L" + x + " " + yAt(x).toFixed(1);
-  cord += " L" + W + " " + top.toFixed(1);
-  const fw = gap * 0.84, fh = 27, notch = 9;
-  let flags = "";
-  for (let i = 0; i < n; i++) {
-    const ax = gap * (i + 0.5), ay = yAt(ax);
-    const l = (ax - fw / 2).toFixed(1), r = (ax + fw / 2).toFixed(1);
-    const t = ay.toFixed(1), b = (ay + fh).toFixed(1), nb = (ay + fh - notch).toFixed(1);
-    const c = cols[i % cols.length];
-    flags += `<g class="flag" style="animation-delay:${(i * 0.11).toFixed(2)}s;transform-origin:${ax.toFixed(1)}px ${t}px">
-      <path d="M${l} ${t} L${r} ${t} L${r} ${b} L${ax.toFixed(1)} ${nb} L${l} ${b} Z" fill="${c}" stroke="rgba(0,0,0,.16)" stroke-width="1"/>
-      <path d="M${l} ${t} L${r} ${t} L${r} ${(ay + 4).toFixed(1)} L${l} ${(ay + 4).toFixed(1)} Z" fill="rgba(255,255,255,.30)"/>
-      <path d="M${ax.toFixed(1)} ${t} L${r} ${t} L${r} ${b} L${ax.toFixed(1)} ${nb} Z" fill="rgba(0,0,0,.10)"/>
-    </g>`;
-  }
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-    <path d="${cord}" stroke="#d9b85a" stroke-width="2.2" fill="none" stroke-linecap="round"/>${flags}</svg>`;
 }
 
 /* ===================== Componente principal ===================== */
@@ -631,7 +607,7 @@ export default function Game() {
       ) : null}
 
       <div className={"app" + (mestre ? " mestre" : "")}>
-        <div className="bunting noprint" dangerouslySetInnerHTML={{ __html: buntingSvg() }} />
+        <Bunting />
 
         {/* SPLASH */}
         <section id="view-splash" className={v("splash")}>
