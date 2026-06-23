@@ -9,8 +9,10 @@ e **não precisa de servidor**.
 Há **vários cartões** (tags NFC, com QR de reserva) escondidos pelo arraiá. Cada
 cartão tem um **código** (ex: `af6a49c5`) e é de um de dois tipos:
 
-- **Senha** (são 6): cada um revela **1 dígito + a posição** dele na senha de 6
-  números que abre o **baú da premiação** (cadeado físico de verdade).
+- **Senha:** são **2 cadeados independentes, cada um com senha de 3 dígitos**
+  (6 cartões no total). Cada cartão revela **1 dígito + a casa (1–3)** do seu
+  cadeado. Cada cadeado abre um **baú/cadeado físico** — dá pra usar em momentos
+  diferentes da festa.
 - **Curiosidade** (os demais): conteúdo sobre festa junina — **texto, imagem,
   vídeo do YouTube, áudio ou link**. Servem pra manter o jogo divertido.
 
@@ -18,17 +20,18 @@ cartão tem um **código** (ex: `af6a49c5`) e é de um de dois tipos:
 
 1. **QR de entrada** → abre o app **em tela cheia** e pede o nome do jogador.
 2. **Iniciar caçada** (cronômetro começa) → vai pro **hub**.
-3. **Hub:** o **cofre da senha** (6 casinhas) fica sempre visível e um botão
-   **Escanear cartão**.
+3. **Hub:** os **2 cadeados** (3 casinhas cada) ficam sempre visíveis + botão
+   **Escanear cartão**. Recado claro: **ache os cartões em qualquer ordem** —
+   cada número já vai pra sua casinha sozinho (não é uma sequência).
 4. Escaneia → o app busca o cartão pelo código e revela:
-   - **senha** → preenche uma casinha do cofre (momento épico, com fogos);
+   - **senha** → preenche uma casinha do cadeado certo (momento épico, com fogos);
    - **curiosidade** → mostra o conteúdo (texto/imagem/vídeo/áudio/link).
-5. Volta pro hub (loop). Ao completar os **6 números** → o app mostra a senha
-   montada pra abrir o **cadeado do baú** e registra o tempo no **ranking ao vivo**.
+5. Quando um cadeado completa os **3 dígitos** → o app mostra a senha pra abrir
+   aquele cadeado físico e registra o tempo no **ranking ao vivo daquele cadeado**.
 
-O design segue princípios de **design comportamental** (cofre sempre visível =
-meta-gradiente; cada scan é uma recompensa variável; loop de 1 toque) pra ficar
-rápido e não enjoar.
+O design segue princípios de **design comportamental** (cadeados sempre visíveis =
+meta-gradiente; cada scan é uma recompensa variável; "qualquer ordem" pra não
+confundir; loop de 1 toque) pra ficar rápido e não enjoar.
 
 ## NFC no iPhone E no Android (a sacada)
 
@@ -112,6 +115,7 @@ Como funciona:
 
 Setup do Supabase (uma vez), no **SQL Editor**:
 1. Rode `supabase/migrations/0001_scores.sql` — ranking (tabela `scores` + RLS + Realtime).
-2. Rode `supabase/migrations/0002_cards.sql` — cartões da caçada (tabela `cards` + RLS).
+2. Rode `supabase/migrations/0002_cards.sql` e `0003_two_locks.sql` — cartões da
+   caçada (tabela `cards` + RLS + 2 cadeados de 3 dígitos).
 3. Crie o **usuário admin**: Authentication → Add user → e-mail + senha (marque
    "Auto Confirm"). É com ele que o painel do organizador entra pra gerenciar os cartões.

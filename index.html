@@ -169,8 +169,20 @@ select option{color:#1b1030;}
   color:#cdeafe;border-radius:14px;padding:12px 14px;margin-top:14px;font-weight:700;font-size:.92rem;line-height:1.45;}
 .install b{color:#fff;}
 
-/* ---------- Cofre da senha (hub) ---------- */
-.cofre{display:flex;gap:8px;justify-content:center;margin-top:20px;flex-wrap:wrap;}
+/* ---------- Cofres / cadeados (hub) ---------- */
+.anyorder{margin-top:18px;text-align:center;color:#cdeafe;font-weight:700;font-size:.95rem;
+  line-height:1.45;background:rgba(76,201,240,.1);border:1.5px solid rgba(76,201,240,.35);
+  border-radius:14px;padding:11px 14px;}
+.anyorder b{color:#fff;}
+#cofres{display:flex;flex-direction:column;gap:14px;margin-top:16px;}
+.lockpanel{background:rgba(255,255,255,.05);border:1.5px solid rgba(255,255,255,.12);
+  border-radius:18px;padding:16px 14px 18px;}
+.lockpanel.done{border-color:var(--verde);background:rgba(33,191,143,.1);}
+.lockhead{display:flex;align-items:center;justify-content:space-between;font-weight:900;
+  color:var(--milho);font-size:1.05rem;padding:0 4px;}
+.lockhead .cnt{font-size:.85rem;color:#cbb9ea;font-weight:800;}
+.lockhead .ok{font-size:.85rem;color:var(--verde);font-weight:900;}
+.cofre{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;}
 .slot{width:46px;height:58px;border-radius:12px;border:2px solid rgba(255,255,255,.18);
   background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;
   font-family:"Rye",cursive;font-size:1.7rem;color:var(--milho);position:relative;}
@@ -257,7 +269,9 @@ audio.curio-audio{width:100%;margin-top:18px;}
 .rank .pos{font-family:"Rye",cursive;color:var(--milho);font-size:1.3rem;width:34px;flex:none;text-align:center;}
 .rank .nm{font-weight:900;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .rank .tm{font-variant-numeric:tabular-nums;font-weight:800;color:#e9def7;}
-.empty{color:#cbb9ea;text-align:center;margin-top:20px;font-weight:700;}
+.empty{color:#cbb9ea;text-align:center;margin-top:14px;font-weight:700;}
+.ranklock{font-family:"Rye",cursive;color:var(--milho);font-weight:400;font-size:1.2rem;
+  margin:22px 0 0;text-shadow:0 1px 0 #b85c00;}
 
 /* ---------- Admin ---------- */
 .admin-row{background:rgba(255,255,255,.06);border-radius:14px;padding:14px;margin-top:12px;}
@@ -381,12 +395,10 @@ body.mestre #view-splash .bonfire .halo{animation-duration:1.5s;filter:blur(4px)
       <span class="timer" id="timer">00:00</span>
     </div>
 
-    <div class="kicker" style="margin-top:20px;text-align:center;align-self:center">Senha do baú</div>
-    <div class="cofre" id="cofre"></div>
-    <div class="cofre-count" id="cofreCount"></div>
+    <p class="anyorder">🔀 Ache os cartões em <b>qualquer ordem</b> — cada número já sabe a sua casinha.</p>
+    <div id="cofres"></div>
 
     <div class="spacer"></div>
-    <button class="btn fire" id="openChestBtn" style="display:none;margin-bottom:12px">Abrir o baú 🔐</button>
     <button class="btn fire" id="scanBtn">Escanear cartão 📡</button>
     <button class="btn ghost noprint" id="giveUpBtn" style="margin-top:12px">Sair da caçada</button>
   </section>
@@ -420,25 +432,29 @@ body.mestre #view-splash .bonfire .halo{animation-duration:1.5s;filter:blur(4px)
     <button class="btn fire" id="cardContinue">Continuar a caçada 📡</button>
   </section>
 
-  <!-- ============ BAÚ (senha completa) ============ -->
+  <!-- ============ CADEADO (senha completa) ============ -->
   <section id="view-chest" class="view celebrate">
     <div class="chest">🧰</div>
-    <div class="big">Senha completa!</div>
-    <p class="lead" style="text-align:center">Gire o cadeado do baú para:</p>
+    <div class="big">Senha do Cadeado <span id="chestLock">1</span>!</div>
+    <p class="lead" style="text-align:center">Gire o cadeado para:</p>
     <div class="combo" id="chestCombo"></div>
     <p class="lead" style="text-align:center;margin-top:14px">Boa, <b id="chestName"></b>!
-      Mostre a senha pro organizador e abra o baú da premiação. 🎁</p>
+      Mostre a senha pro organizador e abra o baú deste cadeado. 🎁</p>
     <ul class="rank" id="chestRank"></ul>
     <div class="spacer"></div>
-    <button class="btn ghost noprint" id="chestRankBtn">Ver ranking completo 🏆</button>
+    <button class="btn fire" id="chestContinue">Continuar a caçada 📡</button>
   </section>
 
   <!-- ============ RANKING ============ -->
   <section id="view-ranking" class="view">
-    <div class="kicker">Quem montou a senha mais rápido</div>
+    <div class="kicker">Quem montou as senhas mais rápido</div>
     <h1 class="title" style="font-size:2.4rem">Ranking 🏆</h1>
-    <ul class="rank" id="rankList"></ul>
-    <p class="empty" id="rankEmpty" style="display:none">Ninguém abriu o baú ainda. Bora ser o primeiro!</p>
+    <h3 class="ranklock">🔒 Cadeado 1</h3>
+    <ul class="rank" id="rankList1"></ul>
+    <p class="empty" id="rankEmpty1" style="display:none">Ninguém abriu o Cadeado 1 ainda.</p>
+    <h3 class="ranklock">🔒 Cadeado 2</h3>
+    <ul class="rank" id="rankList2"></ul>
+    <p class="empty" id="rankEmpty2" style="display:none">Ninguém abriu o Cadeado 2 ainda.</p>
     <div class="spacer"></div>
     <button class="btn" id="rankBack">Voltar</button>
   </section>
@@ -616,33 +632,50 @@ async function fetchCard(code){
 /* ============================================================
    Estado do jogo
 ============================================================ */
-let game = null;   // {name, startedAt, gameId, senha:{pos:digit}, seen:[code], done:bool}
+// game.locks = { 1:{pos:digit}, 2:{pos:digit} } — 2 cadeados de 3 dígitos
+let game = null;
 let timerInt = null;
+const LOCKS = [1, 2];
 
 function startTimer(){
   clearInterval(timerInt);
-  timerInt = setInterval(() => { if(game && !game.done) $("#timer").textContent = fmt(Date.now() - game.startedAt); }, 500);
+  timerInt = setInterval(() => { if(game && !bothDone()) $("#timer").textContent = fmt(Date.now() - game.startedAt); }, 500);
 }
-function filledCount(){ let n=0; for(let p=1;p<=6;p++) if(game.senha[p]!=null) n++; return n; }
-function renderCofre(){
-  const box = $("#cofre"); box.innerHTML = "";
-  for(let p=1;p<=6;p++){
-    const v = game.senha[p];
+function ensureLocks(){ if(!game.locks) game.locks = {1:{},2:{}}; game.locks[1] = game.locks[1]||{}; game.locks[2] = game.locks[2]||{}; if(!game.doneLocks) game.doneLocks = []; }
+function lockFilled(L){ let n=0; for(let p=1;p<=3;p++) if(game.locks[L][p]!=null) n++; return n; }
+function lockComplete(L){ return lockFilled(L) >= 3; }
+function bothDone(){ return lockComplete(1) && lockComplete(2); }
+
+function lockPanel(L){
+  const filled = lockFilled(L), done = filled >= 3;
+  const p = document.createElement("div");
+  p.className = "lockpanel" + (done ? " done" : "");
+  p.innerHTML = `<div class="lockhead">🔒 Cadeado ${L}
+      ${done ? '<span class="ok">✓ senha pronta</span>' : '<span class="cnt">'+filled+' de 3</span>'}</div>
+    <div class="cofre"></div>`;
+  const cof = p.querySelector(".cofre");
+  for(let pos=1;pos<=3;pos++){
+    const v = game.locks[L][pos];
     const s = document.createElement("div");
     s.className = "slot" + (v!=null ? " filled" : "");
-    s.innerHTML = `<span class="pos">${p}ª</span>` + (v!=null ? v : "🔒");
-    box.appendChild(s);
+    s.innerHTML = `<span class="pos">${pos}</span>` + (v!=null ? v : "🔒");
+    cof.appendChild(s);
   }
+  if(done){
+    const b = document.createElement("button");
+    b.className = "btn fire"; b.style.marginTop = "12px";
+    b.textContent = "Ver a senha do Cadeado " + L + " 🔐";
+    b.addEventListener("click", () => completeLock(L));
+    p.appendChild(b);
+  }
+  return p;
 }
 function renderHub(){
+  ensureLocks();
   $("#gameWho").textContent = "🤠 " + game.name;
   $("#timer").textContent = fmt(Date.now() - game.startedAt);
-  renderCofre();
-  const filled = filledCount();
-  $("#cofreCount").innerHTML = filled >= 6
-    ? "Senha completa! Abra o baú 🎉"
-    : "Você tem <b>" + filled + "</b> de <b>6</b> números — faltam <b>" + (6-filled) + "</b>";
-  $("#openChestBtn").style.display = filled >= 6 ? "block" : "none";
+  const box = $("#cofres"); box.innerHTML = "";
+  LOCKS.forEach(L => box.appendChild(lockPanel(L)));
   show("view-game");
 }
 
@@ -699,7 +732,7 @@ $("#startBtn").addEventListener("click", () => {
   const name = $("#playerName").value.trim();
   if(!name){ $("#playerName").focus(); $("#playerName").style.borderColor = "var(--vermelha)"; return; }
   goFullscreen();
-  game = { name, startedAt: Date.now(), gameId: EVENT, senha:{}, seen:[], done:false };
+  game = { name, startedAt: Date.now(), gameId: EVENT, locks:{1:{},2:{}}, seen:[], doneLocks:[] };
   saveSession();
   if(navigator.vibrate) navigator.vibrate([40,40,120]);
   startTimer();
@@ -707,7 +740,6 @@ $("#startBtn").addEventListener("click", () => {
 });
 
 $("#scanBtn").addEventListener("click", () => openScanner());
-$("#openChestBtn").addEventListener("click", () => openChest());
 $("#giveUpBtn").addEventListener("click", () => {
   clearInterval(timerInt); game = null; clearSession(); show("view-splash");
 });
@@ -836,9 +868,10 @@ async function processCode(code){
 }
 
 function revealSenha(card){
-  const pos = card.position, digit = card.digit;
-  const already = game.senha[pos] != null;
-  game.senha[pos] = digit;
+  ensureLocks();
+  const L = card.lock || 1, pos = card.position, digit = card.digit;
+  const already = game.locks[L][pos] != null;
+  game.locks[L][pos] = digit;
   if(!game.seen.includes(card.code)) game.seen.push(card.code);
   saveSession();
   if(navigator.vibrate) navigator.vibrate([40,30,40,30,160]);
@@ -848,13 +881,13 @@ function revealSenha(card){
   const wrap = $("#cardBody"); wrap.innerHTML = "";
   const r = document.createElement("div"); r.className = "senha-reveal";
   r.innerHTML = `<div class="senha-digit">${digit}</div>
-    <div class="senha-where">é a <b>${pos}ª casa</b> da senha do baú!</div>`;
+    <div class="senha-where">entra na <b>casa ${pos}</b> do <b>Cadeado ${L}</b></div>`;
   if(card.hint){ const h = document.createElement("p"); h.className = "senha-hint"; h.textContent = "💬 " + card.hint; r.appendChild(h); }
   wrap.appendChild(r);
 
-  const complete = filledCount() >= 6;
-  afterCard = complete ? openChest : renderHub;
-  $("#cardContinue").textContent = complete ? "Abrir o baú 🔐" : "Continuar a caçada 📡";
+  const complete = lockComplete(L) && !game.doneLocks.includes(L);
+  afterCard = complete ? () => completeLock(L) : renderHub;
+  $("#cardContinue").textContent = complete ? "Ver a senha do Cadeado " + L + " 🔐" : "Continuar a caçada 📡";
   show("view-card");
 }
 
@@ -909,37 +942,47 @@ $("#cardContinue").addEventListener("click", () => {
 /* ============================================================
    Baú: senha completa
 ============================================================ */
-function openChest(){
-  const combo = $("#chestCombo"); combo.innerHTML = "";
-  for(let p=1;p<=6;p++){ const d = document.createElement("div"); d.className = "d"; d.textContent = game.senha[p]!=null ? game.senha[p] : "?"; combo.appendChild(d); }
+function lockGameId(L){ return EVENT + ":L" + L; }
+function completeLock(L){
+  ensureLocks();
+  $("#chestLock").textContent = L;
   $("#chestName").textContent = game.name;
+  const combo = $("#chestCombo"); combo.innerHTML = "";
+  for(let p=1;p<=3;p++){ const d = document.createElement("div"); d.className = "d"; d.textContent = game.locks[L][p]!=null ? game.locks[L][p] : "?"; combo.appendChild(d); }
 
-  if(!game.done){
-    game.done = true; saveSession(); clearInterval(timerInt);
+  const gid = lockGameId(L);
+  if(!game.doneLocks.includes(L)){
+    game.doneLocks.push(L); saveSession();
+    if(bothDone()) clearInterval(timerInt);
     const elapsed = Date.now() - game.startedAt;
-    const entry = { name:game.name, ms:elapsed, at:Date.now(), total:6 };
+    const entry = { name:game.name, ms:elapsed, at:Date.now(), total:3, lock:L };
     const list = loadRank(); list.push(entry); list.sort((a,b)=>a.ms-b.ms); saveRank(list);
     myScoreId = "local_" + entry.at;
-    renderRows("#chestRank", localRows(), myScoreId);
+    renderRows("#chestRank", localRows(L), myScoreId);
+    burstConfetti(); setTimeout(burstConfetti, 350);
     (async () => {
-      const id = await sbInsert({ gameId:EVENT, name:entry.name, ms:elapsed, total:6 });
+      const id = await sbInsert({ gameId:gid, name:entry.name, ms:elapsed, total:3 });
       if(id) myScoreId = id;
-      await showLeaderboard("#chestRank", EVENT, null);
-      subscribeRank("#chestRank", EVENT, null);
+      await showLeaderboard("#chestRank", gid, null, L);
+      subscribeRank("#chestRank", gid, null, L);
     })();
   }else{
-    renderRows("#chestRank", localRows(), myScoreId);
+    renderRows("#chestRank", localRows(L), myScoreId);
   }
+
+  const both = bothDone();
+  const btn = $("#chestContinue");
+  btn.textContent = both ? "Ver ranking 🏆" : "Continuar a caçada 📡";
+  btn.onclick = both ? () => openRanking() : () => renderHub();
   show("view-chest");
 }
-$("#chestRankBtn").addEventListener("click", () => openRanking());
 
 /* ============================================================
    Ranking (Supabase + fallback local)
 ============================================================ */
 function loadRank(){ try{ return JSON.parse(localStorage.getItem(LS_RANK)) || []; }catch(e){ return []; } }
 function saveRank(list){ localStorage.setItem(LS_RANK, JSON.stringify(list)); }
-let rankChannel = null, myScoreId = null;
+let rankChannels = [], myScoreId = null;
 
 async function sbInsert(entry){
   if(!sb) return null;
@@ -957,7 +1000,8 @@ async function sbTop(gameId){
     return error ? null : (data || []);
   }catch(e){ return null; }
 }
-function localRows(){ return loadRank().map(e => ({ id:"local_"+e.at, name:e.name, ms:e.ms })); }
+// ranking local por cadeado (entries têm .lock)
+function localRows(L){ return loadRank().filter(e => e.lock === L).sort((a,b)=>a.ms-b.ms).map(e => ({ id:"local_"+e.at, name:e.name, ms:e.ms })); }
 function renderRows(sel, rows, highlightId){
   const ul = $(sel); if(!ul) return; ul.innerHTML = "";
   rows.slice(0,12).forEach((e,i) => {
@@ -968,27 +1012,33 @@ function renderRows(sel, rows, highlightId){
     ul.appendChild(li);
   });
 }
-async function showLeaderboard(sel, gameId, emptyEl){
+async function showLeaderboard(sel, gameId, emptyEl, L){
   const rows = await sbTop(gameId);
   if(rows){ renderRows(sel, rows, myScoreId); if(emptyEl) emptyEl.style.display = rows.length ? "none" : "block"; }
-  else{ renderRows(sel, localRows(), myScoreId); if(emptyEl) emptyEl.style.display = loadRank().length ? "none" : "block"; }
+  else{ const lr = localRows(L); renderRows(sel, lr, myScoreId); if(emptyEl) emptyEl.style.display = lr.length ? "none" : "block"; }
 }
-function subscribeRank(sel, gameId, emptyEl){
-  if(!sb) return; unsubscribeRank();
+function subscribeRank(sel, gameId, emptyEl, L){
+  if(!sb) return;
   try{
-    rankChannel = sb.channel("scores_" + gameId)
+    const ch = sb.channel("scores_" + gameId)
       .on("postgres_changes", { event:"INSERT", schema:"public", table:"scores", filter:"game_id=eq."+gameId },
-        () => showLeaderboard(sel, gameId, emptyEl)).subscribe();
-  }catch(e){ rankChannel = null; }
+        () => showLeaderboard(sel, gameId, emptyEl, L)).subscribe();
+    rankChannels.push(ch);
+  }catch(e){}
 }
-function unsubscribeRank(){ if(rankChannel && sb){ try{ sb.removeChannel(rankChannel); }catch(e){} } rankChannel = null; }
+function unsubscribeRank(){ if(sb){ rankChannels.forEach(ch => { try{ sb.removeChannel(ch); }catch(e){} }); } rankChannels = []; }
 
 function openRanking(){
-  renderRows("#rankList", localRows(), myScoreId);
-  $("#rankEmpty").style.display = loadRank().length ? "none" : "block";
+  unsubscribeRank();
+  LOCKS.forEach(L => {
+    const sel = "#rankList" + L, emptyEl = $("#rankEmpty" + L);
+    const lr = localRows(L);
+    renderRows(sel, lr, myScoreId);
+    emptyEl.style.display = lr.length ? "none" : "block";
+    showLeaderboard(sel, lockGameId(L), emptyEl, L);
+    subscribeRank(sel, lockGameId(L), emptyEl, L);
+  });
   show("view-ranking");
-  showLeaderboard("#rankList", EVENT, $("#rankEmpty"));
-  subscribeRank("#rankList", EVENT, $("#rankEmpty"));
 }
 $("#toRanking").addEventListener("click", openRanking);
 $("#rankBack").addEventListener("click", () => { unsubscribeRank(); show(game ? "view-game" : "view-splash"); });
@@ -1024,7 +1074,7 @@ $("#admLogout").addEventListener("click", async () => { try{ await sb.auth.signO
 async function loadCards(){
   const list = $("#cardList"); list.innerHTML = "<p class='empty'>Carregando…</p>";
   try{
-    const { data, error } = await sb.from("cards").select("*").eq("game_id", EVENT).order("kind").order("position",{nullsFirst:false});
+    const { data, error } = await sb.from("cards").select("*").eq("game_id", EVENT).order("kind").order("lock",{nullsFirst:false}).order("position",{nullsFirst:false});
     if(error){ list.innerHTML = "<p class='empty'>Erro: " + escapeHtml(error.message) + "</p>"; return; }
     if(!data.length){ list.innerHTML = "<p class='empty'>Nenhum cartão ainda. Crie o primeiro! ☝️</p>"; $("#printBtn").style.display="none"; return; }
     list.innerHTML = "";
@@ -1035,7 +1085,7 @@ async function loadCards(){
 function cardRow(c){
   const row = document.createElement("div"); row.className = "admin-row";
   const summary = c.kind === "senha"
-    ? `🔐 Senha · casa <b>${c.position}</b> = <b>${c.digit}</b>` + (c.hint ? ` · dica: ${escapeHtml(c.hint)}` : "")
+    ? `🔐 Cadeado <b>${c.lock}</b> · casa <b>${c.position}</b> = <b>${c.digit}</b>` + (c.hint ? ` · dica: ${escapeHtml(c.hint)}` : "")
     : `${mediaIcon(c.media)} ${escapeHtml(c.title || "Curiosidade")}`;
   row.innerHTML = `<div class="rh">${escapeHtml(c.code)}</div>
     <div style="color:#e9def7;margin-top:6px">${summary}</div>
@@ -1075,8 +1125,13 @@ function openCardForm(c){
         <option value="curiosidade"${kind==="curiosidade"?" selected":""}>📜 Curiosidade</option>
       </select>
       <div id="fSenha">
-        <label class="field" for="fPos">Posição na senha (1 a 6)</label>
-        <input id="fPos" type="number" min="1" max="6" value="${c&&c.position!=null?c.position:1}" />
+        <label class="field" for="fLock">Cadeado (1 ou 2)</label>
+        <select id="fLock">
+          <option value="1">🔒 Cadeado 1</option>
+          <option value="2">🔒 Cadeado 2</option>
+        </select>
+        <label class="field" for="fPos">Casa na senha (1 a 3)</label>
+        <input id="fPos" type="number" min="1" max="3" value="${c&&c.position!=null?c.position:1}" />
         <label class="field" for="fDigit">Dígito (0 a 9)</label>
         <input id="fDigit" type="number" min="0" max="9" value="${c&&c.digit!=null?c.digit:0}" />
         <label class="field" for="fHint">Dica (opcional)</label>
@@ -1104,6 +1159,7 @@ function openCardForm(c){
   const fKind = $("#fKind"), fSenha = $("#fSenha"), fCurio = $("#fCurio"), fMedia = $("#fMedia");
   function syncKind(){ const k = fKind.value; fSenha.style.display = k==="senha"?"block":"none"; fCurio.style.display = k==="curiosidade"?"block":"none"; }
   fKind.addEventListener("change", syncKind); syncKind();
+  if(c && c.lock) $("#fLock").value = String(c.lock);
   if(c && c.kind === "curiosidade" && c.media) fMedia.value = c.media;
   const regen = $("#fRegen"); if(regen) regen.addEventListener("click", () => { $("#fCode").value = randCode(); });
   $("#fCancel").addEventListener("click", () => { f.style.display = "none"; });
@@ -1114,12 +1170,14 @@ async function saveCard(){
   const code = $("#fCode").value.trim();
   const kind = $("#fKind").value;
   if(!/^[A-Za-z0-9_-]{4,40}$/.test(code)){ err.textContent = "Código inválido (use 4–40 letras/números)."; err.style.display="block"; return; }
-  const payload = { code, game_id: EVENT, kind, position:null, digit:null, hint:null, media:null, title:null, body:null };
+  const payload = { code, game_id: EVENT, kind, lock:null, position:null, digit:null, hint:null, media:null, title:null, body:null };
   if(kind === "senha"){
+    const lock = parseInt($("#fLock").value,10);
     const pos = parseInt($("#fPos").value,10), dig = parseInt($("#fDigit").value,10);
-    if(!(pos>=1 && pos<=6)){ err.textContent="Posição precisa ser de 1 a 6."; err.style.display="block"; return; }
+    if(!(lock===1 || lock===2)){ err.textContent="Escolha o cadeado (1 ou 2)."; err.style.display="block"; return; }
+    if(!(pos>=1 && pos<=3)){ err.textContent="A casa precisa ser de 1 a 3."; err.style.display="block"; return; }
     if(!(dig>=0 && dig<=9)){ err.textContent="Dígito precisa ser de 0 a 9."; err.style.display="block"; return; }
-    payload.position = pos; payload.digit = dig; payload.hint = $("#fHint").value.trim() || null;
+    payload.lock = lock; payload.position = pos; payload.digit = dig; payload.hint = $("#fHint").value.trim() || null;
   }else{
     payload.media = $("#fMedia").value;
     payload.title = $("#fTitle").value.trim() || null;
