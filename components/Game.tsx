@@ -14,6 +14,8 @@ const LS_SESS = "arraia.session.v2";
 const LS_RANK = "arraia.ranking.v1";
 const LS_CARDS = "arraia.cardcache.v1";
 const LS_MESTRE = "arraia.mestre";
+const LS_EGGS = "arraia.eggs.v1";
+const EGGS_TOTAL = 4;
 
 function fmt(ms: number) {
   const t = Math.max(0, Math.floor(ms / 1000));
@@ -62,6 +64,14 @@ export default function Game() {
   const [mestre, setMestre] = useState(false);
   const [eggOpen, setEggOpen] = useState(false);
   const [festaHoje, setFestaHoje] = useState(false);
+  const [foundEggs, setFoundEggs] = useState<string[]>([]);
+  const foundEggsRef = useRef<string[]>([]);
+  const markEgg = useCallback((id: string) => {
+    if (foundEggsRef.current.includes(id)) return;
+    const next = [...foundEggsRef.current, id];
+    foundEggsRef.current = next; setFoundEggs(next);
+    try { localStorage.setItem(LS_EGGS, JSON.stringify(next)); } catch {}
+  }, []);
 
   // scanner
   const [scanErr, setScanErr] = useState("");
@@ -91,6 +101,8 @@ export default function Game() {
   const nfcAbortRef = useRef<AbortController | null>(null);
   const channelsRef = useRef<any[]>([]);
   const burstRef = useRef<() => void>(() => {});
+  const rainRef = useRef<() => void>(() => {});
+  const fireworksRef = useRef<() => void>(() => {});
   const lastErrRef = useRef(0);
   const toastT = useRef<any>(null);
 
@@ -212,6 +224,7 @@ export default function Game() {
   /* ---------- launch (?c=) ---------- */
   useEffect(() => {
     try { if (localStorage.getItem(LS_MESTRE) === "1") setMestre(true); } catch {}
+    try { const fe = JSON.parse(localStorage.getItem(LS_EGGS) || "[]"); if (Array.isArray(fe)) { foundEggsRef.current = fe; setFoundEggs(fe); } } catch {}
     const c = new URLSearchParams(window.location.search).get("c");
     if (c) {
       let sess: GameState | null = null;
@@ -234,7 +247,8 @@ export default function Game() {
     const d = new Date();
     if (d.getMonth() === 5 && (d.getDate() === 27 || d.getDate() === 24)) {
       setFestaHoje(true);
-      setTimeout(() => burstRef.current(), 700);
+      markEgg("festa");
+      setTimeout(() => fireworksRef.current(), 700);
     }
     let last = 0, lx = 0, ly = 0, lz = 0, primed = false;
     const onMotion = (e: DeviceMotionEvent) => {
@@ -245,12 +259,12 @@ export default function Game() {
       if (!primed) { primed = true; return; }
       if (delta > 45) {
         const now = Date.now(); if (now - last < 4000) return; last = now;
-        vibrate([20, 30, 20]); burstRef.current(); showToast("☔ Olha a chuva… é mentira! 😄");
+        vibrate([20, 30, 20]); rainRef.current(); markEgg("chuva"); showToast("☔ Olha a chuva… é mentira! 😄");
       }
     };
     window.addEventListener("devicemotion", onMotion);
     return () => window.removeEventListener("devicemotion", onMotion);
-  }, [showToast]);
+  }, [showToast, markEgg]);
 
   /* ---------- confete ---------- */
   useEffect(() => {
@@ -261,9 +275,22 @@ export default function Game() {
     resize(); window.addEventListener("resize", resize);
     const tick = () => {
       ctx.clearRect(0, 0, cvs.width, cvs.height);
-      parts.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life++;
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); ctx.restore(); });
-      parts = parts.filter(p => p.y < cvs.height + 40 && p.life < 260);
+      parts.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life++;
+        if (p.kind === "rain") {
+          ctx.strokeStyle = p.c; ctx.lineWidth = p.s; ctx.lineCap = "round"; ctx.globalAlpha = p.a;
+          ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .6, p.y - p.vy * 1.1); ctx.stroke(); ctx.globalAlpha = 1;
+        } else if (p.kind === "spark") {
+          p.vx *= 0.97; p.vy *= 0.97;
+          const fade = 1 - p.life / p.max;
+          ctx.globalAlpha = Math.max(0, fade); ctx.fillStyle = p.c;
+          ctx.shadowColor = p.c; ctx.shadowBlur = 8;
+          ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, 6.28); ctx.fill();
+          ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        } else {
+          p.rot += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); ctx.restore();
+        }
+      });
+      parts = parts.filter(p => p.y < cvs.height + 40 && p.life < (p.max || 260));
       if (parts.length) requestAnimationFrame(tick); else { rafOn = false; ctx.clearRect(0, 0, cvs.width, cvs.height); }
     };
     burstRef.current = () => {
@@ -272,9 +299,38 @@ export default function Game() {
         rot: Math.random() * 6.28, vr: (Math.random() - .5) * 0.4, c: COLORS[(Math.random() * COLORS.length) | 0], life: 0 });
       if (!rafOn) { rafOn = true; requestAnimationFrame(tick); }
     };
+    const RAIN = ["#9fd6f5", "#bfe3ff", "#d6ecff", "#8ecbf0"];
+    rainRef.current = () => {
+      for (let i = 0; i < 240; i++) parts.push({ kind: "rain", x: Math.random() * innerWidth, y: -20 - Math.random() * innerHeight * 1.1,
+        vx: 2.4 + Math.random() * 1.8, vy: 15 + Math.random() * 11, g: 0.12, s: 1.8 + Math.random() * 2.2,
+        a: 0.45 + Math.random() * 0.45, c: RAIN[(Math.random() * RAIN.length) | 0], life: 0 });
+      if (!rafOn) { rafOn = true; requestAnimationFrame(tick); }
+    };
+    const FIRE = ["#f9c21a", "#ffd84a", "#e23b2e", "#e84c97", "#28a8e0", "#ffffff"];
+    const shell = (cx: number, cy: number) => {
+      const c = FIRE[(Math.random() * FIRE.length) | 0];
+      const n = 34 + (Math.random() * 14 | 0);
+      const spd = 4 + Math.random() * 2.4;
+      for (let i = 0; i < n; i++) {
+        const ang = (i / n) * 6.28 + Math.random() * 0.2;
+        const v = spd * (0.6 + Math.random() * 0.5);
+        parts.push({ kind: "spark", x: cx, y: cy, vx: Math.cos(ang) * v, vy: Math.sin(ang) * v,
+          g: 0.05, s: 1.6 + Math.random() * 1.8, c, life: 0, max: 55 + (Math.random() * 30 | 0) });
+      }
+    };
+    fireworksRef.current = () => {
+      const launch = (n: number) => {
+        for (let i = 0; i < n; i++) shell(innerWidth * (0.2 + Math.random() * 0.6), innerHeight * (0.18 + Math.random() * 0.32));
+        if (!rafOn) { rafOn = true; requestAnimationFrame(tick); }
+      };
+      launch(3);
+      setTimeout(() => launch(3), 280);
+      setTimeout(() => launch(4), 620);
+    };
     return () => window.removeEventListener("resize", resize);
   }, []);
   const burst = useCallback(() => burstRef.current(), []);
+  const fireworks = useCallback(() => fireworksRef.current(), []);
 
   /* ---------- ambiente (brasas + vaga-lumes) ---------- */
   useEffect(() => {
@@ -343,13 +399,14 @@ export default function Game() {
     const magic = nm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     if (["marista", "sao joao", "festa junina", "ze do milho"].includes(magic)) {
       setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {}
-      vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 250);
+      markEgg("nome");
+      vibrate([30, 40, 30, 40, 140]); fireworks();
       showToast("✨ Nome mágico! Modo Mestre liberado 🔥👑");
     }
     const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {}, 2: {} }, seen: [], doneLocks: [], active: true };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
     setView("game");
-  }, [name, goFullscreen, persist, burst, showToast]);
+  }, [name, goFullscreen, persist, fireworks, markEgg, showToast]);
 
   const completeLock = useCallback((L: number) => {
     const g = gameRef.current!; const combo: (number | string)[] = [];
@@ -419,7 +476,6 @@ export default function Game() {
     else media = <div className="curio-text">{body}</div>;
     const node = (
       <div className="curio">
-        <div className="curio-emoji">{mediaIcon(card.media)}</div>
         {card.title ? <h2 className="curio-title">{card.title}</h2> : null}
         {media}
       </div>
@@ -518,10 +574,10 @@ export default function Game() {
   const eggTaps = useRef(0); const eggLast = useRef(0);
   const bonfireTap = useCallback(() => {
     vibrate(8);
-    if (mestre) { burst(); return; }
+    if (mestre) { fireworks(); return; }
     const now = Date.now(); if (now - eggLast.current > 1200) eggTaps.current = 0; eggLast.current = now;
-    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {} vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
-  }, [mestre, burst]);
+    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {} markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); fireworks(); setEggOpen(true); }
+  }, [mestre, fireworks, markEgg]);
 
   /* ===================== admin ===================== */
   const [admEmail, setAdmEmail] = useState(""); const [admPass, setAdmPass] = useState("");
@@ -665,16 +721,19 @@ export default function Game() {
 
         {/* SPLASH */}
         <section id="view-splash" className={v("splash")}>
+          <div className="splash-deco" aria-hidden>
+            <span className="d1">🌵</span><span className="d2">🪗</span><span className="d3">🌻</span><span className="d4">🌽</span>
+          </div>
           <div className="kicker">Colégio Marista de Brasília</div>
           <h1 className="title">Arraiá<br />do Tesouro</h1>
-          <p className="festa">Festa Junina 2026</p>
-          <p className="lead">Encontre os cartões escondidos pela festa. Alguns revelam a senha de um <b>cadeado</b> com premiação — o resto são curiosidades juninas. Bora?</p>
+          <p className="festa">Festa Junina <span className="ano">2026</span></p>
+          <p className="lead">Ache os cartões escondidos pela festa. Alguns abrem um <b>cadeado</b> com premiação; o resto são curiosidades. Bora?</p>
           <div className="bonfire" aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
             <div className="logs"><span /><span /></div>
           </div>
           {festaHoje ? <div className="festa-hoje">🎉 É hoje! Festa Junina do Marista. Boa caçada!</div> : null}
-          <span className="badge" id="gameBadge">🔓 Vale a senha do Cadeado {activeLock} agora</span>
+          {foundEggs.length ? <div className="eggs-badge">🏅 {foundEggs.length}/{EGGS_TOTAL} segredos juninos {foundEggs.length >= EGGS_TOTAL ? "· lenda do arraiá! 👑" : "descobertos"}</div> : null}
           <div className="install" style={{ display: "block" }}>{nfcNotice}</div>
           {splashMsg ? <div className="install warn" style={{ display: "block" }}>{splashMsg}</div> : null}
           <label className="field" htmlFor="playerName">Seu nome de caipira</label>
