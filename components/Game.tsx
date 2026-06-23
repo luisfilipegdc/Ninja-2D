@@ -14,8 +14,19 @@ const LS_SESS = "arraia.session.v2";
 const LS_RANK = "arraia.ranking.v1";
 const LS_CARDS = "arraia.cardcache.v1";
 const LS_MESTRE = "arraia.mestre";
+const LS_MESTRE_KEY = "arraia.mestre.key";
 const LS_EGGS = "arraia.eggs.v1";
 const EGGS_TOTAL = 4;
+
+// Cada nome mágico tem sua própria referência e selo único
+const MAGIC: Record<string, { chip: string; toast: string }> = {
+  "marista": { chip: "🔵🟡 Espírito Marista", toast: "🔵🟡 Espírito Marista ativado! Champagnat aprova — Modo Mestre liberado 👑" },
+  "sao joao": { chip: "🔥 Fogueira de São João", toast: "🔥🎆 São João acendeu a fogueira do arraiá! Modo Mestre liberado 👑" },
+  "festa junina": { chip: "💃 Rei do Arraiá", toast: "💃🕺 A festa em pessoa! Puxe a quadrilha — Modo Mestre liberado 👑" },
+  "ze do milho": { chip: "🌽 Zé do Milho", toast: "🌽 Pamonha, curau e canjica! Zé do Milho liberou o Modo Mestre 👑" },
+};
+const FOGUEIRA_CHIP = "🔥 Mestre da Fogueira";
+function mestreChipLabel(key: string) { return MAGIC[key]?.chip || (key === "fogueira" ? FOGUEIRA_CHIP : "👑 Modo Mestre"); }
 
 function fmt(ms: number) {
   const t = Math.max(0, Math.floor(ms / 1000));
@@ -62,6 +73,7 @@ export default function Game() {
   const [splashMsg, setSplashMsg] = useState("");
   const [toast, setToast] = useState("");
   const [mestre, setMestre] = useState(false);
+  const [mestreKey, setMestreKey] = useState("");
   const [eggOpen, setEggOpen] = useState(false);
   const [festaHoje, setFestaHoje] = useState(false);
   const [foundEggs, setFoundEggs] = useState<string[]>([]);
@@ -103,6 +115,8 @@ export default function Game() {
   const burstRef = useRef<() => void>(() => {});
   const rainRef = useRef<() => void>(() => {});
   const fireworksRef = useRef<() => void>(() => {});
+  const heartsRef = useRef<() => void>(() => {});
+  const balloonsRef = useRef<() => void>(() => {});
   const lastErrRef = useRef(0);
   const toastT = useRef<any>(null);
 
@@ -224,6 +238,7 @@ export default function Game() {
   /* ---------- launch (?c=) ---------- */
   useEffect(() => {
     try { if (localStorage.getItem(LS_MESTRE) === "1") setMestre(true); } catch {}
+    try { const mk = localStorage.getItem(LS_MESTRE_KEY); if (mk) setMestreKey(mk); } catch {}
     try { const fe = JSON.parse(localStorage.getItem(LS_EGGS) || "[]"); if (Array.isArray(fe)) { foundEggsRef.current = fe; setFoundEggs(fe); } } catch {}
     const c = new URLSearchParams(window.location.search).get("c");
     if (c) {
@@ -275,7 +290,7 @@ export default function Game() {
     resize(); window.addEventListener("resize", resize);
     const tick = () => {
       ctx.clearRect(0, 0, cvs.width, cvs.height);
-      parts.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life++;
+      parts.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.life++; if (p.sw) p.sway += p.sw;
         if (p.kind === "rain") {
           ctx.strokeStyle = p.c; ctx.lineWidth = p.s; ctx.lineCap = "round"; ctx.globalAlpha = p.a;
           ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - p.vx * .6, p.y - p.vy * 1.1); ctx.stroke(); ctx.globalAlpha = 1;
@@ -284,6 +299,21 @@ export default function Game() {
           const fade = 1 - p.life / p.max;
           ctx.globalAlpha = Math.max(0, fade); ctx.fillStyle = p.c;
           ctx.beginPath(); ctx.arc(p.x, p.y, p.s, 0, 6.28); ctx.fill();
+          ctx.globalAlpha = 1;
+        } else if (p.kind === "heart") {
+          const fade = p.life > p.max * 0.7 ? Math.max(0, 1 - (p.life - p.max * 0.7) / (p.max * 0.3)) : 1;
+          ctx.globalAlpha = fade; ctx.font = p.s + "px serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+          ctx.fillText(p.e, p.x + Math.sin(p.sway) * 12, p.y); ctx.globalAlpha = 1;
+        } else if (p.kind === "balloon") {
+          const fade = p.life > p.max * 0.78 ? Math.max(0, 1 - (p.life - p.max * 0.78) / (p.max * 0.22)) : 1;
+          ctx.globalAlpha = fade;
+          const bx = p.x + Math.sin(p.sway) * 14, by = p.y, rx = p.s * 0.52, ry = p.s * 0.66;
+          ctx.strokeStyle = "rgba(190,205,230,.45)"; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(bx, by + ry); ctx.quadraticCurveTo(bx + 7, by + ry + p.s * 0.5, bx, by + ry + p.s); ctx.stroke();
+          const g2 = ctx.createRadialGradient(bx - rx * 0.35, by - ry * 0.45, 1, bx, by, ry * 1.5);
+          g2.addColorStop(0, p.hl); g2.addColorStop(1, p.c);
+          ctx.fillStyle = g2; ctx.beginPath(); ctx.ellipse(bx, by, rx, ry, 0, 0, 6.28); ctx.fill();
+          ctx.fillStyle = p.c; ctx.beginPath(); ctx.moveTo(bx - 3, by + ry); ctx.lineTo(bx + 3, by + ry); ctx.lineTo(bx, by + ry + 5); ctx.closePath(); ctx.fill();
           ctx.globalAlpha = 1;
         } else {
           p.rot += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6); ctx.restore();
@@ -326,6 +356,23 @@ export default function Game() {
       setTimeout(() => launch(2), 300);
       setTimeout(() => launch(3), 660);
     };
+    const HEARTS = ["❤️", "💖", "💗", "💕", "🤍", "💞"];
+    const floatUp = (mk: (i: number) => any, n: number, waves: number) => {
+      const wave = () => { for (let i = 0; i < n; i++) parts.push(mk(i)); if (!rafOn) { rafOn = true; requestAnimationFrame(tick); } };
+      wave(); for (let w = 1; w < waves; w++) setTimeout(wave, w * 380);
+    };
+    heartsRef.current = () => floatUp(() => ({
+      kind: "heart", x: innerWidth * (0.08 + Math.random() * 0.84), y: innerHeight + 12 + Math.random() * 22,
+      vx: 0, vy: -(1.5 + Math.random() * 1.7), g: 0, s: 20 + Math.random() * 22,
+      sway: Math.random() * 6.28, sw: 0.03 + Math.random() * 0.03, e: HEARTS[(Math.random() * HEARTS.length) | 0],
+      life: 0, max: 150 + (Math.random() * 90 | 0) }), 9, 3);
+    balloonsRef.current = () => floatUp(() => {
+      const navy = ["#15375d", "#1b3a6b", "#0f2c4d", "#21487f"][(Math.random() * 4) | 0];
+      return { kind: "balloon", x: innerWidth * (0.1 + Math.random() * 0.8), y: innerHeight + 16 + Math.random() * 26,
+        vx: 0, vy: -(1.2 + Math.random() * 1.4), g: 0, s: 34 + Math.random() * 20,
+        sway: Math.random() * 6.28, sw: 0.02 + Math.random() * 0.022, c: navy, hl: "#5b86c4",
+        life: 0, max: 170 + (Math.random() * 90 | 0) };
+    }, 7, 3);
     return () => window.removeEventListener("resize", resize);
   }, []);
   const burst = useCallback(() => burstRef.current(), []);
@@ -396,11 +443,19 @@ export default function Game() {
     goFullscreen();
     // easter egg: nome mágico
     const magic = nm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    if (["marista", "sao joao", "festa junina", "ze do milho"].includes(magic)) {
-      setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {}
+    const spell = MAGIC[magic];
+    if (spell) {
+      setMestre(true); setMestreKey(magic);
+      try { localStorage.setItem(LS_MESTRE, "1"); localStorage.setItem(LS_MESTRE_KEY, magic); } catch {}
       markEgg("nome");
       vibrate([30, 40, 30, 40, 140]); fireworks();
-      showToast("✨ Nome mágico! Modo Mestre liberado 🔥👑");
+      showToast(spell.toast);
+    } else if (["emanuela bastos", "ester bastos"].includes(magic)) {
+      vibrate([20, 40, 20, 40, 20]); heartsRef.current();
+      showToast("💖 " + nm + ", um arraiá cheio de amor! 💕");
+    } else if (["luis bezaleu", "estevao bastos"].includes(magic)) {
+      vibrate([20, 40, 20, 40, 20]); balloonsRef.current();
+      showToast("🎈 Balões pra você, " + nm + "! Voa alto 💙");
     }
     const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {}, 2: {} }, seen: [], doneLocks: [], active: true };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
@@ -575,7 +630,7 @@ export default function Game() {
     vibrate(8);
     if (mestre) { burst(); return; }
     const now = Date.now(); if (now - eggLast.current > 1200) eggTaps.current = 0; eggLast.current = now;
-    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); try { localStorage.setItem(LS_MESTRE, "1"); } catch {} markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
+    if (++eggTaps.current >= 5) { eggTaps.current = 0; setMestre(true); setMestreKey("fogueira"); try { localStorage.setItem(LS_MESTRE, "1"); localStorage.setItem(LS_MESTRE_KEY, "fogueira"); } catch {} markEgg("fogueira"); vibrate([30, 40, 30, 40, 140]); burst(); setTimeout(burst, 260); setTimeout(burst, 520); setEggOpen(true); }
   }, [mestre, burst, markEgg]);
 
   /* ===================== admin ===================== */
@@ -726,7 +781,7 @@ export default function Game() {
           <div className="kicker">Colégio Marista de Brasília</div>
           <h1 className="title">Arraiá<br />do Tesouro</h1>
           <p className="festa">Festa Junina <span className="ano">2026</span></p>
-          {mestre ? <div className="mestre-chip">👑 Modo Mestre</div> : null}
+          {mestre ? <div className="mestre-chip">{mestreChipLabel(mestreKey)}</div> : null}
           <p className="lead">Ache os cartões escondidos pela festa. Alguns abrem um <b>cadeado</b> com premiação; o resto são curiosidades. Bora?</p>
           <div className="bonfire" aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
