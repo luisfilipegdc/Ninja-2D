@@ -584,16 +584,28 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       return { id: "r" + p, digit: d, pos: p, label: lvl === "impossivel" ? riddleFor(d) : String(d) };
     });
     if (lvl === "impossivel") {
+      const nDecoys = g.coringa === "easy" ? 0 : g.coringa === "hard" ? 3 : 2; // coringa: alívio / pesadelo
       const real = new Set([1, 2, 3].map(p => g.locks[1]?.[p] as number));
       const avail: number[] = []; for (let d = 0; d <= 9; d++) if (!real.has(d)) avail.push(d);
       for (let i = avail.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [avail[i], avail[j]] = [avail[j], avail[i]]; }
-      avail.slice(0, 2).forEach((fake, k) => items.push({ id: "d" + k, digit: fake, pos: 0, label: riddleFor(fake), decoy: true }));
+      avail.slice(0, nDecoys).forEach((fake, k) => items.push({ id: "d" + k, digit: fake, pos: 0, label: riddleFor(fake), decoy: true }));
     }
     for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
     return items;
   }, []);
 
+  const peekUsed = useRef(false);
+  const montarPeek = useCallback(() => {
+    if (peekUsed.current) return; peekUsed.current = true;
+    const g = gameRef.current!;
+    const correct: Chip[] = [1, 2, 3].map(p => ({ id: "r" + p, digit: g.locks[1]?.[p] as number, pos: p, label: String(g.locks[1]?.[p]) }));
+    setMontarSlots(correct); setMontarPool([]); vibrate(20);
+    setTimeout(() => montarReset(), 2000);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openMontar = useCallback(() => {
+    peekUsed.current = false;
     setMontarPool(buildChips(gameRef.current!)); setMontarSlots([null, null, null]); setMontarErr(false); setView("montar");
   }, [buildChips]);
 
@@ -701,17 +713,54 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setView("card");
   }, [persist, syncGame, renderHub]);
 
+  const revealCoringa = useCallback(async (card: Card) => {
+    const g = gameRef.current!;
+    const lvl = g.level || "medio";
+    const alreadyUsed = g.seen.includes(card.code) && !!g.coringa;
+    if (!g.seen.includes(card.code)) g.seen.push(card.code);
+    vibrate([30, 40, 30]);
+    let titulo = "🃏 Coringa!"; let msg = ""; let effect = g.coringa || "";
+    if (alreadyUsed) {
+      msg = "Você já usou o coringa nessa caçada 😉";
+    } else if (lvl === "facil") {
+      const missing = [1, 2, 3].filter(p => g.locks[1]?.[p] == null);
+      if (missing.length === 0) { msg = "Você já tem os 3 números — boa caçada! 🎁"; effect = "facil"; }
+      else {
+        let digit: number | null = null, pos = missing[0];
+        try { const { data } = await sb!.from("cards").select("position,digit").eq("game_id", EVENT).eq("kind", "senha"); const row = (data || []).find((r: any) => missing.includes(r.position)); if (row) { pos = row.position; digit = row.digit; } } catch {}
+        if (digit != null) { if (!g.locks[1]) g.locks[1] = {}; g.locks[1][pos] = digit; titulo = "🃏 Coringa da sorte!"; msg = `Ganhou um número de graça: o ${digit}! 🍀`; }
+        else msg = "O coringa piscou… mas não achou número novo 😅";
+        effect = "facil";
+      }
+    } else if (lvl === "medio") {
+      effect = Math.random() < 0.5 ? "peek" : "hide:" + (1 + Math.floor(Math.random() * 3));
+      msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você poderá ESPIAR a senha por 2 segundos." : "😈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
+    } else if (lvl === "dificil") {
+      effect = "blur:" + (1 + Math.floor(Math.random() * 3));
+      titulo = "🃏 Coringa travesso!"; msg = "😈 Um dos números vai aparecer embaçado na hora de montar. Decifra!";
+    } else {
+      effect = Math.random() < 0.5 ? "easy" : "hard";
+      msg = effect === "easy" ? "🍀 ALÍVIO! As fichas falsas somem na hora de montar." : "💀 Azar! Vai entrar mais uma ficha falsa pra te confundir.";
+    }
+    g.coringa = effect; persist(); syncGame();
+    const node = (<div className="curio"><h2 className="curio-title">{titulo}</h2><p className="curio-text" style={{ textAlign: "center" }}>{msg}</p></div>);
+    afterCardRef.current = renderHub;
+    setCardView({ kind: "curio", node, kicker: "Você achou o coringa 🃏", cta: "Continuar a caçada 📡" });
+    setView("card");
+  }, [sb, persist, syncGame, renderHub]);
+
   const processCode = useCallback(async (code: string) => {
     if (!gameRef.current) { setSplashMsg("Comece a caçada primeiro 😉"); setView("splash"); return; }
     await stopScan();
     showToast("Lendo cartão…");
     const card = await fetchCard(code);
     if (!card) { flashErr("Cartão não encontrado. Veja a conexão e tente de novo."); setView("game"); return; }
-    logEvent("scan", { actor: gameRef.current?.name, code: card.code, detail: card.kind === "senha" ? `senha · casa ${card.position} = ${card.digit}` : `curiosidade · ${card.title || card.media || ""}` });
+    logEvent("scan", { actor: gameRef.current?.name, code: card.code, detail: card.kind === "senha" ? `senha · casa ${card.position} = ${card.digit}` : card.kind === "coringa" ? "coringa" : `curiosidade · ${card.title || card.media || ""}` });
     if (card.kind === "senha") revealSenha(card);
+    else if (card.kind === "coringa") revealCoringa(card);
     else revealCuriosidade(card);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchCard, flashErr, showToast, revealSenha, revealCuriosidade, logEvent]);
+  }, [fetchCard, flashErr, showToast, revealSenha, revealCuriosidade, revealCoringa, logEvent]);
 
   /* ===================== scanner (apenas NFC) ===================== */
   const defaultMethod = (): Method => flags.NFC_OK ? "nfc" : (flags.isIOS ? "nfctap" : "none");
@@ -999,6 +1048,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       if (!(pos >= 1 && pos <= 3)) { setFormErr("A casa precisa ser de 1 a 3."); return; }
       if (!(dig >= 0 && dig <= 9)) { setFormErr("Dígito precisa ser de 0 a 9."); return; }
       payload.lock = 1; payload.position = pos; payload.digit = dig; payload.hint = (form.hint || "").trim() || null;
+    } else if (form.kind === "coringa") {
+      // coringa não tem conteúdo: o efeito é gerado no jogo conforme o nível
     } else {
       payload.media = form.media || "texto"; payload.title = (form.title || "").trim() || null; payload.body = (form.body || "").trim();
       if (!payload.body) { setFormErr("Coloque o conteúdo (texto ou URL)."); return; }
@@ -1044,6 +1095,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const lockDone = g ? lockComplete(g, activeLock) : false;
   const lvl: Level = (g?.level as Level) || "medio";
   const cofreLabel = (p: number) => lvl === "facil" ? ORDINAL[p] : lvl === "medio" ? POS_CLUE[p].emoji : "•";
+  const cor = g?.coringa || "";
+  const hidePos = cor.startsWith("hide:") ? Number(cor.slice(5)) : 0;   // médio: pista sumida
+  const blurPos = cor.startsWith("blur:") ? Number(cor.slice(5)) : 0;   // difícil: número embaçado
+  const canPeek = cor === "peek";                                       // médio: espiar 2s
 
   const logStats = useMemo(() => {
     const list = logs || [];
@@ -1193,20 +1248,24 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
           <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💀 <b>Sem pistas.</b> Resolva as continhas, descubra a ordem e <b>cuidado com as fichas falsas!</b></> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
+          {canPeek ? <button className="btn ghost noprint" style={{ marginTop: 8 }} onClick={montarPeek}>👀 Espiar a senha (2s) — coringa</button> : null}
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
-            {[1, 2, 3].map((p, i) => (
-              <div key={p} className={"mslot" + (montarSlots[i] ? " filled" : "")} onClick={() => montarRemove(i)}>
-                <span className="mclue">{lvl === "medio" ? POS_CLUE[p].emoji : ORDINAL[p]}</span>
-                <span className="mnum">{montarSlots[i] ? montarSlots[i]!.digit : "?"}</span>
-                {lvl === "medio" ? <span className="mword">{POS_CLUE[p].word}</span> : null}
-              </div>
-            ))}
+            {[1, 2, 3].map((p, i) => {
+              const hidden = lvl === "medio" && hidePos === p;
+              return (
+                <div key={p} className={"mslot" + (montarSlots[i] ? " filled" : "")} onClick={() => montarRemove(i)}>
+                  <span className="mclue">{lvl === "medio" ? (hidden ? "❔" : POS_CLUE[p].emoji) : ORDINAL[p]}</span>
+                  <span className="mnum">{montarSlots[i] ? montarSlots[i]!.digit : "?"}</span>
+                  {lvl === "medio" ? <span className="mword">{hidden ? "pista sumiu!" : POS_CLUE[p].word}</span> : null}
+                </div>
+              );
+            })}
           </div>
           <div className="montar-pool">
             {montarPool.map(c => (
               <button key={c.id} className={"mchip" + (c.decoy ? " decoy" : "")} onClick={() => montarPlace(c)}>
-                <span className="mchip-num">{c.label}</span>
-                {lvl === "medio" && !c.decoy ? <span className="mchip-clue">{POS_CLUE[c.pos].emoji}</span> : null}
+                <span className={"mchip-num" + (lvl === "dificil" && blurPos === c.pos ? " blurry" : "")}>{c.label}</span>
+                {lvl === "medio" && !c.decoy && hidePos !== c.pos ? <span className="mchip-clue">{POS_CLUE[c.pos].emoji}</span> : null}
               </button>
             ))}
             {montarSlots.every(s => s) ? <span className="montar-ready">Confere! 👇</span> : null}
@@ -1319,6 +1378,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                   <select id="fKind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as any })}>
                     <option value="senha">🔐 Senha (1 número do cadeado)</option>
                     <option value="curiosidade">📜 Curiosidade</option>
+                    <option value="coringa">🃏 Coringa (efeito variável por nível)</option>
                   </select>
                   {form.kind === "senha" ? (
                     <>
@@ -1329,7 +1389,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                       <label className="field" htmlFor="fHint">Dica (opcional)</label>
                       <input id="fHint" type="text" value={form.hint || ""} onChange={(e) => setForm({ ...form, hint: e.target.value })} placeholder="Ex: o número da sorte do caipira" />
                     </>
-                  ) : (
+                  ) : form.kind === "curiosidade" ? (
                     <>
                       <label className="field" htmlFor="fMedia">Tipo de conteúdo</label>
                       <select id="fMedia" value={form.media || "texto"} onChange={(e) => setForm({ ...form, media: e.target.value as Media })}>
@@ -1368,6 +1428,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                         </>
                       )}
                     </>
+                  ) : (
+                    <div className="install" style={{ display: "block", marginTop: 14 }}>🃏 <b>Tag coringa.</b> O efeito muda conforme o nível de quem achar (dá uma força ou apronta!). É só dar o ID, a localização e espalhar — sem mais nada pra preencher.</div>
                   )}
                   {formErr ? <div className="scan-err">{formErr}</div> : null}
                   <button className="btn" style={{ marginTop: 16 }} onClick={saveCard}>Salvar cartão</button>
@@ -1383,7 +1445,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                         <div className="rh">{c.code}</div>
                         {c.location ? <div style={{ color: "#9fc3e8", marginTop: 4, fontSize: ".85rem", fontWeight: 700 }}>📍 {c.location}</div> : null}
                         <div style={{ color: "#e9def7", marginTop: 6 }}>
-                          {c.kind === "senha" ? <>🔐 casa <b>{c.position}</b> = <b>{c.digit}</b>{c.hint ? ` · dica: ${c.hint}` : ""}</> : <>{mediaIcon(c.media)} {c.title || "Curiosidade"}</>}
+                          {c.kind === "senha" ? <>🔐 casa <b>{c.position}</b> = <b>{c.digit}</b>{c.hint ? ` · dica: ${c.hint}` : ""}</> : c.kind === "coringa" ? <>🃏 <b>Coringa</b> · efeito variável</> : <>{mediaIcon(c.media)} {c.title || "Curiosidade"}</>}
                         </div>
                         {qrMap[c.code] ? <div className="qbox-mini"><img src={qrMap[c.code]} alt={c.code} /></div> : null}
                         <div className="card-actions noprint">
