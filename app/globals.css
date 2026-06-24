@@ -323,6 +323,7 @@ select option{color:#1b1030;}
   background:linear-gradient(90deg,transparent,var(--milho),transparent);opacity:.8;}
 .curio{margin-top:6px;}
 .curio-title{font-family:"Fredoka",cursive;color:var(--milho);text-align:center;font-size:1.6rem;margin:.1em 0 .1em;text-shadow:0 2px 0 #b85c00;}
+.curio-sub{text-align:center;color:#fff;opacity:.92;font-size:1.05rem;font-weight:600;margin:.1em 0 .2em;}
 .curio-text{background:var(--papel);color:var(--tinta);border-radius:16px;padding:20px 22px;font-size:1.15rem;line-height:1.55;font-weight:600;margin-top:14px;box-shadow:var(--sombra);white-space:pre-wrap;}
 .curio-img{width:100%;border-radius:16px;margin-top:14px;box-shadow:var(--sombra);display:block;}
 .curio-yt{position:relative;width:100%;padding-top:56.25%;border-radius:16px;overflow:hidden;margin-top:14px;box-shadow:var(--sombra);}

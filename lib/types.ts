@@ -11,7 +11,9 @@ export interface Card {
   hint: string | null;
   media: Media | null;       // curiosidade
   title: string | null;
-  body: string | null;
+  subtitle: string | null;   // subtítulo da curiosidade (página rica)
+  body: string | null;       // texto/descrição OU link (youtube/spotify) OU url do arquivo
+  image_url: string | null;  // imagem da curiosidade (página rica/imagem)
   location: string | null;   // localização física da tag (admin)
 }
 
@@ -46,4 +48,5 @@ export interface GameState {
   active?: boolean;
   level?: Level;          // dificuldade escolhida na splash
   coringa?: string | null; // efeito do coringa em vigor (aplicado no "Monte o código")
+  coringasUsed?: string[]; // códigos de coringa já usados (cada tag conta 1x)
 }

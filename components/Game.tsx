@@ -263,7 +263,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   /* ---------- cartões (Supabase + cache) ---------- */
   const cacheCard = (c: Card) => { try { const m = JSON.parse(localStorage.getItem(LS_CARDS) || "{}"); m[c.code] = c; localStorage.setItem(LS_CARDS, JSON.stringify(m)); } catch {} };
   const cachedCard = (code: string): Card | null => { try { return JSON.parse(localStorage.getItem(LS_CARDS) || "{}")[code] || null; } catch { return null; } };
-  const fetchCard = useCallback(async (code: string): Promise<Card | null> => {
+  const fetchCard = useCallback(async (codeRaw: string): Promise<Card | null> => {
+    const code = (codeRaw || "").trim().toLowerCase(); // serial do leitor pode vir em maiúsculas
     if (sb) {
       try {
         const { data, error } = await sb.from("cards").select("*").eq("code", code).maybeSingle();
@@ -758,9 +759,15 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const g = gameRef.current; if (g && !g.seen.includes(card.code)) { g.seen.push(card.code); persist(); syncGame(); }
     vibrate(30);
     const body = card.body || "";
+    const isImg = card.media === "imagem";
+    const imgSrc = card.image_url || (isImg ? body : ""); // fallback p/ cartões antigos (imagem no body)
+    // descrição só aparece quando a imagem está num campo próprio (image_url)
+    const desc = isImg && card.image_url ? body : "";
     let media: React.ReactNode;
     if (card.media === "texto") media = <div className="curio-text">{body}</div>;
-    else if (card.media === "imagem") media = <img className="curio-img" src={body} alt={card.title || "imagem"} />;
+    else if (isImg) media = imgSrc
+      ? <img className="curio-img" src={imgSrc} alt={card.title || "imagem"} />
+      : <div className="curio-text">Imagem ainda não configurada. Suba pelo /admin 🙂</div>;
     else if (card.media === "youtube") {
       const id = ytId(body);
       media = id
@@ -778,7 +785,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const node = (
       <div className="curio">
         {card.title ? <h2 className="curio-title">{card.title}</h2> : null}
+        {card.subtitle ? <p className="curio-sub">{card.subtitle}</p> : null}
         {media}
+        {desc ? <div className="curio-text">{desc}</div> : null}
       </div>
     );
     afterCardRef.current = renderHub;
@@ -789,11 +798,23 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const revealCoringa = useCallback(async (card: Card) => {
     const g = gameRef.current!;
     const lvl = g.level || "medio";
-    if (!g.seen.includes(card.code)) g.seen.push(card.code);
     vibrate([30, 40, 30]);
+    // cada tag de coringa vale 1 uso por jogador — os 3 coringas não se sobrepõem nem se anulam
+    const used = g.coringasUsed || (g.coringasUsed = []);
+    if (used.includes(card.code)) {
+      const node = (<div className="curio"><h2 className="curio-title">🃏 Coringa</h2><p className="curio-text" style={{ textAlign: "center" }}>Esse coringa você já usou! Procure outro por aí 😉</p></div>);
+      afterCardRef.current = renderHub;
+      setCardView({ kind: "curio", node, kicker: "Você achou o coringa 🃏", cta: "Continuar a caçada 📡" });
+      setView("card");
+      return;
+    }
+    used.push(card.code);
+    if (!g.seen.includes(card.code)) g.seen.push(card.code);
     let titulo = "🃏 Coringa!"; let msg = ""; let effect = g.coringa || "";
-    const prev = g.coringa || ""; // pra não repetir o efeito anterior
+    const prev = g.coringa || "";
     const randPos = (not: number) => { let p; do { p = 1 + Math.floor(Math.random() * 3); } while (p === not); return p; };
+    // quão bom é um efeito pro jogador — um coringa NUNCA piora o que outro já te deu
+    const good = (e: string) => (e === "peek" || e === "easy") ? 2 : e === "facil" ? 1 : !e ? 0 : e.startsWith("blur:") ? -1 : -2;
     if (lvl === "facil") {
       const missing = [1, 2, 3].filter(p => g.locks[1]?.[p] == null);
       if (missing.length === 0) { msg = "Você já tem os 3 números — boa caçada! 🎁"; effect = "facil"; }
@@ -804,15 +825,22 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         else msg = "O coringa piscou… mas não achou número novo 😅";
         effect = "facil";
       }
-    } else if (lvl === "medio") {
-      effect = prev === "peek" ? "hide:" + randPos(0) : prev.startsWith("hide:") ? "peek" : (Math.random() < 0.5 ? "peek" : "hide:" + randPos(0));
-      msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você pode dar uma PISCADA na senha… bem rapidinho 😅" : "🙈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
-    } else if (lvl === "dificil") {
-      effect = "blur:" + randPos(prev.startsWith("blur:") ? Number(prev.slice(5)) : 0);
-      titulo = "🃏 Coringa travesso!"; msg = "😜 Um dos números vai aparecer embaçado na hora de montar. Decifra!";
     } else {
-      effect = prev === "easy" ? "hard" : prev === "hard" ? "easy" : (Math.random() < 0.5 ? "easy" : "hard");
-      msg = effect === "easy" ? "🍀 ALÍVIO! As fichas falsas somem na hora de montar." : "😬 Azar! Vai entrar mais uma ficha falsa pra te confundir.";
+      // efeito-candidato deste coringa (alterna pra não repetir o anterior)
+      let cand: string;
+      if (lvl === "medio") cand = prev === "peek" ? "hide:" + randPos(0) : prev.startsWith("hide:") ? "peek" : (Math.random() < 0.5 ? "peek" : "hide:" + randPos(0));
+      else if (lvl === "dificil") cand = "blur:" + randPos(prev.startsWith("blur:") ? Number(prev.slice(5)) : 0);
+      else cand = prev === "easy" ? "hard" : prev === "hard" ? "easy" : (Math.random() < 0.5 ? "easy" : "hard");
+      if (prev && good(cand) < good(prev)) {
+        // já tinha um efeito melhor de outro coringa → mantém, não prejudica
+        effect = prev; titulo = "🃏 Coringa amigo!";
+        msg = "🍀 Esse coringa respeitou o anterior — sua sorte continua valendo!";
+      } else {
+        effect = cand;
+        if (lvl === "medio") msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você pode dar uma PISCADA na senha… bem rapidinho 😅" : "🙈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
+        else if (lvl === "dificil") { titulo = "🃏 Coringa travesso!"; msg = "😜 Um dos números vai aparecer embaçado na hora de montar. Decifra!"; }
+        else msg = effect === "easy" ? "🍀 ALÍVIO! As fichas falsas somem na hora de montar." : "😬 Azar! Vai entrar mais uma ficha falsa pra te confundir.";
+      }
     }
     g.coringa = effect; persist(); syncGame();
     const node = (<div className="curio"><h2 className="curio-title">{titulo}</h2><p className="curio-text" style={{ textAlign: "center" }}>{msg}</p></div>);
@@ -1009,7 +1037,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     } catch (e: any) { showToast("Não consegui zerar: " + (e?.message || "erro") + " (rodou a migration 0009?)"); }
   }, [sb, adminUser, logEvent, showToast]);
 
-  const uploadFile = useCallback(async (file: File) => {
+  const uploadFile = useCallback(async (file: File, field: "body" | "image_url" = "body") => {
     if (!sb) { setFormErr("Supabase não configurado."); return; }
     if (file.size > 25 * 1024 * 1024) { setFormErr("Arquivo grande demais (máx. 25 MB)."); return; }
     setFormErr(""); setUploading(true);
@@ -1020,7 +1048,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       if (error) { setFormErr("Falha no upload: " + error.message + " (rodou a migration 0005?)"); }
       else {
         const { data } = sb.storage.from("curiosidades").getPublicUrl(path);
-        setForm((f) => (f ? { ...f, body: data.publicUrl } : f));
+        setForm((f) => (f ? { ...f, [field]: data.publicUrl } : f));
       }
     } catch { setFormErr("Erro no upload."); }
     setUploading(false);
@@ -1094,7 +1122,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (tags.length < 2) { showToast("Cadastre as tags primeiro 🏷️"); return; }
     // o conteúdo (senha OU curiosidade) é remanejado entre as tags;
     // cada tag física fica no lugar (code + location não mudam)
-    const orig = tags.map(c => ({ kind: c.kind, position: c.position, digit: c.digit, hint: c.hint, media: c.media, title: c.title, body: c.body }));
+    const orig = tags.map(c => ({ kind: c.kind, position: c.position, digit: c.digit, hint: c.hint, media: c.media, title: c.title, subtitle: c.subtitle, body: c.body, image_url: c.image_url }));
     const next = orig.slice();
     for (let i = next.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [next[i], next[j]] = [next[j], next[i]]; }
     if (next.every((c, i) => c === orig[i]) && next.length > 1) { const t = next[0]; next[0] = next[1]; next[1] = t; }
@@ -1111,7 +1139,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           hint: isSenha ? ct.hint : null,
           media: isSenha ? null : ct.media,
           title: isSenha ? null : ct.title,
+          subtitle: isSenha ? null : ct.subtitle,
           body: isSenha ? null : ct.body,
+          image_url: isSenha ? null : ct.image_url,
         };
         const { error } = await sb.from("cards").update(payload).eq("code", tags[i].code);
         if (error) throw error;
@@ -1131,9 +1161,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
   const saveCard = useCallback(async () => {
     if (!sb || !form) return; setFormErr("");
-    const code = (form.code || "").trim();
-    if (!/^[A-Za-z0-9_-]{4,40}$/.test(code)) { setFormErr("Código inválido (4–40 letras/números)."); return; }
-    const payload: any = { code, game_id: EVENT, kind: form.kind, lock: null, position: null, digit: null, hint: null, media: null, title: null, body: null, location: (form.location || "").trim() || null };
+    const code = (form.code || "").trim().toLowerCase(); // serial do leitor pode vir em maiúsculas
+    if (!/^[a-z0-9_-]{4,40}$/.test(code)) { setFormErr("Código inválido (4–40 letras/números)."); return; }
+    const payload: any = { code, game_id: EVENT, kind: form.kind, lock: null, position: null, digit: null, hint: null, media: null, title: null, subtitle: null, body: null, image_url: null, location: (form.location || "").trim() || null };
     if (form.kind === "senha") {
       const pos = Number(form.position), dig = Number(form.digit);
       if (!(pos >= 1 && pos <= 3)) { setFormErr("A casa precisa ser de 1 a 3."); return; }
@@ -1142,8 +1172,17 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     } else if (form.kind === "coringa") {
       // coringa não tem conteúdo: o efeito é gerado no jogo conforme o nível
     } else {
-      payload.media = form.media || "texto"; payload.title = (form.title || "").trim() || null; payload.body = (form.body || "").trim();
-      if (!payload.body) { setFormErr("Coloque o conteúdo (texto ou URL)."); return; }
+      payload.media = form.media || "texto";
+      payload.title = (form.title || "").trim() || null;
+      payload.subtitle = (form.subtitle || "").trim() || null;
+      if (payload.media === "imagem") {
+        payload.image_url = (form.image_url || "").trim() || null;
+        payload.body = (form.body || "").trim() || null; // descrição (opcional)
+        if (!payload.image_url) { setFormErr("Envie/cole a imagem da curiosidade."); return; }
+      } else {
+        payload.body = (form.body || "").trim();
+        if (!payload.body) { setFormErr("Coloque o conteúdo (texto ou link)."); return; }
+      }
     }
     const existed = !!(cards && cards.some(c => c.code === code));
     const { error } = await sb.from("cards").upsert(payload, { onConflict: "code" });
@@ -1524,10 +1563,32 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                       </select>
                       <label className="field" htmlFor="fTitle">Título</label>
                       <input id="fTitle" type="text" value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex: Por que tem fogueira?" />
+                      {(form.media === "imagem" || form.media === "texto") ? (
+                        <>
+                          <label className="field" htmlFor="fSub">Subtítulo (opcional)</label>
+                          <input id="fSub" type="text" value={form.subtitle || ""} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} placeholder="Ex: comidas típicas de junho" />
+                        </>
+                      ) : null}
                       {form.media === "texto" ? (
                         <>
                           <label className="field" htmlFor="fBody">Texto da curiosidade</label>
                           <textarea id="fBody" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Escreva o textinho aqui" />
+                        </>
+                      ) : form.media === "imagem" ? (
+                        <>
+                          <label className="field">Imagem da página</label>
+                          <div className="uploadbox">
+                            <label className="nfc-btn" style={{ display: "inline-block", cursor: "pointer" }}>
+                              {uploading ? "Enviando…" : "📤 Enviar imagem"}
+                              <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploading}
+                                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f, "image_url"); e.currentTarget.value = ""; }} />
+                            </label>
+                            {form.image_url ? <span className="upload-ok">✔ pronto</span> : null}
+                          </div>
+                          <input type="text" value={form.image_url || ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="…ou cole a URL da imagem" style={{ marginTop: 8 }} />
+                          {form.image_url ? <img className="upload-prev" src={form.image_url} alt="prévia" /> : null}
+                          <label className="field" htmlFor="fBody">Descrição (opcional — deixe vazio p/ só imagem)</label>
+                          <textarea id="fBody" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Texto que aparece abaixo da imagem (opcional)" />
                         </>
                       ) : (
                         <>
@@ -1536,18 +1597,16 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                           </label>
                           <input id="fBody" type="text" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })}
                             placeholder={form.media === "youtube" ? "https://youtu.be/..." : form.media === "spotify" ? "https://open.spotify.com/..." : "cole a URL ou use o upload abaixo"} />
-                          {(form.media === "imagem" || form.media === "audio") ? (
+                          {form.media === "audio" ? (
                             <div className="uploadbox">
                               <label className="nfc-btn" style={{ display: "inline-block", cursor: "pointer" }}>
                                 {uploading ? "Enviando…" : "📤 Enviar arquivo"}
-                                <input type="file" accept={form.media === "imagem" ? "image/*" : "audio/*"} style={{ display: "none" }}
-                                  disabled={uploading}
+                                <input type="file" accept="audio/*" style={{ display: "none" }} disabled={uploading}
                                   onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); e.currentTarget.value = ""; }} />
                               </label>
                               {form.body ? <span className="upload-ok">✔ pronto</span> : null}
                             </div>
                           ) : null}
-                          {form.media === "imagem" && form.body ? <img className="upload-prev" src={form.body} alt="prévia" /> : null}
                         </>
                       )}
                     </>
