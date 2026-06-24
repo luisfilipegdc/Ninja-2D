@@ -1227,9 +1227,12 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (!/^[a-z0-9_-]{4,40}$/.test(code)) { setFormErr("Código inválido (4–40 letras/números)."); return; }
     const payload: any = { code, game_id: EVENT, kind: form.kind, lock: null, position: null, digit: null, hint: null, media: null, title: null, subtitle: null, body: null, image_url: null, location: (form.location || "").trim() || null };
     if (form.kind === "senha") {
-      const pos = Number(form.position), dig = Number(form.digit);
+      const pos = Number(form.position);
       if (!(pos >= 1 && pos <= 3)) { setFormErr("A casa precisa ser de 1 a 3."); return; }
-      if (!(dig >= 0 && dig <= 9)) { setFormErr("Dígito precisa ser de 0 a 9."); return; }
+      // dígito é pré-definido pelo cadeado: herda do que já está nessa casa (combo ativo); senão, combo padrão 120
+      const DEFAULT_COMBO: Record<number, number> = { 1: 1, 2: 2, 3: 0 };
+      const existing = cards?.find(c => c.kind === "senha" && c.position === pos && c.code !== code && c.digit != null);
+      const dig = existing ? Number(existing.digit) : DEFAULT_COMBO[pos];
       payload.lock = 1; payload.position = pos; payload.digit = dig; payload.hint = (form.hint || "").trim() || null;
     } else if (form.kind === "coringa") {
       // coringa não tem conteúdo: o efeito é gerado no jogo conforme o nível
@@ -1615,8 +1618,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                     <>
                       <label className="field" htmlFor="fPos">Casa na senha (1 a 3)</label>
                       <input id="fPos" type="number" min={1} max={3} value={String(form.position ?? 1)} onChange={(e) => setForm({ ...form, position: Number(e.target.value) })} />
-                      <label className="field" htmlFor="fDigit">Dígito (0 a 9)</label>
-                      <input id="fDigit" type="number" min={0} max={9} value={String(form.digit ?? 0)} onChange={(e) => setForm({ ...form, digit: Number(e.target.value) })} />
+                      <div className="install" style={{ display: "block", marginTop: 12 }}>🔐 O <b>dígito é pré-definido pelo cadeado</b> (combo 120/476) — não precisa preencher aqui. Troque a combinação no botão de combo lá em cima.</div>
                       <label className="field" htmlFor="fHint">Dica (opcional)</label>
                       <input id="fHint" type="text" value={form.hint || ""} onChange={(e) => setForm({ ...form, hint: e.target.value })} placeholder="Ex: o número da sorte do caipira" />
                     </>
