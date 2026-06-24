@@ -970,6 +970,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [qrMap, setQrMap] = useState<Record<string, string>>({});
   const [form, setForm] = useState<Partial<Card> | null>(null);
   const [formErr, setFormErr] = useState("");
+  const [scanningSerial, setScanningSerial] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [adminUser, setAdminUser] = useState("");
   const [logs, setLogs] = useState<EventRow[] | null>(null);
@@ -1036,6 +1037,31 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       showToast("Ranking zerado! 🧹");
     } catch (e: any) { showToast("Não consegui zerar: " + (e?.message || "erro") + " (rodou a migration 0009?)"); }
   }, [sb, adminUser, logEvent, showToast]);
+
+  // lê o serial (UID) da tag pelo NFC do celular e preenche o campo de código
+  const scanTagSerial = useCallback(async () => {
+    if (!flags.NFC_OK) { setFormErr("Escanear tag só funciona no Chrome do Android. No iPhone, digite/cole o serial."); return; }
+    setFormErr(""); setScanningSerial(true);
+    try {
+      const reader = new (window as any).NDEFReader();
+      const ac = new AbortController();
+      const timer = setTimeout(() => { try { ac.abort(); } catch {} setScanningSerial(false); }, 25000);
+      await reader.scan({ signal: ac.signal });
+      reader.onreadingerror = () => setFormErr("Não consegui ler a tag. Aproxime de novo.");
+      reader.onreading = (ev: any) => {
+        const serial = String(ev.serialNumber || "").replace(/[^0-9a-fA-F]/g, "").toLowerCase();
+        clearTimeout(timer); try { ac.abort(); } catch {}
+        setScanningSerial(false);
+        if (serial) { setForm((f) => (f ? { ...f, code: serial } : f)); vibrate([30, 40, 30]); showToast("📡 Serial lido: " + serial); }
+        else setFormErr("Tag lida, mas sem serial. Tente outra leitura.");
+      };
+    } catch (err: any) {
+      setScanningSerial(false);
+      const n = err?.name || "";
+      if (n === "NotAllowedError") setFormErr("Permita o NFC e confira se ele está LIGADO (barra de cima → ícone NFC).");
+      else setFormErr("Ligue o NFC do celular e tente de novo.");
+    }
+  }, [flags.NFC_OK, showToast]);
 
   const uploadFile = useCallback(async (file: File, field: "body" | "image_url" = "body") => {
     if (!sb) { setFormErr("Supabase não configurado."); return; }
@@ -1532,8 +1558,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                   <label className="field" htmlFor="fCode">ID da tag (código gravado)</label>
                   <div style={{ display: "flex", gap: 8 }}>
                     <input id="fCode" type="text" value={form.code || ""} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="ex: 53bfb8a3500001 (serial do leitor) ou aleatório" />
-                    <button className="nfc-btn" style={{ flex: "none" }} onClick={() => setForm({ ...form, code: randCode() })}>🎲</button>
+                    <button className="nfc-btn" style={{ flex: "none" }} onClick={scanTagSerial} disabled={scanningSerial} title="Escanear a tag e pegar o serial">{scanningSerial ? "📡…" : "📡"}</button>
+                    <button className="nfc-btn" style={{ flex: "none" }} onClick={() => setForm({ ...form, code: randCode() })} title="Código aleatório">🎲</button>
                   </div>
+                  {scanningSerial ? <div className="install" style={{ display: "block", marginTop: 8 }}>📡 Encoste a tag na parte de trás do celular…</div> : null}
                   <label className="field" htmlFor="fLoc">📍 Localização física</label>
                   <input id="fLoc" type="text" value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex: atrás da barraca da pescaria" />
                   <label className="field" htmlFor="fKind">Tipo</label>
