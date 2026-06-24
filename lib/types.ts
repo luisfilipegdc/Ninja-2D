@@ -33,6 +33,8 @@ export interface EventRow {
   detail: string | null; // descrição
 }
 
+export type Level = "facil" | "medio" | "dificil" | "impossivel";
+
 // Estado de jogo persistido no localStorage
 export interface GameState {
   name: string;
@@ -42,4 +44,6 @@ export interface GameState {
   seen: string[];
   doneLocks: number[];
   active?: boolean;
+  level?: Level;          // dificuldade escolhida na splash
+  coringa?: string | null; // efeito do coringa em vigor (aplicado no "Monte o código")
 }

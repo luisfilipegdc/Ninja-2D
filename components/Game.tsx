@@ -796,7 +796,14 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const loadAdmins = useCallback(async () => {
     if (!sb) return; setAdmList(null); setAdmMgmtMsg("");
     const { data, error } = await sb.functions.invoke("admin-manage", { body: { action: "list" } });
-    if (error || (data as any)?.error) { setAdmMgmtMsg("Erro ao listar: " + ((data as any)?.error || error?.message || "") + " (a Edge Function está publicada?)"); setAdmList([]); return; }
+    if (error || (data as any)?.error) {
+      const raw = (data as any)?.error || error?.message || "";
+      const notDeployed = /Failed to send|Edge Function|not found|404|FunctionsFetchError/i.test(raw);
+      setAdmMgmtMsg(notDeployed
+        ? "⚙️ Falta publicar a Edge Function pra cadastrar admins por aqui. Enquanto isso, dá pra criar logins direto no painel do Supabase (Authentication → Add user)."
+        : "Não consegui listar: " + raw);
+      setAdmList([]); return;
+    }
     setAdmList(((data as any)?.admins || []) as any);
   }, [sb]);
 
@@ -1161,7 +1168,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         {/* ADMIN */}
         <section id="view-admin" className={v("admin")}>
           <div className="kicker noprint">Painel do organizador</div>
-          <h1 className="title noprint" style={{ fontSize: "2.2rem" }}>Cartões</h1>
+          <h1 className="title noprint" style={{ fontSize: "2.2rem" }}>Arraiá · Admin</h1>
+          {authed ? <div className="adm-whoami noprint">{myRole === "master" ? "👑 master" : "🙋 admin"} · {adminUser || "—"}</div> : null}
           {!authed ? (
             <div className="noprint">
               <p className="lead">Entre com o usuário admin pra gerenciar os cartões.</p>
@@ -1185,17 +1193,18 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               </div>
 
               {showAdmins && myRole === "master" ? (
-                <div className="logs-panel noprint">
-                  <div className="note" style={{ marginTop: 0 }}>👑 <b>Você é o master.</b> Cadastre outros organizadores (eles entram com esse e-mail/senha no painel).</div>
-                  <label className="field" htmlFor="naEmail">E-mail do novo admin</label>
-                  <input id="naEmail" type="email" value={newAdmEmail} onChange={(e) => setNewAdmEmail(e.target.value)} placeholder="organizador@exemplo.com" autoComplete="off" />
-                  <label className="field" htmlFor="naPass">Senha (mín. 6)</label>
-                  <input id="naPass" type="text" value={newAdmPass} onChange={(e) => setNewAdmPass(e.target.value)} placeholder="senha provisória" autoComplete="off" />
-                  {admMgmtMsg ? <div className={admMgmtMsg.includes("✓") ? "upload-ok" : "scan-err"} style={{ marginTop: 10 }}>{admMgmtMsg}</div> : null}
+                <div className="panel noprint">
+                  <h3 className="panel-h">👑 Organizadores</h3>
+                  <p className="panel-sub">Você é o <b>master</b>. Cadastre quem mais vai usar o painel (entram com este e-mail/senha).</p>
+                  {admMgmtMsg ? <div className={admMgmtMsg.includes("✓") ? "panel-msg ok" : admMgmtMsg.startsWith("⚙️") ? "panel-msg info" : "panel-msg err"}>{admMgmtMsg}</div> : null}
+                  <div className="field-row">
+                    <input className="fld" type="email" value={newAdmEmail} onChange={(e) => setNewAdmEmail(e.target.value)} placeholder="E-mail do novo admin" autoComplete="off" />
+                    <input className="fld" type="text" value={newAdmPass} onChange={(e) => setNewAdmPass(e.target.value)} placeholder="Senha (mín. 6)" autoComplete="off" />
+                  </div>
                   <button className="btn" style={{ marginTop: 12 }} onClick={createAdmin}>➕ Cadastrar admin</button>
                   <ul className="adm-list">
                     {admList === null ? <li className="empty">Carregando…</li> :
-                      admList.length === 0 ? <li className="empty">Nenhum admin cadastrado.</li> :
+                      admList.length === 0 ? <li className="empty">Nenhum admin cadastrado ainda.</li> :
                         admList.map(a => (
                           <li key={a.email}>
                             <span className="adm-em">{a.role === "master" ? "👑 " : "🙋 "}{a.email}</span>
