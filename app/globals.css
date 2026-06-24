@@ -181,7 +181,7 @@ select option{color:#1b1030;}
 .btn.ghost{background:transparent;color:#d8e6f4;box-shadow:none;border:2px solid rgba(255,255,255,.22);font-weight:800;}
 .btn.ghost:active{transform:translateY(2px);}
 .btn:disabled{opacity:.5;}
-.btn.share{background:linear-gradient(135deg,#e84c97,#6e5ba6);margin-top:14px;}
+.btn.share{background:linear-gradient(135deg,#25d366,#128c4b);margin-top:14px;}
 .btn.danger-btn{background:transparent;border:2px solid rgba(255,77,109,.55);color:#ffd3dc;box-shadow:none;font-weight:800;}
 .btn.danger-btn:active{transform:translateY(2px);}
 
@@ -377,6 +377,11 @@ audio.curio-audio{width:100%;margin-top:18px;}
 .logs-list .log-code{color:#8fb0d4;font-family:monospace;font-size:.78rem;}
 .logs-list .log-time{flex:none;color:#88a4c4;font-size:.74rem;font-weight:700;}
 .logs-list .log-admin{background:rgba(255,210,58,.05);}
+.adm-list{list-style:none;margin:14px 0 0;padding:0;}
+.adm-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 4px;border-bottom:1px solid rgba(255,255,255,.08);font-size:.9rem;color:#e9def7;}
+.adm-list .adm-em{word-break:break-all;font-weight:700;}
+.adm-list .adm-role{color:var(--milho);font-weight:900;font-size:.78rem;text-transform:uppercase;}
+.adm-list .empty{justify-content:center;color:#88a4c4;}
 @media (min-width:760px){ .app.admin-wide .logs-metrics{grid-template-columns:repeat(4,1fr);} }
 
 /* Admin — desktop mais largo + lista em grade */
