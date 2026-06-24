@@ -32,7 +32,7 @@ export default function Cartaz() {
       </div>
 
       <div className="cartaz-foot">
-        <div>🎪 Cartões espalhados pela festa · monte a senha · abra o baú 🎁</div>
+        <div>🎪 Cartões escondidos no estande · monte a senha · abra o baú 🎁</div>
         <div className="cartaz-url">{url}</div>
       </div>
 
