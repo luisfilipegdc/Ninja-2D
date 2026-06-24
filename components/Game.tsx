@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 import Bunting from "@/components/Bunting";
 import { getSupabase, EVENT } from "@/lib/supabase";
 import type { Card, EventRow, GameState, Media, ScoreRow } from "@/lib/types";
+import { isNameClean } from "@/lib/badwords";
 
 /* ===================== helpers puros ===================== */
 type ViewId = "splash" | "game" | "scan" | "card" | "chest" | "ranking" | "admin";
@@ -429,6 +430,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const startHunt = useCallback(() => {
     const nm = name.trim();
     if (!nm) return;
+    if (!isNameClean(nm)) { vibrate([60, 40, 60]); setSplashMsg("Ô caipira! 😅 Vamos manter o arraiá pra toda a família — escolhe outro nome."); return; }
+    setSplashMsg("");
     goFullscreen();
     // easter egg: nome mágico
     const magic = nm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
