@@ -79,6 +79,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [name, setName] = useState("");
   const [splashMsg, setSplashMsg] = useState("");
   const [toast, setToast] = useState("");
+  const [social, setSocial] = useState("");
+  const socialT = useRef<any>(null);
   const [mestre, setMestre] = useState(false);
   const [fogueiraOut, setFogueiraOut] = useState(false);
   const [blowOn, setBlowOn] = useState(false);
@@ -168,6 +170,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setToast(msg);
     clearTimeout(toastT.current);
     toastT.current = setTimeout(() => setToast(""), 2600);
+  }, []);
+  const showSocial = useCallback((msg: string) => {
+    setSocial(msg); vibrate([15, 30, 15]);
+    clearTimeout(socialT.current);
+    socialT.current = setTimeout(() => setSocial(""), 6000);
   }, []);
   const flashErr = useCallback((msg: string) => {
     const now = Date.now();
@@ -278,6 +285,43 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     window.addEventListener("devicemotion", onMotion);
     return () => window.removeEventListener("devicemotion", onMotion);
   }, [showToast, markEgg]);
+
+  /* ---------- prova social ao vivo (broadcast em tempo real) ---------- */
+  const playing = !!game;
+  useEffect(() => {
+    if (!sb || !playing) return;
+    const ch = sb.channel("social_" + EVENT)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "events", filter: "game_id=eq." + EVENT }, (payload: any) => {
+        const e = payload?.new; if (!e || e.kind !== "complete") return;
+        const me = gameRef.current?.name;
+        if (e.actor && e.actor !== me) showSocial(`🔥 ${e.actor} acabou de abrir o baú! Não fica pra trás — seja o próximo 🤠`);
+      }).subscribe();
+    return () => { try { sb.removeChannel(ch); } catch {} };
+  }, [sb, playing, showSocial]);
+
+  /* ---------- prova social periódica (1,3,5,10,20… min) ---------- */
+  useEffect(() => {
+    if (!sb || !playing) return;
+    let alive = true;
+    const fire = async () => {
+      if (!alive) return;
+      try {
+        const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        const { data: scans } = await sb.from("events").select("actor").eq("game_id", EVENT).eq("kind", "scan").gte("at", since);
+        const players = new Set((scans || []).map((r: any) => r.actor).filter(Boolean));
+        const { data: comps } = await sb.from("events").select("actor").eq("game_id", EVENT).eq("kind", "complete").order("at", { ascending: false }).limit(8);
+        const completes = (comps || []).map((r: any) => r.actor).filter(Boolean);
+        const opts: string[] = [];
+        if (players.size >= 3) opts.push(`🤠 ${players.size} caipiras estão caçando agora!`);
+        if (completes.length) opts.push(`🏆 ${completes[(Math.random() * completes.length) | 0]} já descobriu a senha — seja o próximo! 🔥`);
+        if (!opts.length) opts.push("🔥 A caçada tá rolando! Ache os 3 números e abra o baú 🎁");
+        if (alive) showSocial(opts[(Math.random() * opts.length) | 0]);
+      } catch { /* ignora */ }
+    };
+    const marks = [1, 3, 5, 10, 20, 30, 45, 60, 90, 120];
+    const timers = marks.map(m => setTimeout(fire, m * 60 * 1000));
+    return () => { alive = false; timers.forEach(clearTimeout); };
+  }, [sb, playing, showSocial]);
 
   /* ---------- confete ---------- */
   useEffect(() => {
@@ -902,6 +946,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       <canvas id="confetti" ref={confettiRef} />
       <div className="hot-flash" ref={hotRef} aria-hidden />
       {toast ? <div className="toast show">{toast}</div> : null}
+      {social ? <div className="social-alert">{social}</div> : null}
 
       <div className={"app" + (mestre ? " mestre" : "") + (view === "admin" ? " admin-wide" : "")}>
         <Bunting />
