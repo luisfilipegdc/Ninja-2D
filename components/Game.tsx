@@ -268,6 +268,17 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ---------- anti-cópia (menu direito + copiar/recortar), exceto campos ---------- */
+  useEffect(() => {
+    const inField = (t: EventTarget | null) => !!(t && (t as HTMLElement).closest && (t as HTMLElement).closest("input,textarea,select,[contenteditable='true']"));
+    const onCtx = (e: MouseEvent) => { if (!inField(e.target)) e.preventDefault(); };
+    const onCopy = (e: ClipboardEvent) => { if (!inField(e.target)) e.preventDefault(); };
+    document.addEventListener("contextmenu", onCtx);
+    document.addEventListener("copy", onCopy);
+    document.addEventListener("cut", onCopy);
+    return () => { document.removeEventListener("contextmenu", onCtx); document.removeEventListener("copy", onCopy); document.removeEventListener("cut", onCopy); };
+  }, []);
+
   /* ---------- easter egg: chacoalhar → chuva ---------- */
   useEffect(() => {
     let last = 0, lx = 0, ly = 0, lz = 0, primed = false;
@@ -759,6 +770,20 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setLogs((data || []) as EventRow[]);
   }, [sb]);
 
+  const resetRanking = useCallback(async () => {
+    if (!sb) return;
+    if (!confirm("Zerar TODO o ranking? Apaga os tempos de todos os jogadores e o histórico de quem abriu o baú. Não dá pra desfazer.")) return;
+    try {
+      const r1 = await sb.from("scores").delete().eq("game_id", lockGameId(1));
+      if (r1.error) throw r1.error;
+      await sb.from("events").delete().eq("game_id", EVENT).eq("kind", "complete");
+      try { localStorage.removeItem(LS_RANK); } catch {}
+      logEvent("admin", { actor: adminUser, detail: "zerou o ranking" });
+      setRank1([]);
+      showToast("Ranking zerado! 🧹");
+    } catch (e: any) { showToast("Não consegui zerar: " + (e?.message || "erro") + " (rodou a migration 0009?)"); }
+  }, [sb, adminUser, logEvent, showToast]);
+
   const uploadFile = useCallback(async (file: File) => {
     if (!sb) { setFormErr("Supabase não configurado."); return; }
     if (file.size > 25 * 1024 * 1024) { setFormErr("Arquivo grande demais (máx. 25 MB)."); return; }
@@ -1226,6 +1251,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               <div className="noprint">
                 <div className="note">Crie os cartões, grave cada um numa <b>tag NFC</b> (Android) e/ou imprima o <b>QR</b>. A mesma tag funciona no iPhone (abre sozinho) e no Android.</div>
                 {cards && cards.length ? <button className="btn fire" style={{ marginTop: 14 }} onClick={() => window.print()}>Imprimir os QR Codes 🖨️</button> : null}
+                <button className="btn danger-btn" style={{ marginTop: 12 }} onClick={resetRanking}>🗑️ Zerar ranking</button>
                 <button className="btn ghost" style={{ marginTop: 12 }} onClick={doLogout}>Sair do admin</button>
               </div>
             </div>

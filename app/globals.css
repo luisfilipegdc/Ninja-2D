@@ -182,6 +182,13 @@ select option{color:#1b1030;}
 .btn.ghost:active{transform:translateY(2px);}
 .btn:disabled{opacity:.5;}
 .btn.share{background:linear-gradient(135deg,#e84c97,#6e5ba6);margin-top:14px;}
+.btn.danger-btn{background:transparent;border:2px solid rgba(255,77,109,.55);color:#ffd3dc;box-shadow:none;font-weight:800;}
+.btn.danger-btn:active{transform:translateY(2px);}
+
+/* Anti-cópia: bloqueia seleção/long-press no jogo, mas libera nos campos */
+.app{-webkit-user-select:none;-moz-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.app input,.app textarea,.app select,.app [contenteditable="true"]{-webkit-user-select:text;-moz-user-select:text;user-select:text;-webkit-touch-callout:default;}
+.app img{-webkit-user-drag:none;user-select:none;}
 .spacer{flex:1;}
 
 /* Prêmio na splash */
