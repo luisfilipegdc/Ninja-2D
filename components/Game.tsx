@@ -970,7 +970,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [qrMap, setQrMap] = useState<Record<string, string>>({});
   const [form, setForm] = useState<Partial<Card> | null>(null);
   const [formErr, setFormErr] = useState("");
-  const [scanningSerial, setScanningSerial] = useState(false);
+  const [writingTag, setWritingTag] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [adminUser, setAdminUser] = useState("");
   const [logs, setLogs] = useState<EventRow[] | null>(null);
@@ -1038,66 +1038,21 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     } catch (e: any) { showToast("Não consegui zerar: " + (e?.message || "erro") + " (rodou a migration 0009?)"); }
   }, [sb, adminUser, logEvent, showToast]);
 
-  // lê o serial (UID) da tag pelo NFC do celular e preenche o campo de código
-  const scanTagSerial = useCallback(async () => {
-    if (!flags.NFC_OK) { setFormErr("Escanear tag só funciona no Chrome do Android. No iPhone, digite/cole o serial."); return; }
-    setFormErr(""); setScanningSerial(true);
+  // grava o link ?c=<code> na tag (usado no "Salvar e gravar"); retorna msg de erro ou null
+  const writeUrlToTag = useCallback(async (code: string): Promise<string | null> => {
+    if (!flags.NFC_OK) return "no-nfc";
     try {
-      const reader = new (window as any).NDEFReader();
-      const ac = new AbortController();
-      const timer = setTimeout(() => { try { ac.abort(); } catch {} setScanningSerial(false); }, 25000);
-      await reader.scan({ signal: ac.signal });
-      reader.onreadingerror = () => setFormErr("Não consegui ler a tag. Aproxime de novo.");
-      reader.onreading = (ev: any) => {
-        const serial = String(ev.serialNumber || "").replace(/[^0-9a-fA-F]/g, "").toLowerCase();
-        clearTimeout(timer); try { ac.abort(); } catch {}
-        setScanningSerial(false);
-        if (serial) { setForm((f) => (f ? { ...f, code: serial } : f)); vibrate([30, 40, 30]); showToast("📡 Serial lido: " + serial); }
-        else setFormErr("Tag lida, mas sem serial. Tente outra leitura.");
-      };
-    } catch (err: any) {
-      setScanningSerial(false);
-      const n = err?.name || "";
-      if (n === "NotAllowedError") setFormErr("Permita o NFC e confira se ele está LIGADO (barra de cima → ícone NFC).");
-      else setFormErr("Ligue o NFC do celular e tente de novo.");
+      const w = new (window as any).NDEFReader();
+      await w.write({ records: [{ recordType: "url", data: window.location.origin + "/?c=" + code }] });
+      return null;
+    } catch (e: any) {
+      const n = e?.name || "";
+      if (n === "NotSupportedError") return "Essa tag não aceita gravação web (Mifare Classic). Use NTAG213/215/216 — ou imprima o QR.";
+      if (n === "NotAllowedError") return "Ligue o NFC e permita o acesso, depois tente de novo.";
+      if (n === "NetworkError" || n === "AbortError") return "Tirou a tag cedo demais — encoste e segure até confirmar.";
+      return "Não gravou (" + (n || e?.message || "erro") + "). Tente NTAG213/215/216 ou use o QR.";
     }
-  }, [flags.NFC_OK, showToast]);
-
-  // fluxo 1 toque: lê o serial da tag E grava o link ?c=<serial> na mesma tag
-  const scanAndWriteTag = useCallback(async () => {
-    if (!flags.NFC_OK) { setFormErr("Preparar tag só funciona no Chrome do Android. No iPhone, digite/cole o serial."); return; }
-    setFormErr(""); setScanningSerial(true);
-    let done = false;
-    try {
-      const reader = new (window as any).NDEFReader();
-      const ac = new AbortController();
-      const timer = setTimeout(() => { try { ac.abort(); } catch {} setScanningSerial(false); }, 25000);
-      await reader.scan({ signal: ac.signal });
-      reader.onreadingerror = () => { if (!done) setFormErr("Não consegui ler a tag. Aproxime de novo."); };
-      reader.onreading = async (ev: any) => {
-        if (done) return; done = true;
-        const serial = String(ev.serialNumber || "").replace(/[^0-9a-fA-F]/g, "").toLowerCase();
-        clearTimeout(timer);
-        if (!serial) { setScanningSerial(false); try { ac.abort(); } catch {} setFormErr("Tag lida, mas sem serial. Tente outra."); return; }
-        setForm((f) => (f ? { ...f, code: serial } : f));
-        const url = window.location.origin + "/?c=" + serial; // sempre aponta pra raiz do jogo
-        try {
-          await reader.write({ records: [{ recordType: "url", data: url }] });
-          vibrate([40, 30, 120]); showToast("✔ Tag pronta! Serial " + serial + " + link gravado");
-        } catch (e: any) {
-          const n = e?.name || "";
-          if (n === "NotSupportedError") setFormErr("Serial lido (" + serial + "), mas essa tag não aceita gravação web (Mifare Classic). Use NTAG213/215/216 — ou imprima o QR.");
-          else setFormErr("Serial lido (" + serial + "), mas o link não gravou (" + (n || "erro") + "). Toque em Gravar NFC depois de salvar.");
-        }
-        setScanningSerial(false); try { ac.abort(); } catch {}
-      };
-    } catch (err: any) {
-      setScanningSerial(false);
-      const n = err?.name || "";
-      if (n === "NotAllowedError") setFormErr("Permita o NFC e confira se ele está LIGADO (barra de cima → ícone NFC).");
-      else setFormErr("Ligue o NFC do celular e tente de novo.");
-    }
-  }, [flags.NFC_OK, showToast]);
+  }, [flags.NFC_OK]);
 
   const uploadFile = useCallback(async (file: File, field: "body" | "image_url" = "body") => {
     if (!sb) { setFormErr("Supabase não configurado."); return; }
@@ -1221,7 +1176,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     } catch (e: any) { showToast("Não consegui randomizar: " + (e?.message || "erro")); }
   }, [sb, cards, loadCards, showToast, logEvent, adminUser]);
 
-  const saveCard = useCallback(async () => {
+  const saveCard = useCallback(async (alsoWrite = false) => {
     if (!sb || !form) return; setFormErr("");
     const code = (form.code || "").trim().toLowerCase(); // serial do leitor pode vir em maiúsculas
     if (!/^[a-z0-9_-]{4,40}$/.test(code)) { setFormErr("Código inválido (4–40 letras/números)."); return; }
@@ -1253,8 +1208,19 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const { error } = await sb.from("cards").upsert(payload, { onConflict: "code" });
     if (error) { setFormErr("Erro: " + error.message + ((error as any).code === "23505" ? " (já existe um cartão nessa casa do cadeado)" : "")); return; }
     logEvent("admin", { actor: adminUser, code, detail: (existed ? "editou tag " : "criou tag ") + (form.kind === "senha" ? `(senha casa ${payload.position})` : "(curiosidade)") });
+    // grava o link na tag no mesmo ato do cadastro (opcional)
+    if (alsoWrite) {
+      if (!flags.NFC_OK) { showToast("Cartão salvo ✔ — gravação NFC só no Chrome do Android. Use o QR neste aparelho."); }
+      else {
+        setWritingTag(true); showToast("📡 Encoste a tag e segure pra gravar o link…");
+        const err = await writeUrlToTag(code);
+        setWritingTag(false);
+        if (err) { showToast("Cartão salvo ✔, mas não gravei a tag: " + err); }
+        else { vibrate([40, 30, 120]); showToast("✔ Cartão salvo e tag gravada!"); }
+      }
+    }
     setForm(null); loadCards();
-  }, [sb, form, cards, loadCards, logEvent, adminUser]);
+  }, [sb, form, cards, loadCards, logEvent, adminUser, flags.NFC_OK, writeUrlToTag, showToast]);
 
   const delCard = useCallback(async (code: string) => {
     if (!sb) return; if (!confirm("Apagar o cartão " + code + "?")) return;
@@ -1596,23 +1562,26 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                 <div className="admin-row noprint">
                   <label className="field" htmlFor="fCode">ID da tag (código gravado)</label>
                   <div style={{ display: "flex", gap: 8 }}>
-                    <input id="fCode" type="text" value={form.code || ""} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="ex: 53bfb8a3500001 (serial do leitor) ou aleatório" />
-                    <button className="nfc-btn" style={{ flex: "none" }} onClick={scanTagSerial} disabled={scanningSerial} title="Escanear a tag e pegar o serial">{scanningSerial ? "📡…" : "📡"}</button>
+                    <input id="fCode" type="text" value={form.code || ""} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="ex: 53bfb8a3500001 (digite o ID da tag)" />
                     <button className="nfc-btn" style={{ flex: "none" }} onClick={() => setForm({ ...form, code: randCode() })} title="Código aleatório">🎲</button>
                   </div>
-                  {flags.NFC_OK ? (
-                    <button className="btn fire" style={{ marginTop: 10 }} onClick={scanAndWriteTag} disabled={scanningSerial}>
-                      {scanningSerial ? "📡 Encoste a tag e segure…" : "📡 Preparar tag (ler serial + gravar link)"}
-                    </button>
-                  ) : null}
-                  {scanningSerial ? <div className="install" style={{ display: "block", marginTop: 8 }}>📡 Encoste a tag na parte de trás do celular e segure até aparecer ✔…</div> : null}
                   <label className="field" htmlFor="fLoc">📍 Localização física</label>
                   <input id="fLoc" type="text" value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex: atrás da barraca da pescaria" />
-                  <label className="field" htmlFor="fKind">Tipo</label>
-                  <select id="fKind" value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value as any })}>
+                  <label className="field" htmlFor="fKind">Tipo de conteúdo</label>
+                  <select id="fKind" value={form.kind === "senha" ? "senha" : form.kind === "coringa" ? "coringa" : (form.media === "imagem" ? "imagem" : form.media === "youtube" ? "video" : "curiosidade")}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === "senha") setForm({ ...form, kind: "senha" });
+                      else if (v === "coringa") setForm({ ...form, kind: "coringa" });
+                      else if (v === "imagem") setForm({ ...form, kind: "curiosidade", media: "imagem" });
+                      else if (v === "video") setForm({ ...form, kind: "curiosidade", media: "youtube" });
+                      else setForm({ ...form, kind: "curiosidade", media: "texto" });
+                    }}>
                     <option value="senha">🔐 Senha (1 número do cadeado)</option>
-                    <option value="curiosidade">📜 Curiosidade</option>
                     <option value="coringa">🃏 Coringa (efeito variável por nível)</option>
+                    <option value="curiosidade">📜 Curiosidade (texto)</option>
+                    <option value="imagem">🖼️ Imagem (com título)</option>
+                    <option value="video">▶️ Vídeo do YouTube</option>
                   </select>
                   {form.kind === "senha" ? (
                     <>
@@ -1624,60 +1593,39 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                     </>
                   ) : form.kind === "curiosidade" ? (
                     <>
-                      <label className="field" htmlFor="fMedia">Tipo de conteúdo</label>
-                      <select id="fMedia" value={form.media || "texto"} onChange={(e) => setForm({ ...form, media: e.target.value as Media })}>
-                        <option value="texto">📝 Texto</option>
-                        <option value="imagem">🖼️ Imagem (URL ou upload)</option>
-                        <option value="youtube">▶️ Vídeo do YouTube (link)</option>
-                        <option value="spotify">🎵 Música do Spotify (link)</option>
-                        <option value="audio">🔊 Áudio (URL ou upload)</option>
-                      </select>
                       <label className="field" htmlFor="fTitle">Título</label>
                       <input id="fTitle" type="text" value={form.title || ""} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Ex: Por que tem fogueira?" />
-                      {(form.media === "imagem" || form.media === "texto") ? (
+                      {form.media === "youtube" ? (
                         <>
-                          <label className="field" htmlFor="fSub">Subtítulo (opcional)</label>
-                          <input id="fSub" type="text" value={form.subtitle || ""} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} placeholder="Ex: comidas típicas de junho" />
-                        </>
-                      ) : null}
-                      {form.media === "texto" ? (
-                        <>
-                          <label className="field" htmlFor="fBody">Texto da curiosidade</label>
-                          <textarea id="fBody" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Escreva o textinho aqui" />
-                        </>
-                      ) : form.media === "imagem" ? (
-                        <>
-                          <label className="field">Imagem da página</label>
-                          <div className="uploadbox">
-                            <label className="nfc-btn" style={{ display: "inline-block", cursor: "pointer" }}>
-                              {uploading ? "Enviando…" : "📤 Enviar imagem"}
-                              <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploading}
-                                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f, "image_url"); e.currentTarget.value = ""; }} />
-                            </label>
-                            {form.image_url ? <span className="upload-ok">✔ pronto</span> : null}
-                          </div>
-                          <input type="text" value={form.image_url || ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="…ou cole a URL da imagem" style={{ marginTop: 8 }} />
-                          {form.image_url ? <img className="upload-prev" src={form.image_url} alt="prévia" /> : null}
-                          <label className="field" htmlFor="fBody">Descrição (opcional — deixe vazio p/ só imagem)</label>
-                          <textarea id="fBody" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Texto que aparece abaixo da imagem (opcional)" />
+                          <label className="field" htmlFor="fBody">Link do YouTube</label>
+                          <input id="fBody" type="text" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="https://youtu.be/..." />
                         </>
                       ) : (
                         <>
-                          <label className="field" htmlFor="fBody">
-                            {form.media === "youtube" ? "Link do YouTube" : form.media === "spotify" ? "Link do Spotify" : "URL do arquivo"}
-                          </label>
-                          <input id="fBody" type="text" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })}
-                            placeholder={form.media === "youtube" ? "https://youtu.be/..." : form.media === "spotify" ? "https://open.spotify.com/..." : "cole a URL ou use o upload abaixo"} />
-                          {form.media === "audio" ? (
-                            <div className="uploadbox">
-                              <label className="nfc-btn" style={{ display: "inline-block", cursor: "pointer" }}>
-                                {uploading ? "Enviando…" : "📤 Enviar arquivo"}
-                                <input type="file" accept="audio/*" style={{ display: "none" }} disabled={uploading}
-                                  onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f); e.currentTarget.value = ""; }} />
-                              </label>
-                              {form.body ? <span className="upload-ok">✔ pronto</span> : null}
-                            </div>
-                          ) : null}
+                          <label className="field" htmlFor="fSub">Subtítulo (opcional)</label>
+                          <input id="fSub" type="text" value={form.subtitle || ""} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} placeholder="Ex: comidas típicas de junho" />
+                          {form.media === "imagem" ? (
+                            <>
+                              <label className="field">Imagem da página</label>
+                              <div className="uploadbox">
+                                <label className="nfc-btn" style={{ display: "inline-block", cursor: "pointer" }}>
+                                  {uploading ? "Enviando…" : "📤 Enviar imagem"}
+                                  <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploading}
+                                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f, "image_url"); e.currentTarget.value = ""; }} />
+                                </label>
+                                {form.image_url ? <span className="upload-ok">✔ pronto</span> : null}
+                              </div>
+                              <input type="text" value={form.image_url || ""} onChange={(e) => setForm({ ...form, image_url: e.target.value })} placeholder="…ou cole a URL da imagem" style={{ marginTop: 8 }} />
+                              {form.image_url ? <img className="upload-prev" src={form.image_url} alt="prévia" /> : null}
+                              <label className="field" htmlFor="fBody">Descrição (opcional — deixe vazio p/ só imagem)</label>
+                              <textarea id="fBody" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Texto que aparece abaixo da imagem (opcional)" />
+                            </>
+                          ) : (
+                            <>
+                              <label className="field" htmlFor="fBody">Texto da curiosidade</label>
+                              <textarea id="fBody" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Escreva o textinho aqui" />
+                            </>
+                          )}
                         </>
                       )}
                     </>
@@ -1685,8 +1633,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                     <div className="install" style={{ display: "block", marginTop: 14 }}>🃏 <b>Tag coringa.</b> O efeito muda conforme o nível de quem achar (dá uma força ou apronta!). É só dar o ID, a localização e espalhar — sem mais nada pra preencher.</div>
                   )}
                   {formErr ? <div className="scan-err">{formErr}</div> : null}
-                  <button className="btn" style={{ marginTop: 16 }} onClick={saveCard}>Salvar cartão</button>
-                  <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setForm(null)}>Cancelar</button>
+                  <button className="btn fire" style={{ marginTop: 16 }} disabled={writingTag} onClick={() => saveCard(true)}>
+                    {writingTag ? "📡 Encoste a tag e segure…" : (flags.NFC_OK ? "📡 Salvar e gravar tag" : "💾 Salvar cartão")}
+                  </button>
+                  {flags.NFC_OK ? <button className="btn" style={{ marginTop: 10 }} disabled={writingTag} onClick={() => saveCard(false)}>💾 Salvar sem gravar</button> : null}
+                  <button className="btn ghost" style={{ marginTop: 10 }} disabled={writingTag} onClick={() => setForm(null)}>Cancelar</button>
                 </div>
               ) : null}
 
