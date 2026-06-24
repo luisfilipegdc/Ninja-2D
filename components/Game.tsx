@@ -26,6 +26,15 @@ const MAGIC_NAMES: Record<string, { anim: "catolica" | "saojoao" | "festa" | "mi
   "ze do milho": { anim: "milho",  toast: "🌽 Pamonha, curau e canjica! Zé do Milho passou por aqui" },
 };
 
+// Nomes com referência católica/marista (efeito contextual ao nome)
+const SACRED_NAMES: Record<string, { emojis: string[]; toast: string }> = {
+  "marista": { emojis: ["⭐", "💙", "🤍", "✨"], toast: "💙🤍 Espírito Marista! Com Maria, a Boa Mãe, sempre 🙏" },
+  "papa": { emojis: ["🤍", "💛", "🕊️", "✝️"], toast: "🕊️ A bênção do Papa pra sua caçada! 🤍💛" },
+  "papa leao": { emojis: ["🦁", "👑", "✝️", "✨"], toast: "🦁 Papa Leão abençoa — força e fé! 👑" },
+  "maria": { emojis: ["🌹", "⭐", "💙", "🤍", "🕊️"], toast: "🌹 Ave Maria, Estrela do mar — ilumine o caminho ⭐" },
+  "boa mae": { emojis: ["💗", "🌷", "🕊️", "🌹"], toast: "💗 Nossa Senhora, a Boa Mãe, cuida de você 🙏" },
+};
+
 // Prêmio do baú — edite aqui pra mudar a copy na splash e no baú
 const PREMIO = "uma lembrancinha junina";
 // Pistas temáticas da ordem da senha (gamificação "Monte o código")
@@ -161,6 +170,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const catolicaRef = useRef<() => void>(() => {});
   const milhoRef = useRef<() => void>(() => {});
   const floresRef = useRef<() => void>(() => {});
+  const floatEmojiRef = useRef<(emojis: string[]) => void>(() => {});
   const blowRef = useRef<{ stop: () => void } | null>(null);
   const lastErrRef = useRef(0);
   const toastT = useRef<any>(null);
@@ -461,6 +471,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     catolicaRef.current = () => floatEmoji(["✝️", "🕊️", "🙏", "✨", "🤍"], 22, 18, 8);
     milhoRef.current = () => floatEmoji(["🌽"], 26, 14, 9);
     floresRef.current = () => floatEmoji(["🌻", "🌼", "🌷", "🌺", "💐", "🌸"], 24, 20, 9);
+    floatEmojiRef.current = (emojis: string[]) => floatEmoji(emojis, 24, 18, 9);
     return () => window.removeEventListener("resize", resize);
   }, []);
   const burst = useCallback(() => burstRef.current(), []);
@@ -555,6 +566,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     } else if (magic === "maria flor") {
       vibrate([20, 40, 20, 40, 20]); floresRef.current();
       showToast("🌻 Um jardim de flores pra você, " + nm + "! 💐");
+    } else if (SACRED_NAMES[magic]) {
+      vibrate([20, 40, 20, 40, 20]); floatEmojiRef.current(SACRED_NAMES[magic].emojis);
+      showToast(SACRED_NAMES[magic].toast);
     }
     const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {} }, seen: [], doneLocks: [], active: true, level, coringa: null };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
