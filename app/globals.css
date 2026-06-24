@@ -181,7 +181,14 @@ select option{color:#1b1030;}
 .btn.ghost{background:transparent;color:#d8e6f4;box-shadow:none;border:2px solid rgba(255,255,255,.22);font-weight:800;}
 .btn.ghost:active{transform:translateY(2px);}
 .btn:disabled{opacity:.5;}
-.btn.share{background:linear-gradient(135deg,#e84c97,#6e5ba6);margin-top:14px;}
+.btn.share{background:linear-gradient(135deg,#25d366,#128c4b);margin-top:14px;}
+.btn.danger-btn{background:transparent;border:2px solid rgba(255,77,109,.55);color:#ffd3dc;box-shadow:none;font-weight:800;}
+.btn.danger-btn:active{transform:translateY(2px);}
+
+/* Anti-cópia: bloqueia seleção/long-press no jogo, mas libera nos campos */
+.app{-webkit-user-select:none;-moz-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.app input,.app textarea,.app select,.app [contenteditable="true"]{-webkit-user-select:text;-moz-user-select:text;user-select:text;-webkit-touch-callout:default;}
+.app img{-webkit-user-drag:none;user-select:none;}
 .spacer{flex:1;}
 
 /* Prêmio na splash */
@@ -199,6 +206,11 @@ select option{color:#1b1030;}
 .montar-slots{display:flex;gap:12px;justify-content:center;margin-top:18px;}
 .montar-slots.err{animation:wrong .4s;}
 @keyframes wrong{0%,100%{transform:translateX(0);}25%{transform:translateX(-8px);}75%{transform:translateX(8px);}}
+.montar-slots.ok .mslot{border-color:var(--verde);background:rgba(46,194,126,.18);animation:rightPop .5s cubic-bezier(.2,1.5,.4,1) both;}
+.montar-slots.ok .mslot:nth-child(2){animation-delay:.1s;}
+.montar-slots.ok .mslot:nth-child(3){animation-delay:.2s;}
+.montar-slots.ok .mnum{color:var(--verde) !important;}
+@keyframes rightPop{0%{transform:scale(1);}45%{transform:scale(1.18) translateY(-6px);}100%{transform:scale(1);}}
 .mslot{flex:1;max-width:96px;background:rgba(255,255,255,.06);border:2px dashed rgba(255,255,255,.25);border-radius:16px;
   padding:12px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}
 .mslot.filled{border-style:solid;border-color:var(--milho);background:rgba(249,194,26,.12);}
@@ -370,6 +382,11 @@ audio.curio-audio{width:100%;margin-top:18px;}
 .logs-list .log-code{color:#8fb0d4;font-family:monospace;font-size:.78rem;}
 .logs-list .log-time{flex:none;color:#88a4c4;font-size:.74rem;font-weight:700;}
 .logs-list .log-admin{background:rgba(255,210,58,.05);}
+.adm-list{list-style:none;margin:14px 0 0;padding:0;}
+.adm-list li{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 4px;border-bottom:1px solid rgba(255,255,255,.08);font-size:.9rem;color:#e9def7;}
+.adm-list .adm-em{word-break:break-all;font-weight:700;}
+.adm-list .adm-role{color:var(--milho);font-weight:900;font-size:.78rem;text-transform:uppercase;}
+.adm-list .empty{justify-content:center;color:#88a4c4;}
 @media (min-width:760px){ .app.admin-wide .logs-metrics{grid-template-columns:repeat(4,1fr);} }
 
 /* Admin — desktop mais largo + lista em grade */

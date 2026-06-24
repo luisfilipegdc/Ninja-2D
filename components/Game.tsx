@@ -111,6 +111,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
   // "Monte o código" (gamificação da ordem da senha)
   type Chip = { digit: number; pos: number };
+  const [montarOk, setMontarOk] = useState(false);
   const [montarSlots, setMontarSlots] = useState<(Chip | null)[]>([null, null, null]);
   const [montarPool, setMontarPool] = useState<Chip[]>([]);
   const [montarErr, setMontarErr] = useState(false);
@@ -266,6 +267,17 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     // service worker
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ---------- anti-cópia (menu direito + copiar/recortar), exceto campos ---------- */
+  useEffect(() => {
+    const inField = (t: EventTarget | null) => !!(t && (t as HTMLElement).closest && (t as HTMLElement).closest("input,textarea,select,[contenteditable='true']"));
+    const onCtx = (e: MouseEvent) => { if (!inField(e.target)) e.preventDefault(); };
+    const onCopy = (e: ClipboardEvent) => { if (!inField(e.target)) e.preventDefault(); };
+    document.addEventListener("contextmenu", onCtx);
+    document.addEventListener("copy", onCopy);
+    document.addEventListener("cut", onCopy);
+    return () => { document.removeEventListener("contextmenu", onCtx); document.removeEventListener("copy", onCopy); document.removeEventListener("cut", onCopy); };
   }, []);
 
   /* ---------- easter egg: chacoalhar → chuva ---------- */
@@ -556,20 +568,44 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setMontarSlots(prev => { const c = prev[i]; if (!c) return prev; setMontarPool(p => [...p, c]); const next = prev.slice(); next[i] = null; return next; });
   }, []);
 
+  const playSuccess = useCallback(() => {
+    try {
+      const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AC(); const t0 = ctx.currentTime;
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "triangle"; o.frequency.value = f; o.connect(g); g.connect(ctx.destination);
+        const t = t0 + i * 0.1;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.28, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+        o.start(t); o.stop(t + 0.36);
+      });
+      setTimeout(() => { try { ctx.close(); } catch {} }, 1300);
+    } catch { /* sem áudio */ }
+  }, []);
+
+  const montarReset = useCallback(() => {
+    const g = gameRef.current!;
+    const items: Chip[] = [1, 2, 3].map(p => ({ digit: g.locks[1]?.[p] as number, pos: p }));
+    for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+    setMontarPool(items); setMontarSlots([null, null, null]);
+  }, []);
+
   const montarCheck = useCallback(() => {
     const ok = montarSlots.every((c, i) => c && c.pos === i + 1);
-    if (ok) { vibrate([40, 40, 120]); completeLock(1); }
-    else { vibrate([80, 50, 80]); setMontarErr(true); showToast("Quase! 🔥 Olha as pistas e tenta de novo"); }
+    if (ok) {
+      setMontarOk(true); vibrate([40, 40, 40, 40, 220]); playSuccess(); burst(); setTimeout(burst, 260);
+      setTimeout(() => { setMontarOk(false); completeLock(1); }, 1200);
+    } else {
+      vibrate([90, 60, 90, 60, 120]); setMontarErr(true); showToast("Quase! 🔥 Olha as pistas e tenta de novo");
+      setTimeout(() => { setMontarErr(false); montarReset(); }, 550);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [montarSlots, completeLock, showToast]);
+  }, [montarSlots, completeLock, showToast, playSuccess, burst, montarReset]);
 
-  const shareWin = useCallback(async () => {
-    const txt = "Abri o baú do Arraiá do Tesouro do Marista! 🎁🔥 Bora caçar você também:";
-    const url = "https://festajuninamarista.vercel.app/";
-    try {
-      if ((navigator as any).share) await (navigator as any).share({ title: "Arraiá do Tesouro", text: txt, url });
-      else { await navigator.clipboard?.writeText(txt + " " + url); showToast("Link copiado! Cola no seu story 📲"); }
-    } catch { /* usuário cancelou */ }
+  const shareWin = useCallback(() => {
+    const txt = "Eu abri o baú do Arraiá do Tesouro do Marista! 🎁🔥 Vem caçar o tesouro você também: https://festajuninamarista.vercel.app/";
+    try { window.open("https://wa.me/?text=" + encodeURIComponent(txt), "_blank"); }
+    catch { try { navigator.clipboard?.writeText(txt); showToast("Convite copiado! Cola no WhatsApp 📲"); } catch {} }
   }, [showToast]);
 
   const revealSenha = useCallback((card: Card) => {
@@ -751,6 +787,38 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [logs, setLogs] = useState<EventRow[] | null>(null);
   const [showLogs, setShowLogs] = useState(false);
   const [logFilter, setLogFilter] = useState<"tudo" | "scan" | "admin">("tudo");
+  const [myRole, setMyRole] = useState<"admin" | "master">("admin");
+  const [showAdmins, setShowAdmins] = useState(false);
+  const [admList, setAdmList] = useState<{ email: string; role: string }[] | null>(null);
+  const [newAdmEmail, setNewAdmEmail] = useState(""); const [newAdmPass, setNewAdmPass] = useState("");
+  const [admMgmtMsg, setAdmMgmtMsg] = useState("");
+
+  const fetchRole = useCallback(async (email: string) => {
+    if (!sb || !email) { setMyRole("admin"); return; }
+    try { const { data } = await sb.from("admins").select("role").eq("email", email.toLowerCase()).maybeSingle(); setMyRole(((data?.role as any) === "master") ? "master" : "admin"); }
+    catch { setMyRole("admin"); }
+  }, [sb]);
+
+  const loadAdmins = useCallback(async () => {
+    if (!sb) return; setAdmList(null); setAdmMgmtMsg("");
+    const { data, error } = await sb.functions.invoke("admin-manage", { body: { action: "list" } });
+    if (error || (data as any)?.error) { setAdmMgmtMsg("Erro ao listar: " + ((data as any)?.error || error?.message || "") + " (a Edge Function está publicada?)"); setAdmList([]); return; }
+    setAdmList(((data as any)?.admins || []) as any);
+  }, [sb]);
+
+  const createAdmin = useCallback(async () => {
+    if (!sb) return; setAdmMgmtMsg("");
+    const { data, error } = await sb.functions.invoke("admin-manage", { body: { action: "create", email: newAdmEmail.trim(), password: newAdmPass } });
+    if (error || (data as any)?.error) { setAdmMgmtMsg((data as any)?.error || error?.message || "Erro ao criar."); return; }
+    setNewAdmEmail(""); setNewAdmPass(""); setAdmMgmtMsg("Admin criado! ✓"); logEvent("admin", { actor: adminUser, detail: "criou um admin" }); loadAdmins();
+  }, [sb, newAdmEmail, newAdmPass, loadAdmins, logEvent, adminUser]);
+
+  const removeAdmin = useCallback(async (email: string) => {
+    if (!sb) return; if (!confirm("Remover o admin " + email + "?")) return;
+    const { data, error } = await sb.functions.invoke("admin-manage", { body: { action: "delete", email } });
+    if (error || (data as any)?.error) { setAdmMgmtMsg((data as any)?.error || error?.message || "Erro ao remover."); return; }
+    logEvent("admin", { actor: adminUser, detail: "removeu o admin " + email }); loadAdmins();
+  }, [sb, loadAdmins, logEvent, adminUser]);
 
   const loadLogs = useCallback(async () => {
     if (!sb) return;
@@ -758,6 +826,20 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const { data } = await sb.from("events").select("*").eq("game_id", EVENT).order("at", { ascending: false }).limit(1000);
     setLogs((data || []) as EventRow[]);
   }, [sb]);
+
+  const resetRanking = useCallback(async () => {
+    if (!sb) return;
+    if (!confirm("Zerar TODO o ranking? Apaga os tempos de todos os jogadores e o histórico de quem abriu o baú. Não dá pra desfazer.")) return;
+    try {
+      const r1 = await sb.from("scores").delete().eq("game_id", lockGameId(1));
+      if (r1.error) throw r1.error;
+      await sb.from("events").delete().eq("game_id", EVENT).eq("kind", "complete");
+      try { localStorage.removeItem(LS_RANK); } catch {}
+      logEvent("admin", { actor: adminUser, detail: "zerou o ranking" });
+      setRank1([]);
+      showToast("Ranking zerado! 🧹");
+    } catch (e: any) { showToast("Não consegui zerar: " + (e?.message || "erro") + " (rodou a migration 0009?)"); }
+  }, [sb, adminUser, logEvent, showToast]);
 
   const uploadFile = useCallback(async (file: File) => {
     if (!sb) { setFormErr("Supabase não configurado."); return; }
@@ -804,8 +886,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const openAdmin = useCallback(async () => {
     setView("admin");
     if (!sb) return;
-    try { const { data } = await sb.auth.getSession(); if (data?.session) { setAuthed(true); setAdminUser(data.session.user?.email || ""); loadCards(); } else setAuthed(false); } catch { setAuthed(false); }
-  }, [sb, loadCards]);
+    try { const { data } = await sb.auth.getSession(); if (data?.session) { const em = data.session.user?.email || ""; setAuthed(true); setAdminUser(em); fetchRole(em); loadCards(); } else setAuthed(false); } catch { setAuthed(false); }
+  }, [sb, loadCards, fetchRole]);
 
   const startedAdmin = useRef(false);
   useEffect(() => { if (start === "admin" && !startedAdmin.current) { startedAdmin.current = true; openAdmin(); } }, [start, openAdmin]);
@@ -815,8 +897,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (!admEmail.trim() || !admPass) { setAdmErr("Preencha e-mail e senha."); return; }
     const { error } = await sb.auth.signInWithPassword({ email: admEmail.trim(), password: admPass });
     if (error) { setAdmErr("Não entrou: " + error.message); return; }
-    setAuthed(true); setAdminUser(admEmail.trim()); logEvent("admin", { actor: admEmail.trim(), detail: "entrou no painel" }); loadCards();
-  }, [sb, admEmail, admPass, loadCards, logEvent]);
+    setAuthed(true); setAdminUser(admEmail.trim()); fetchRole(admEmail.trim()); logEvent("admin", { actor: admEmail.trim(), detail: "entrou no painel" }); loadCards();
+  }, [sb, admEmail, admPass, loadCards, logEvent, fetchRole]);
 
   const doLogout = useCallback(async () => { if (sb) { try { await sb.auth.signOut(); } catch {} } setAuthed(false); }, [sb]);
 
@@ -1038,7 +1120,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <p className="lead" style={{ textAlign: "center" }}>Gire o cadeado para:</p>
           <div className="combo">{chest?.combo.map((d, i) => <div key={i} className="d">{d}</div>)}</div>
           <p className="lead" style={{ textAlign: "center", marginTop: 14 }}>Boa, <b>{g?.name}</b>! Mostre pro organizador, abra o baú e pegue {PREMIO}. 🎁</p>
-          <button className="btn share noprint" onClick={shareWin}>📸 Postar nos stories que eu abri!</button>
+          <button className="btn share noprint" onClick={shareWin}>📲 Você abriu! Chamar um amigo no WhatsApp</button>
           <ul className="rank">{chestRank.slice(0, 12).map((e, i) => <li key={e.id} className={e.id === myScoreId.current ? "me" : ""}><span className="pos">{["🥇", "🥈", "🥉"][i] || i + 1}</span><span className="nm">{e.name}</span><span className="tm">{fmt(e.ms)}</span></li>)}</ul>
           <div className="spacer" />
           <button className="btn fire" onClick={() => (chestBoth ? openRanking() : setView("game"))}>{chestBoth ? "Ver ranking 🏆" : "Continuar a caçada 📡"}</button>
@@ -1049,7 +1131,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
           <p className="lead">Use as <b>pistas</b> e coloque os 3 números na ordem certa.</p>
-          <div className={"montar-slots" + (montarErr ? " err" : "")}>
+          <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => (
               <div key={p} className={"mslot" + (montarSlots[i] ? " filled" : "")} onClick={() => montarRemove(i)}>
                 <span className="mclue">{POS_CLUE[p].emoji}</span>
@@ -1103,7 +1185,30 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               <div className="admin-toolbar noprint">
                 <button className="btn ghost" onClick={() => setForm({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto", location: "" })}>+ Nova tag</button>
                 <button className={"btn ghost" + (showLogs ? " on" : "")} onClick={() => { const ns = !showLogs; setShowLogs(ns); if (ns) loadLogs(); }}>📋 Logs</button>
+                {myRole === "master" ? <button className={"btn ghost" + (showAdmins ? " on" : "")} onClick={() => { const ns = !showAdmins; setShowAdmins(ns); if (ns) loadAdmins(); }}>👑 Admins</button> : null}
               </div>
+
+              {showAdmins && myRole === "master" ? (
+                <div className="logs-panel noprint">
+                  <div className="note" style={{ marginTop: 0 }}>👑 <b>Você é o master.</b> Cadastre outros organizadores (eles entram com esse e-mail/senha no painel).</div>
+                  <label className="field" htmlFor="naEmail">E-mail do novo admin</label>
+                  <input id="naEmail" type="email" value={newAdmEmail} onChange={(e) => setNewAdmEmail(e.target.value)} placeholder="organizador@exemplo.com" autoComplete="off" />
+                  <label className="field" htmlFor="naPass">Senha (mín. 6)</label>
+                  <input id="naPass" type="text" value={newAdmPass} onChange={(e) => setNewAdmPass(e.target.value)} placeholder="senha provisória" autoComplete="off" />
+                  {admMgmtMsg ? <div className={admMgmtMsg.includes("✓") ? "upload-ok" : "scan-err"} style={{ marginTop: 10 }}>{admMgmtMsg}</div> : null}
+                  <button className="btn" style={{ marginTop: 12 }} onClick={createAdmin}>➕ Cadastrar admin</button>
+                  <ul className="adm-list">
+                    {admList === null ? <li className="empty">Carregando…</li> :
+                      admList.length === 0 ? <li className="empty">Nenhum admin cadastrado.</li> :
+                        admList.map(a => (
+                          <li key={a.email}>
+                            <span className="adm-em">{a.role === "master" ? "👑 " : "🙋 "}{a.email}</span>
+                            {a.role === "master" ? <span className="adm-role">master</span> : <button className="nfc-btn danger" onClick={() => removeAdmin(a.email)}>remover</button>}
+                          </li>
+                        ))}
+                  </ul>
+                </div>
+              ) : null}
 
               {showLogs ? (
                 <div className="logs-panel noprint">
@@ -1226,6 +1331,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               <div className="noprint">
                 <div className="note">Crie os cartões, grave cada um numa <b>tag NFC</b> (Android) e/ou imprima o <b>QR</b>. A mesma tag funciona no iPhone (abre sozinho) e no Android.</div>
                 {cards && cards.length ? <button className="btn fire" style={{ marginTop: 14 }} onClick={() => window.print()}>Imprimir os QR Codes 🖨️</button> : null}
+                {myRole === "master" ? <button className="btn danger-btn" style={{ marginTop: 12 }} onClick={resetRanking}>🗑️ Zerar ranking</button> : null}
                 <button className="btn ghost" style={{ marginTop: 12 }} onClick={doLogout}>Sair do admin</button>
               </div>
             </div>
