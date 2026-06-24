@@ -41,7 +41,7 @@ const LEVELS: { id: Level; emoji: string; label: string; desc: string }[] = [
   { id: "facil", emoji: "🐣", label: "Fácil", desc: "5 a 7 anos · senha vem pronta" },
   { id: "medio", emoji: "🌽", label: "Médio", desc: "8 a 10 anos · monte com pistas" },
   { id: "dificil", emoji: "🔥", label: "Difícil", desc: "11 a 13 anos · sem pistas" },
-  { id: "impossivel", emoji: "🌪️", label: "Impossível", desc: "14+ · contas, iscas e travessuras do Saci" },
+  { id: "impossivel", emoji: "💃", label: "Impossível", desc: "14+ · contas, iscas e a quadrilha embolada" },
 ];
 
 // "Continha" que resulta no dígito (nível impossível) — força decifrar
@@ -160,6 +160,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const balloonsRef = useRef<() => void>(() => {});
   const catolicaRef = useRef<() => void>(() => {});
   const milhoRef = useRef<() => void>(() => {});
+  const floresRef = useRef<() => void>(() => {});
   const blowRef = useRef<{ stop: () => void } | null>(null);
   const lastErrRef = useRef(0);
   const toastT = useRef<any>(null);
@@ -459,6 +460,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       life: 0, max: 165 + (Math.random() * 90 | 0) }), n, 3);
     catolicaRef.current = () => floatEmoji(["✝️", "🕊️", "🙏", "✨", "🤍"], 22, 18, 8);
     milhoRef.current = () => floatEmoji(["🌽"], 26, 14, 9);
+    floresRef.current = () => floatEmoji(["🌻", "🌼", "🌷", "🌺", "💐", "🌸"], 24, 20, 9);
     return () => window.removeEventListener("resize", resize);
   }, []);
   const burst = useCallback(() => burstRef.current(), []);
@@ -550,6 +552,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     } else if (["luis bezaleu", "estevao bastos"].includes(magic)) {
       vibrate([20, 40, 20, 40, 20]); balloonsRef.current();
       showToast("🎈 Balões pra você, " + nm + "! Voa alto 💙");
+    } else if (magic === "maria flor") {
+      vibrate([20, 40, 20, 40, 20]); floresRef.current();
+      showToast("🌻 Um jardim de flores pra você, " + nm + "! 💐");
     }
     const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {} }, seen: [], doneLocks: [], active: true, level, coringa: null };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
@@ -675,7 +680,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const id = setInterval(() => {
       n++;
       setMontarPool(p => { const a = p.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; });
-      if (n % 4 === 0) { showToast("🌪️ O Saci baguncou tudo!"); montarReset(); }
+      if (n % 4 === 0) { showToast("💃 Anarriê! Embolou tudo!"); montarReset(); }
       if (n % 6 === 0) { setFakeOff(true); setTimeout(() => setFakeOff(false), 1100); }
     }, 3000);
     return () => clearInterval(id);
@@ -1306,7 +1311,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         <section id="view-montar" className={v("montar")}>
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
-          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>🌪️ <b>O Saci tá solto!</b> Continhas, fichas falsas, lógica invertida e travessuras. Boa sorte… 😜</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
+          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💃 <b>A quadrilha embolou!</b> Continhas, fichas falsas, lógica invertida (<b>anarriê!</b>) e pegadinhas. Boa sorte… 😜</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
           {canPeek ? <button className="btn ghost noprint" style={{ marginTop: 8 }} onClick={montarPeek}>👀 Piscar a senha (rapidinho!) 🃏</button> : null}
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => {
