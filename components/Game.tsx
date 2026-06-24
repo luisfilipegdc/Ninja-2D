@@ -41,7 +41,7 @@ const LEVELS: { id: Level; emoji: string; label: string; desc: string }[] = [
   { id: "facil", emoji: "🐣", label: "Fácil", desc: "5 a 7 anos · senha vem pronta" },
   { id: "medio", emoji: "🌽", label: "Médio", desc: "8 a 10 anos · monte com pistas" },
   { id: "dificil", emoji: "🔥", label: "Difícil", desc: "11 a 13 anos · sem pistas" },
-  { id: "impossivel", emoji: "💀", label: "Impossível", desc: "14+ · contas, iscas e trolagem" },
+  { id: "impossivel", emoji: "🌪️", label: "Impossível", desc: "14+ · contas, iscas e travessuras do Saci" },
 ];
 
 // "Continha" que resulta no dígito (nível impossível) — força decifrar
@@ -656,7 +656,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (ok) {
       // falso "ganhou" (1x no impossível) — caminho falso seguro do Level Devil
       if (gameRef.current?.level === "impossivel" && !fakeWinUsed.current) {
-        fakeWinUsed.current = true; vibrate([200]); showToast("🎉 VOCÊ GANHOU!… 😈 mentira!");
+        fakeWinUsed.current = true; vibrate([200]); showToast("🎉 VOCÊ GANHOU!… 😜 mentira!");
         setTimeout(() => montarReset(), 1300); return;
       }
       setMontarOk(true); vibrate([40, 40, 40, 40, 220]); playSuccess(); burst(); setTimeout(burst, 260);
@@ -675,7 +675,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const id = setInterval(() => {
       n++;
       setMontarPool(p => { const a = p.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; });
-      if (n % 4 === 0) { showToast("😈 Baguncei tudo!"); montarReset(); }
+      if (n % 4 === 0) { showToast("🌪️ O Saci baguncou tudo!"); montarReset(); }
       if (n % 6 === 0) { setFakeOff(true); setTimeout(() => setFakeOff(false), 1100); }
     }, 3000);
     return () => clearInterval(id);
@@ -763,13 +763,13 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       }
     } else if (lvl === "medio") {
       effect = prev === "peek" ? "hide:" + randPos(0) : prev.startsWith("hide:") ? "peek" : (Math.random() < 0.5 ? "peek" : "hide:" + randPos(0));
-      msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você pode dar uma PISCADA na senha… bem rapidinho 😅" : "😈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
+      msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você pode dar uma PISCADA na senha… bem rapidinho 😅" : "🙈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
     } else if (lvl === "dificil") {
       effect = "blur:" + randPos(prev.startsWith("blur:") ? Number(prev.slice(5)) : 0);
-      titulo = "🃏 Coringa travesso!"; msg = "😈 Um dos números vai aparecer embaçado na hora de montar. Decifra!";
+      titulo = "🃏 Coringa travesso!"; msg = "😜 Um dos números vai aparecer embaçado na hora de montar. Decifra!";
     } else {
       effect = prev === "easy" ? "hard" : prev === "hard" ? "easy" : (Math.random() < 0.5 ? "easy" : "hard");
-      msg = effect === "easy" ? "🍀 ALÍVIO! As fichas falsas somem na hora de montar." : "💀 Azar! Vai entrar mais uma ficha falsa pra te confundir.";
+      msg = effect === "easy" ? "🍀 ALÍVIO! As fichas falsas somem na hora de montar." : "😬 Azar! Vai entrar mais uma ficha falsa pra te confundir.";
     }
     g.coringa = effect; persist(); syncGame();
     const node = (<div className="curio"><h2 className="curio-title">{titulo}</h2><p className="curio-text" style={{ textAlign: "center" }}>{msg}</p></div>);
@@ -1306,7 +1306,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         <section id="view-montar" className={v("montar")}>
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
-          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💀 <b>O capeta tá solto!</b> Continhas, fichas falsas, lógica invertida e armadilhas. Boa sorte… 😈</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
+          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>🌪️ <b>O Saci tá solto!</b> Continhas, fichas falsas, lógica invertida e travessuras. Boa sorte… 😜</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
           {canPeek ? <button className="btn ghost noprint" style={{ marginTop: 8 }} onClick={montarPeek}>👀 Piscar a senha (rapidinho!) 🃏</button> : null}
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => {
