@@ -125,6 +125,19 @@ h1.title{font-family:"Fredoka",cursive;font-weight:700;line-height:.98;margin:.1
 .logs span{position:absolute;left:0;right:0;top:8px;height:14px;border-radius:8px;background:linear-gradient(#8a5326,#5e3415);}
 .logs span:nth-child(1){transform:rotate(10deg);}
 .logs span:nth-child(2){transform:rotate(-10deg);}
+/* Assoprar pra apagar a fogueira */
+.bonfire .flame{transition:opacity .45s ease;}
+.bonfire .smoke{position:absolute;left:50%;bottom:42px;transform:translateX(-50%);width:44px;height:64px;opacity:0;pointer-events:none;}
+.bonfire.out .flame{opacity:0;}
+.bonfire.out .halo{opacity:0;transition:opacity .45s ease;}
+.bonfire.out .smoke{opacity:1;}
+.bonfire.out .smoke span{position:absolute;bottom:0;left:50%;width:11px;height:11px;border-radius:50%;background:rgba(210,214,222,.45);animation:smokeUp 1.9s ease-out infinite;}
+.bonfire.out .smoke span:nth-child(2){left:38%;animation-delay:.6s;}
+.bonfire.out .smoke span:nth-child(3){left:62%;animation-delay:1.15s;}
+@keyframes smokeUp{0%{transform:translate(-50%,0) scale(.5);opacity:.55;}100%{transform:translate(-50%,-54px) scale(1.7);opacity:0;}}
+.bonfire.listening .halo{animation-duration:.7s;filter:blur(6px) brightness(1.25);}
+.blow-hint{margin-top:10px;align-self:flex-start;background:rgba(76,201,240,.14);border:1.5px solid rgba(76,201,240,.5);
+  color:#bfe3ff;font-weight:800;border-radius:14px;padding:9px 14px;font-size:.9rem;animation:riseIn .4s ease both;}
 /* Modo Mestre — fogueira turbinada + tema mais dourado */
 .app.mestre{--milho:#ffd23a;}
 .app.mestre .bonfire{transform:scale(1.2);transition:transform .55s cubic-bezier(.2,1.5,.4,1);}
