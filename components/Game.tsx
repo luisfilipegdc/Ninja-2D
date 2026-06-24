@@ -21,9 +21,39 @@ const EGGS_TOTAL = 3; // chuva, sopro, nome mágico
 // Nomes mágicos: cada um dispara uma animação temática correlata ao nome
 const MAGIC_NAMES: Record<string, { anim: "catolica" | "saojoao" | "festa" | "milho"; toast: string }> = {
   "marcelino": { anim: "catolica", toast: "🕊️ Paz e bem! O espírito de Marcelino Champagnat te abençoa ✝️" },
+  "champagnat": { anim: "catolica", toast: "💙🤍 São Marcelino Champagnat, fundador dos Maristas — paz e bem! ✝️" },
+  "marcellin champagnat": { anim: "catolica", toast: "💙🤍 São Marcelino Champagnat, fundador dos Maristas — paz e bem! ✝️" },
+  "marcelino champagnat": { anim: "catolica", toast: "💙🤍 São Marcelino Champagnat, fundador dos Maristas — paz e bem! ✝️" },
   "sao joao":  { anim: "saojoao",  toast: "🎆 Viva São João! A festa junina é dele — e a fogueira também 🔥" },
   "festa junina": { anim: "festa", toast: "💃🕺 É arraiá! Puxa a quadrilha que a festa começou 🎪" },
   "ze do milho": { anim: "milho",  toast: "🌽 Pamonha, curau e canjica! Zé do Milho passou por aqui" },
+};
+
+// Nomes com referência católica/marista (efeito contextual ao nome)
+const SACRED_NAMES: Record<string, { emojis: string[]; toast: string }> = {
+  "marista": { emojis: ["⭐", "💙", "🤍", "✨"], toast: "💙🤍 Espírito Marista! Com Maria, a Boa Mãe, sempre 🙏" },
+  "papa": { emojis: ["🤍", "💛", "🕊️", "✝️"], toast: "🕊️ A bênção do Papa pra sua caçada! 🤍💛" },
+  "papa leao": { emojis: ["🦁", "👑", "✝️", "✨"], toast: "🦁 Papa Leão abençoa — força e fé! 👑" },
+  "maria": { emojis: ["🌹", "⭐", "💙", "🤍", "🕊️"], toast: "🌹 Ave Maria, Estrela do mar — ilumine o caminho ⭐" },
+  "boa mae": { emojis: ["💗", "🌷", "🕊️", "🌹"], toast: "💗 Nossa Senhora, a Boa Mãe, cuida de você 🙏" },
+};
+
+// Equipe da escola — efeito contextual ao cargo/função de cada um 💙🤍
+const STAFF_NAMES: Record<string, { emojis: string[]; toast: string }> = {
+  // Gestão
+  "ana maria": { emojis: ["💙", "🤍", "⭐", "🎪", "✨"], toast: "💙 Ana Maria comandando o arraiá! A escola toda agradece 🤍" },
+  "timm": { emojis: ["🎓", "💙", "🤍", "⭐", "🏫"], toast: "🎓 Diretor Timm na área! Liderando a festa com a gente 💙🤍" },
+  // Tecnologia & Transformação Digital
+  "larissa goulart": { emojis: ["💻", "🚀", "✨", "💡", "🔌"], toast: "🚀 Larissa Goulart — Transformação Digital fazendo a mágica acontecer! ✨" },
+  "larissa": { emojis: ["💻", "🚀", "✨", "💡", "🔌"], toast: "🚀 Larissa Goulart — Transformação Digital fazendo a mágica acontecer! ✨" },
+  // TI
+  "fernando": { emojis: ["💻", "🔧", "⚙️", "📡", "🛜"], toast: "🔧 Fernando da TI mantendo tudo no ar! Sem ele, nada conecta 💻" },
+  // Audiovisual
+  "matheus": { emojis: ["🎬", "🎥", "🎞️", "📸", "🎵"], toast: "🎬 Matheus do Audiovisual! Luz, câmera e arraiá 🎥" },
+  "jasiel": { emojis: ["🎬", "🎥", "🎞️", "📸", "🎵"], toast: "🎥 Jasiel do Audiovisual! Capturando cada momento da festa 📸" },
+  "thiago": { emojis: ["🎬", "🎥", "🎞️", "🎙️", "🎵"], toast: "🎙️ Thiago do Audiovisual! Som e imagem no capricho 🎵" },
+  // Química 🧪
+  "carlos": { emojis: ["🧪", "⚗️", "🔬", "💥", "✨"], toast: "🧪 Carlos e a química do arraiá — reação explosiva de diversão! ⚗️💥" },
 };
 
 // Prêmio do baú — edite aqui pra mudar a copy na splash e no baú
@@ -41,7 +71,7 @@ const LEVELS: { id: Level; emoji: string; label: string; desc: string }[] = [
   { id: "facil", emoji: "🐣", label: "Fácil", desc: "5 a 7 anos · senha vem pronta" },
   { id: "medio", emoji: "🌽", label: "Médio", desc: "8 a 10 anos · monte com pistas" },
   { id: "dificil", emoji: "🔥", label: "Difícil", desc: "11 a 13 anos · sem pistas" },
-  { id: "impossivel", emoji: "💀", label: "Impossível", desc: "14+ · contas, iscas e trolagem" },
+  { id: "impossivel", emoji: "💃", label: "Impossível", desc: "14+ · contas, iscas e a quadrilha embolada" },
 ];
 
 // "Continha" que resulta no dígito (nível impossível) — força decifrar
@@ -160,6 +190,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const balloonsRef = useRef<() => void>(() => {});
   const catolicaRef = useRef<() => void>(() => {});
   const milhoRef = useRef<() => void>(() => {});
+  const floresRef = useRef<() => void>(() => {});
+  const floatEmojiRef = useRef<(emojis: string[]) => void>(() => {});
   const blowRef = useRef<{ stop: () => void } | null>(null);
   const lastErrRef = useRef(0);
   const toastT = useRef<any>(null);
@@ -459,6 +491,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       life: 0, max: 165 + (Math.random() * 90 | 0) }), n, 3);
     catolicaRef.current = () => floatEmoji(["✝️", "🕊️", "🙏", "✨", "🤍"], 22, 18, 8);
     milhoRef.current = () => floatEmoji(["🌽"], 26, 14, 9);
+    floresRef.current = () => floatEmoji(["🌻", "🌼", "🌷", "🌺", "💐", "🌸"], 24, 20, 9);
+    floatEmojiRef.current = (emojis: string[]) => floatEmoji(emojis, 24, 18, 9);
     return () => window.removeEventListener("resize", resize);
   }, []);
   const burst = useCallback(() => burstRef.current(), []);
@@ -550,6 +584,15 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     } else if (["luis bezaleu", "estevao bastos"].includes(magic)) {
       vibrate([20, 40, 20, 40, 20]); balloonsRef.current();
       showToast("🎈 Balões pra você, " + nm + "! Voa alto 💙");
+    } else if (magic === "maria flor") {
+      vibrate([20, 40, 20, 40, 20]); floresRef.current();
+      showToast("🌻 Um jardim de flores pra você, " + nm + "! 💐");
+    } else if (SACRED_NAMES[magic]) {
+      vibrate([20, 40, 20, 40, 20]); floatEmojiRef.current(SACRED_NAMES[magic].emojis);
+      showToast(SACRED_NAMES[magic].toast);
+    } else if (STAFF_NAMES[magic]) {
+      vibrate([20, 40, 20, 40, 20]); floatEmojiRef.current(STAFF_NAMES[magic].emojis);
+      showToast(STAFF_NAMES[magic].toast);
     }
     const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {} }, seen: [], doneLocks: [], active: true, level, coringa: null };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
@@ -656,7 +699,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (ok) {
       // falso "ganhou" (1x no impossível) — caminho falso seguro do Level Devil
       if (gameRef.current?.level === "impossivel" && !fakeWinUsed.current) {
-        fakeWinUsed.current = true; vibrate([200]); showToast("🎉 VOCÊ GANHOU!… 😈 mentira!");
+        fakeWinUsed.current = true; vibrate([200]); showToast("🎉 VOCÊ GANHOU!… 😜 mentira!");
         setTimeout(() => montarReset(), 1300); return;
       }
       setMontarOk(true); vibrate([40, 40, 40, 40, 220]); playSuccess(); burst(); setTimeout(burst, 260);
@@ -675,7 +718,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const id = setInterval(() => {
       n++;
       setMontarPool(p => { const a = p.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; });
-      if (n % 4 === 0) { showToast("😈 Baguncei tudo!"); montarReset(); }
+      if (n % 4 === 0) { showToast("💃 Anarriê! Embolou tudo!"); montarReset(); }
       if (n % 6 === 0) { setFakeOff(true); setTimeout(() => setFakeOff(false), 1100); }
     }, 3000);
     return () => clearInterval(id);
@@ -763,13 +806,13 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       }
     } else if (lvl === "medio") {
       effect = prev === "peek" ? "hide:" + randPos(0) : prev.startsWith("hide:") ? "peek" : (Math.random() < 0.5 ? "peek" : "hide:" + randPos(0));
-      msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você pode dar uma PISCADA na senha… bem rapidinho 😅" : "😈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
+      msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você pode dar uma PISCADA na senha… bem rapidinho 😅" : "🙈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
     } else if (lvl === "dificil") {
       effect = "blur:" + randPos(prev.startsWith("blur:") ? Number(prev.slice(5)) : 0);
-      titulo = "🃏 Coringa travesso!"; msg = "😈 Um dos números vai aparecer embaçado na hora de montar. Decifra!";
+      titulo = "🃏 Coringa travesso!"; msg = "😜 Um dos números vai aparecer embaçado na hora de montar. Decifra!";
     } else {
       effect = prev === "easy" ? "hard" : prev === "hard" ? "easy" : (Math.random() < 0.5 ? "easy" : "hard");
-      msg = effect === "easy" ? "🍀 ALÍVIO! As fichas falsas somem na hora de montar." : "💀 Azar! Vai entrar mais uma ficha falsa pra te confundir.";
+      msg = effect === "easy" ? "🍀 ALÍVIO! As fichas falsas somem na hora de montar." : "😬 Azar! Vai entrar mais uma ficha falsa pra te confundir.";
     }
     g.coringa = effect; persist(); syncGame();
     const node = (<div className="curio"><h2 className="curio-title">{titulo}</h2><p className="curio-text" style={{ textAlign: "center" }}>{msg}</p></div>);
@@ -1213,7 +1256,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
           {splashStep === 1 ? (
             <>
-              <label className="field" htmlFor="playerName">Seu nome de caipira</label>
+              <label className="field" htmlFor="playerName">Seu apelido/nome de caipira</label>
               <input id="playerName" type="text" maxLength={22} placeholder="Ex: Zé do Milho" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") goStep2(); }} autoComplete="off" />
               <div className="spacer" />
               <button className="btn fire" id="startBtn" onClick={goStep2}>Continuar →</button>
@@ -1306,7 +1349,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         <section id="view-montar" className={v("montar")}>
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
-          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💀 <b>O capeta tá solto!</b> Continhas, fichas falsas, lógica invertida e armadilhas. Boa sorte… 😈</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
+          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💃 <b>A quadrilha embolou!</b> Continhas, fichas falsas, lógica invertida (<b>anarriê!</b>) e pegadinhas. Boa sorte… 😜</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
           {canPeek ? <button className="btn ghost noprint" style={{ marginTop: 8 }} onClick={montarPeek}>👀 Piscar a senha (rapidinho!) 🃏</button> : null}
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => {

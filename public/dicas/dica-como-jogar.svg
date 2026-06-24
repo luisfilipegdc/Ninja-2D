@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 1120" font-family="'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif">
+  <rect width="820" height="1120" rx="0" fill="#15375d"/>
+  <!-- bandeirinhas -->
+  <g>
+    <polyline points="0,40 820,40" stroke="#f9c21a" stroke-width="3" opacity="0.5"/>
+    <g>
+      <polygon points="40,40 120,40 80,110" fill="#e23b2e"/>
+      <polygon points="140,40 220,40 180,110" fill="#f9c21a"/>
+      <polygon points="240,40 320,40 280,110" fill="#e84c97"/>
+      <polygon points="340,40 420,40 380,110" fill="#28a8e0"/>
+      <polygon points="440,40 520,40 480,110" fill="#6e5ba6"/>
+      <polygon points="540,40 620,40 580,110" fill="#e23b2e"/>
+      <polygon points="640,40 720,40 680,110" fill="#f9c21a"/>
+      <polygon points="740,40 820,40 780,110" fill="#28a8e0"/>
+    </g>
+  </g>
+
+  <text x="410" y="210" fill="#f9c21a" font-size="68" font-weight="800" text-anchor="middle">Como jogar</text>
+  <text x="410" y="270" fill="#ffffff" font-size="34" font-weight="600" text-anchor="middle" opacity="0.92">Arraiá do Tesouro · Festa Junina 2026</text>
+
+  <!-- passos -->
+  <g>
+    <!-- 1 -->
+    <rect x="60" y="330" width="700" height="150" rx="24" fill="#1d4470" stroke="#ffffff" stroke-opacity="0.12"/>
+    <circle cx="140" cy="405" r="44" fill="#f9c21a"/>
+    <text x="140" y="423" fill="#15375d" font-size="48" font-weight="800" text-anchor="middle">1</text>
+    <text x="215" y="395" fill="#ffffff" font-size="38" font-weight="800">Encoste o celular no cartão 📡</text>
+    <text x="215" y="445" fill="#bcd4ec" font-size="28">O jogo abre sozinho na tag.</text>
+
+    <!-- 2 -->
+    <rect x="60" y="510" width="700" height="150" rx="24" fill="#1d4470" stroke="#ffffff" stroke-opacity="0.12"/>
+    <circle cx="140" cy="585" r="44" fill="#f9c21a"/>
+    <text x="140" y="603" fill="#15375d" font-size="48" font-weight="800" text-anchor="middle">2</text>
+    <text x="215" y="575" fill="#ffffff" font-size="38" font-weight="800">Ache os 3 números 🔢</text>
+    <text x="215" y="625" fill="#bcd4ec" font-size="28">Em qualquer ordem, espalhados pelo estande.</text>
+
+    <!-- 3 -->
+    <rect x="60" y="690" width="700" height="150" rx="24" fill="#1d4470" stroke="#ffffff" stroke-opacity="0.12"/>
+    <circle cx="140" cy="765" r="44" fill="#f9c21a"/>
+    <text x="140" y="783" fill="#15375d" font-size="48" font-weight="800" text-anchor="middle">3</text>
+    <text x="215" y="755" fill="#ffffff" font-size="38" font-weight="800">Monte o código 🧩</text>
+    <text x="215" y="805" fill="#bcd4ec" font-size="28">Coloque os números na ordem certa.</text>
+
+    <!-- 4 -->
+    <rect x="60" y="870" width="700" height="150" rx="24" fill="#2a5a2e" stroke="#2ec27e" stroke-opacity="0.5"/>
+    <circle cx="140" cy="945" r="44" fill="#2ec27e"/>
+    <text x="140" y="963" fill="#0f2c1a" font-size="48" font-weight="800" text-anchor="middle">4</text>
+    <text x="215" y="935" fill="#ffffff" font-size="38" font-weight="800">Abra o baú 🧰</text>
+    <text x="215" y="985" fill="#bfeccd" font-size="28">Gire o cadeado e leve sua lembrancinha! 🎁</text>
+  </g>
+
+  <text x="410" y="1075" fill="#f9c21a" font-size="30" font-weight="800" text-anchor="middle">Boa caçada, caipira! 🤠🔥</text>
+</svg>
