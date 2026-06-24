@@ -38,10 +38,10 @@ const ORDINAL: Record<number, string> = { 1: "1ª", 2: "2ª", 3: "3ª" };
 
 // Níveis de dificuldade (escolhidos na splash)
 const LEVELS: { id: Level; emoji: string; label: string; desc: string }[] = [
-  { id: "facil", emoji: "🐣", label: "Fácil", desc: "A senha vem pronta — ideal pros pequenos" },
-  { id: "medio", emoji: "🌽", label: "Médio", desc: "Monte a senha seguindo as pistas" },
-  { id: "dificil", emoji: "🔥", label: "Difícil", desc: "Sem pistas: descubra a ordem" },
-  { id: "impossivel", emoji: "💀", label: "Impossível", desc: "Sem pistas, com contas e pegadinhas" },
+  { id: "facil", emoji: "🐣", label: "Fácil", desc: "5 a 7 anos · senha vem pronta" },
+  { id: "medio", emoji: "🌽", label: "Médio", desc: "8 a 10 anos · monte com pistas" },
+  { id: "dificil", emoji: "🔥", label: "Difícil", desc: "11 a 13 anos · sem pistas" },
+  { id: "impossivel", emoji: "💀", label: "Impossível", desc: "14+ · contas, iscas e trolagem" },
 ];
 
 // "Continha" que resulta no dígito (nível impossível) — força decifrar
@@ -745,13 +745,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const revealCoringa = useCallback(async (card: Card) => {
     const g = gameRef.current!;
     const lvl = g.level || "medio";
-    const alreadyUsed = g.seen.includes(card.code) && !!g.coringa;
     if (!g.seen.includes(card.code)) g.seen.push(card.code);
     vibrate([30, 40, 30]);
     let titulo = "🃏 Coringa!"; let msg = ""; let effect = g.coringa || "";
-    if (alreadyUsed) {
-      msg = "Você já usou o coringa nessa caçada 😉";
-    } else if (lvl === "facil") {
+    if (lvl === "facil") {
       const missing = [1, 2, 3].filter(p => g.locks[1]?.[p] == null);
       if (missing.length === 0) { msg = "Você já tem os 3 números — boa caçada! 🎁"; effect = "facil"; }
       else {
@@ -909,6 +906,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [admList, setAdmList] = useState<{ email: string; role: string }[] | null>(null);
   const [newAdmEmail, setNewAdmEmail] = useState(""); const [newAdmPass, setNewAdmPass] = useState("");
   const [admMgmtMsg, setAdmMgmtMsg] = useState("");
+  const [comboInput, setComboInput] = useState("");
 
   const fetchRole = useCallback(async (email: string) => {
     if (!sb || !email) { setMyRole("admin"); return; }
@@ -1025,6 +1023,24 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   }, [sb, admEmail, admPass, loadCards, logEvent, fetchRole]);
 
   const doLogout = useCallback(async () => { if (sb) { try { await sb.auth.signOut(); } catch {} } setAuthed(false); }, [sb]);
+
+  const applyCombo = useCallback(async (combo: string) => {
+    if (!sb || !cards) return;
+    const c = (combo || "").replace(/\D/g, "");
+    if (c.length !== 3) { showToast("A senha precisa ter 3 dígitos 🔢"); return; }
+    const senhas = cards.filter(x => x.kind === "senha");
+    if (senhas.length < 3) { showToast("Cadastre as 3 tags de senha (casas 1, 2 e 3) primeiro 🔐"); return; }
+    try {
+      for (const s of senhas) {
+        const p = s.position; if (!p || p < 1 || p > 3) continue;
+        const { error } = await sb.from("cards").update({ digit: Number(c[p - 1]), lock: 1 }).eq("code", s.code);
+        if (error) throw error;
+      }
+      vibrate([30, 40, 30]); setComboInput(""); showToast(`🔒 Senha das tags definida: ${c}`);
+      logEvent("admin", { actor: adminUser, detail: "definiu a senha do cadeado: " + c });
+      loadCards();
+    } catch (e: any) { showToast("Não consegui aplicar: " + (e?.message || "erro")); }
+  }, [sb, cards, loadCards, showToast, logEvent, adminUser]);
 
   const randomizeTags = useCallback(async () => {
     if (!sb || !cards) return;
@@ -1149,10 +1165,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   }, [logs, logFilter]);
 
   const nfcNotice = flags.NFC_OK
-    ? <>📡 Pra ler os cartões por aproximação, <b>ligue o NFC</b> do celular (puxe a barra de cima → ícone <b>NFC</b>). Sem NFC? Use a câmera no QR.</>
+    ? <>📡 Pra ler os cartões por aproximação, <b>ligue o NFC</b> do celular (puxe a barra de cima → ícone <b>NFC</b>).</>
     : flags.isIOS
-      ? <>📡 Encoste o <b>topo do iPhone</b> no cartão pra ler. Não rolou? Use a câmera no QR.</>
-      : <>📷 Este aparelho não tem NFC. No celular, aponte a <b>câmera</b> no <b>QR do cartão</b> — ele abre o jogo sozinho.</>;
+      ? <>📡 Encoste o <b>topo do iPhone</b> no cartão pra ler.</>
+      : <>📡 Encoste o <b>topo do celular</b> no cartão pra ler. Se não rolar, ligue o <b>NFC</b> nos ajustes.</>;
 
   return (
     <>
@@ -1178,7 +1194,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           {splashStep === 1 ? (
             <>
               <p className="festa">Festa Junina <span className="ano">2026</span></p>
-              <p className="lead">Ache os cartões escondidos pela festa, monte a senha e abra o baú. Bora?</p>
+              <p className="lead">Ache os cartões escondidos no estande, monte a senha e abra o baú. Bora?</p>
               <div className="premio-splash">🎁 Abra o baú e leve <b>{PREMIO}</b>!</div>
               <div className={"bonfire" + (fogueiraOut ? " out" : "") + (blowOn ? " listening" : "")} aria-hidden onClick={bonfireTap}>
                 <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
@@ -1344,7 +1360,21 @@ export default function Game({ start }: { start?: "admin" } = {}) {
             </div>
           ) : (
             <div>
-              <div className="note noprint">🔐 <b>Cadeado único.</b> As tags ficam fixas no lugar — use <b>Randomizar</b> pra embaralhar qual tag mostra qual conteúdo (senhas e curiosidades), sem precisar mexer nelas.</div>
+              <div className="note noprint">🔐 As <b>3 tags de senha</b> ficam fixas no lugar. Aqui você define <b>qual cadeado</b> elas revelam e pode <b>randomizar</b> qual tag mostra qual conteúdo — sem mexer nas tags.</div>
+
+              <div className="panel noprint">
+                <h3 className="panel-h">🔢 Senha das tags</h3>
+                <p className="panel-sub">Escolhe o cadeado físico que vale agora (vai pras 3 tags de senha):</p>
+                <div className="combo-presets">
+                  <button className="btn ghost" onClick={() => applyCombo("120")}>🔒 Cadeado 1 · <b>120</b></button>
+                  <button className="btn ghost" onClick={() => applyCombo("476")}>🔒 Cadeado 2 · <b>476</b></button>
+                </div>
+                <div className="field-row" style={{ marginTop: 10 }}>
+                  <input className="fld" inputMode="numeric" maxLength={3} value={comboInput} onChange={(e) => setComboInput(e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="Outra senha (3 dígitos)" />
+                  <button className="btn" onClick={() => applyCombo(comboInput)}>Aplicar</button>
+                </div>
+              </div>
+
               {cards && cards.length >= 2 ? (
                 <button className="btn fire noprint" style={{ marginTop: 12 }} onClick={randomizeTags}>🎲 Randomizar tags</button>
               ) : null}

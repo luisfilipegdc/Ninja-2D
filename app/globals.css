@@ -410,6 +410,8 @@ audio.curio-audio{width:100%;margin-top:18px;}
 .panel-msg.ok{background:rgba(46,194,126,.14);border:1.5px solid rgba(46,194,126,.5);color:#b8f0d4;}
 .panel-msg.info{background:rgba(76,201,240,.12);border:1.5px solid rgba(76,201,240,.4);color:#cfeaff;}
 .panel-msg.err{background:rgba(255,77,109,.12);border:1.5px solid rgba(255,77,109,.45);color:#ffd3dc;}
+.combo-presets{display:flex;gap:10px;flex-wrap:wrap;}
+.combo-presets .btn{flex:1;margin-top:0;min-width:140px;}
 .field-row{display:flex;flex-direction:column;gap:10px;}
 .fld{width:100%;margin:0;padding:15px 16px;border-radius:14px;border:1.5px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:#fff;font-family:inherit;font-size:1rem;font-weight:600;outline:none;}
 .fld::placeholder{color:#7e9bba;}
