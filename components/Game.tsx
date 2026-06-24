@@ -1130,7 +1130,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         <section id="view-montar" className={v("montar")}>
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
-          <p className="lead">Use as <b>pistas</b> e coloque os 3 números na ordem certa.</p>
+          <p className="lead">Cada número leva o <b>desenho da sua pista</b>. Junte cada um no lugar certo! 🧩</p>
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => (
               <div key={p} className={"mslot" + (montarSlots[i] ? " filled" : "")} onClick={() => montarRemove(i)}>
@@ -1142,7 +1142,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           </div>
           <div className="montar-pool">
             {montarPool.map(c => (
-              <button key={c.pos} className="mchip" onClick={() => montarPlace(c)}>{c.digit}</button>
+              <button key={c.pos} className="mchip" onClick={() => montarPlace(c)}>
+                <span className="mchip-num">{c.digit}</span>
+                <span className="mchip-clue">{POS_CLUE[c.pos].emoji}</span>
+              </button>
             ))}
             {montarPool.length === 0 ? <span className="montar-ready">Tudo no lugar? Confere! 👇</span> : null}
           </div>
