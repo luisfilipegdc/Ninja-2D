@@ -21,6 +21,9 @@ const EGGS_TOTAL = 3; // chuva, sopro, nome mágico
 // Nomes mágicos: cada um dispara uma animação temática correlata ao nome
 const MAGIC_NAMES: Record<string, { anim: "catolica" | "saojoao" | "festa" | "milho"; toast: string }> = {
   "marcelino": { anim: "catolica", toast: "🕊️ Paz e bem! O espírito de Marcelino Champagnat te abençoa ✝️" },
+  "champagnat": { anim: "catolica", toast: "💙🤍 São Marcelino Champagnat, fundador dos Maristas — paz e bem! ✝️" },
+  "marcellin champagnat": { anim: "catolica", toast: "💙🤍 São Marcelino Champagnat, fundador dos Maristas — paz e bem! ✝️" },
+  "marcelino champagnat": { anim: "catolica", toast: "💙🤍 São Marcelino Champagnat, fundador dos Maristas — paz e bem! ✝️" },
   "sao joao":  { anim: "saojoao",  toast: "🎆 Viva São João! A festa junina é dele — e a fogueira também 🔥" },
   "festa junina": { anim: "festa", toast: "💃🕺 É arraiá! Puxa a quadrilha que a festa começou 🎪" },
   "ze do milho": { anim: "milho",  toast: "🌽 Pamonha, curau e canjica! Zé do Milho passou por aqui" },
@@ -33,6 +36,24 @@ const SACRED_NAMES: Record<string, { emojis: string[]; toast: string }> = {
   "papa leao": { emojis: ["🦁", "👑", "✝️", "✨"], toast: "🦁 Papa Leão abençoa — força e fé! 👑" },
   "maria": { emojis: ["🌹", "⭐", "💙", "🤍", "🕊️"], toast: "🌹 Ave Maria, Estrela do mar — ilumine o caminho ⭐" },
   "boa mae": { emojis: ["💗", "🌷", "🕊️", "🌹"], toast: "💗 Nossa Senhora, a Boa Mãe, cuida de você 🙏" },
+};
+
+// Equipe da escola — efeito contextual ao cargo/função de cada um 💙🤍
+const STAFF_NAMES: Record<string, { emojis: string[]; toast: string }> = {
+  // Gestão
+  "ana maria": { emojis: ["💙", "🤍", "⭐", "🎪", "✨"], toast: "💙 Ana Maria comandando o arraiá! A escola toda agradece 🤍" },
+  "timm": { emojis: ["🎓", "💙", "🤍", "⭐", "🏫"], toast: "🎓 Diretor Timm na área! Liderando a festa com a gente 💙🤍" },
+  // Tecnologia & Transformação Digital
+  "larissa goulart": { emojis: ["💻", "🚀", "✨", "💡", "🔌"], toast: "🚀 Larissa Goulart — Transformação Digital fazendo a mágica acontecer! ✨" },
+  "larissa": { emojis: ["💻", "🚀", "✨", "💡", "🔌"], toast: "🚀 Larissa Goulart — Transformação Digital fazendo a mágica acontecer! ✨" },
+  // TI
+  "fernando": { emojis: ["💻", "🔧", "⚙️", "📡", "🛜"], toast: "🔧 Fernando da TI mantendo tudo no ar! Sem ele, nada conecta 💻" },
+  // Audiovisual
+  "matheus": { emojis: ["🎬", "🎥", "🎞️", "📸", "🎵"], toast: "🎬 Matheus do Audiovisual! Luz, câmera e arraiá 🎥" },
+  "jasiel": { emojis: ["🎬", "🎥", "🎞️", "📸", "🎵"], toast: "🎥 Jasiel do Audiovisual! Capturando cada momento da festa 📸" },
+  "thiago": { emojis: ["🎬", "🎥", "🎞️", "🎙️", "🎵"], toast: "🎙️ Thiago do Audiovisual! Som e imagem no capricho 🎵" },
+  // Química 🧪
+  "carlos": { emojis: ["🧪", "⚗️", "🔬", "💥", "✨"], toast: "🧪 Carlos e a química do arraiá — reação explosiva de diversão! ⚗️💥" },
 };
 
 // Prêmio do baú — edite aqui pra mudar a copy na splash e no baú
@@ -569,6 +590,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     } else if (SACRED_NAMES[magic]) {
       vibrate([20, 40, 20, 40, 20]); floatEmojiRef.current(SACRED_NAMES[magic].emojis);
       showToast(SACRED_NAMES[magic].toast);
+    } else if (STAFF_NAMES[magic]) {
+      vibrate([20, 40, 20, 40, 20]); floatEmojiRef.current(STAFF_NAMES[magic].emojis);
+      showToast(STAFF_NAMES[magic].toast);
     }
     const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {} }, seen: [], doneLocks: [], active: true, level, coringa: null };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
@@ -1232,7 +1256,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
           {splashStep === 1 ? (
             <>
-              <label className="field" htmlFor="playerName">Seu nome de caipira</label>
+              <label className="field" htmlFor="playerName">Seu apelido/nome de caipira</label>
               <input id="playerName" type="text" maxLength={22} placeholder="Ex: Zé do Milho" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") goStep2(); }} autoComplete="off" />
               <div className="spacer" />
               <button className="btn fire" id="startBtn" onClick={goStep2}>Continuar →</button>
