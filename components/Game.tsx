@@ -749,6 +749,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     if (!g.seen.includes(card.code)) g.seen.push(card.code);
     vibrate([30, 40, 30]);
     let titulo = "🃏 Coringa!"; let msg = ""; let effect = g.coringa || "";
+    const prev = g.coringa || ""; // pra não repetir o efeito anterior
+    const randPos = (not: number) => { let p; do { p = 1 + Math.floor(Math.random() * 3); } while (p === not); return p; };
     if (lvl === "facil") {
       const missing = [1, 2, 3].filter(p => g.locks[1]?.[p] == null);
       if (missing.length === 0) { msg = "Você já tem os 3 números — boa caçada! 🎁"; effect = "facil"; }
@@ -760,13 +762,13 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         effect = "facil";
       }
     } else if (lvl === "medio") {
-      effect = Math.random() < 0.5 ? "peek" : "hide:" + (1 + Math.floor(Math.random() * 3));
+      effect = prev === "peek" ? "hide:" + randPos(0) : prev.startsWith("hide:") ? "peek" : (Math.random() < 0.5 ? "peek" : "hide:" + randPos(0));
       msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você pode dar uma PISCADA na senha… bem rapidinho 😅" : "😈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
     } else if (lvl === "dificil") {
-      effect = "blur:" + (1 + Math.floor(Math.random() * 3));
+      effect = "blur:" + randPos(prev.startsWith("blur:") ? Number(prev.slice(5)) : 0);
       titulo = "🃏 Coringa travesso!"; msg = "😈 Um dos números vai aparecer embaçado na hora de montar. Decifra!";
     } else {
-      effect = Math.random() < 0.5 ? "easy" : "hard";
+      effect = prev === "easy" ? "hard" : prev === "hard" ? "easy" : (Math.random() < 0.5 ? "easy" : "hard");
       msg = effect === "easy" ? "🍀 ALÍVIO! As fichas falsas somem na hora de montar." : "💀 Azar! Vai entrar mais uma ficha falsa pra te confundir.";
     }
     g.coringa = effect; persist(); syncGame();
