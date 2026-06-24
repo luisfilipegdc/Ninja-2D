@@ -1341,11 +1341,13 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         <section id="view-ranking" className={v("ranking")}>
           <div className="kicker">Quem montou as senhas mais rápido</div>
           <h1 className="title" style={{ fontSize: "2.4rem" }}>Ranking 🏆</h1>
-          {rank1.length ? (
-            <ul className="rank">{rank1.slice(0, 12).map((e, i) => <li key={e.id} className={e.id === myScoreId.current ? "me" : ""}><span className="pos">{["🥇", "🥈", "🥉"][i] || i + 1}</span><span className="nm">{e.name}</span><span className="tm">{fmt(e.ms)}</span></li>)}</ul>
-          ) : <p className="empty">Ninguém abriu o cadeado ainda. Seja o primeiro! 🔥</p>}
+          {rank1.length ? (<>
+            <div className="rank-count">{rank1.length} participante{rank1.length === 1 ? "" : "s"}</div>
+            <ul className="rank rank-all">{rank1.map((e, i) => <li key={e.id} className={e.id === myScoreId.current ? "me" : ""}><span className="pos">{["🥇", "🥈", "🥉"][i] || i + 1}</span><span className="nm">{e.name}</span><span className="tm">{fmt(e.ms)}</span></li>)}</ul>
+          </>) : <p className="empty">Ninguém abriu o cadeado ainda. Seja o primeiro! 🔥</p>}
           <div className="spacer" />
-          <button className="btn" onClick={() => { unsubAll(); setView(g ? "game" : "splash"); }}>Voltar</button>
+          {authed && myRole === "master" ? <button className="btn danger-btn noprint" onClick={resetRanking}>🗑️ Zerar ranking</button> : null}
+          <button className="btn" style={{ marginTop: 10 }} onClick={() => { unsubAll(); setView(g ? "game" : "splash"); }}>Voltar</button>
         </section>
 
         {/* ADMIN */}

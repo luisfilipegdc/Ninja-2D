@@ -413,6 +413,8 @@ audio.curio-audio{width:100%;margin-top:18px;}
 .hub-brand{text-align:center;margin:2px 0 8px;display:flex;flex-direction:column;line-height:1;}
 .hub-brand .hb-title{font-family:"Fredoka",cursive;font-weight:700;color:var(--milho);font-size:1.5rem;text-shadow:0 2px 0 #b85c00;}
 .hub-brand .hb-sub{font-family:"Pacifico",cursive;color:#fff;font-size:.95rem;opacity:.9;margin-top:2px;}
+.rank-count{color:#aac3de;font-weight:800;font-size:.85rem;margin:8px 0 4px;align-self:flex-start;}
+.rank-all{max-height:56vh;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .combo-presets{display:flex;gap:10px;flex-wrap:wrap;}
 .combo-presets .btn{flex:1;margin-top:0;min-width:140px;}
 .field-row{display:flex;flex-direction:column;gap:10px;}
