@@ -1240,6 +1240,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
         {/* HUB */}
         <section id="view-game" className={v("game")}>
+          <div className="hub-brand">
+            <span className="hb-title">Arraiá do Tesouro</span>
+            <span className="hb-sub">Festa Junina 2026</span>
+          </div>
           <div className="statline"><span>🤠 {g?.name || "—"}</span><span className="timer">{fmt(elapsed)}</span></div>
           <p className="anyorder">🔀 Ache os 3 números em <b>qualquer ordem</b>{lvl === "facil" ? " — a senha vem pronta!" : " — no fim você monta o código!"}</p>
           {g ? (
