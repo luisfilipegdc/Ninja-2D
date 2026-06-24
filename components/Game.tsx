@@ -1138,22 +1138,28 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
         {/* SPLASH */}
         <section id="view-splash" className={v("splash")}>
-          <div className="splash-deco" aria-hidden>
-            <span className="d1">🌵</span><span className="d2">🪗</span><span className="d3">🌻</span><span className="d4">🌽</span>
-          </div>
-          <div className="kicker">Colégio Marista de Brasília</div>
+          {splashStep === 1 ? (
+            <div className="splash-deco" aria-hidden>
+              <span className="d1">🌵</span><span className="d2">🪗</span><span className="d3">🌻</span><span className="d4">🌽</span>
+            </div>
+          ) : null}
+          {splashStep === 1 ? <div className="kicker">Colégio Marista de Brasília</div> : null}
           <h1 className="title">Arraiá<br />do Tesouro</h1>
-          <p className="festa">Festa Junina <span className="ano">2026</span></p>
-          <p className="lead">Ache os cartões escondidos pela festa, monte a senha e abra o baú. Bora?</p>
-          <div className="premio-splash">🎁 Abra o baú e leve <b>{PREMIO}</b>!</div>
-          <div className={"bonfire" + (fogueiraOut ? " out" : "") + (blowOn ? " listening" : "")} aria-hidden onClick={bonfireTap}>
-            <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
-            <div className="smoke"><span /><span /><span /></div>
-            <div className="logs"><span /><span /></div>
-          </div>
-          {blowOn ? <div className="blow-hint">🌬️ Assopre no microfone pra apagar a fogueira…</div> : null}
-          {foundEggs.length ? <div className="eggs-badge">🏅 {foundEggs.length}/{EGGS_TOTAL} segredos juninos {foundEggs.length >= EGGS_TOTAL ? "· lenda do arraiá! 👑" : "descobertos"}</div> : null}
-          <div className="install" style={{ display: "block" }}>{nfcNotice}</div>
+          {splashStep === 1 ? (
+            <>
+              <p className="festa">Festa Junina <span className="ano">2026</span></p>
+              <p className="lead">Ache os cartões escondidos pela festa, monte a senha e abra o baú. Bora?</p>
+              <div className="premio-splash">🎁 Abra o baú e leve <b>{PREMIO}</b>!</div>
+              <div className={"bonfire" + (fogueiraOut ? " out" : "") + (blowOn ? " listening" : "")} aria-hidden onClick={bonfireTap}>
+                <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
+                <div className="smoke"><span /><span /><span /></div>
+                <div className="logs"><span /><span /></div>
+              </div>
+              {blowOn ? <div className="blow-hint">🌬️ Assopre no microfone pra apagar a fogueira…</div> : null}
+              {foundEggs.length ? <div className="eggs-badge">🏅 {foundEggs.length}/{EGGS_TOTAL} segredos juninos {foundEggs.length >= EGGS_TOTAL ? "· lenda do arraiá! 👑" : "descobertos"}</div> : null}
+              <div className="install" style={{ display: "block" }}>{nfcNotice}</div>
+            </>
+          ) : null}
           {splashMsg ? <div className="install warn" style={{ display: "block" }}>{splashMsg}</div> : null}
 
           {splashStep === 1 ? (
