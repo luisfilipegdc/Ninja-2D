@@ -5,9 +5,10 @@ import QRCode from "qrcode";
 import Bunting from "@/components/Bunting";
 import { getSupabase, EVENT } from "@/lib/supabase";
 import type { Card, EventRow, GameState, Media, ScoreRow } from "@/lib/types";
+import { isNameClean } from "@/lib/badwords";
 
 /* ===================== helpers puros ===================== */
-type ViewId = "splash" | "game" | "scan" | "card" | "chest" | "ranking" | "admin";
+type ViewId = "splash" | "game" | "scan" | "card" | "chest" | "ranking" | "admin" | "montar";
 type Method = "nfc" | "nfctap" | "none";
 
 const LS_SESS = "arraia.session.v2";
@@ -23,6 +24,15 @@ const MAGIC_NAMES: Record<string, { anim: "catolica" | "saojoao" | "festa" | "mi
   "sao joao":  { anim: "saojoao",  toast: "🎆 Viva São João! A festa junina é dele — e a fogueira também 🔥" },
   "festa junina": { anim: "festa", toast: "💃🕺 É arraiá! Puxa a quadrilha que a festa começou 🎪" },
   "ze do milho": { anim: "milho",  toast: "🌽 Pamonha, curau e canjica! Zé do Milho passou por aqui" },
+};
+
+// Prêmio do baú — edite aqui pra mudar a copy na splash e no baú
+const PREMIO = "uma lembrancinha junina";
+// Pistas temáticas da ordem da senha (gamificação "Monte o código")
+const POS_CLUE: Record<number, { emoji: string; word: string }> = {
+  1: { emoji: "🌽", word: "abre a senha" },
+  2: { emoji: "🪗", word: "fica no meio" },
+  3: { emoji: "🔥", word: "fecha a senha" },
 };
 
 function fmt(ms: number) {
@@ -69,6 +79,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [name, setName] = useState("");
   const [splashMsg, setSplashMsg] = useState("");
   const [toast, setToast] = useState("");
+  const [social, setSocial] = useState("");
+  const socialT = useRef<any>(null);
   const [mestre, setMestre] = useState(false);
   const [fogueiraOut, setFogueiraOut] = useState(false);
   const [blowOn, setBlowOn] = useState(false);
@@ -96,6 +108,12 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [chest, setChest] = useState<{ lock: number; combo: (number | string)[] } | null>(null);
   const [chestRank, setChestRank] = useState<ScoreRow[]>([]);
   const [chestBoth, setChestBoth] = useState(false);
+
+  // "Monte o código" (gamificação da ordem da senha)
+  type Chip = { digit: number; pos: number };
+  const [montarSlots, setMontarSlots] = useState<(Chip | null)[]>([null, null, null]);
+  const [montarPool, setMontarPool] = useState<Chip[]>([]);
+  const [montarErr, setMontarErr] = useState(false);
 
   // ranking
   const [rank1, setRank1] = useState<ScoreRow[]>([]);
@@ -152,6 +170,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setToast(msg);
     clearTimeout(toastT.current);
     toastT.current = setTimeout(() => setToast(""), 2600);
+  }, []);
+  const showSocial = useCallback((msg: string) => {
+    setSocial(msg); vibrate([15, 30, 15]);
+    clearTimeout(socialT.current);
+    socialT.current = setTimeout(() => setSocial(""), 6000);
   }, []);
   const flashErr = useCallback((msg: string) => {
     const now = Date.now();
@@ -262,6 +285,43 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     window.addEventListener("devicemotion", onMotion);
     return () => window.removeEventListener("devicemotion", onMotion);
   }, [showToast, markEgg]);
+
+  /* ---------- prova social ao vivo (broadcast em tempo real) ---------- */
+  const playing = !!game;
+  useEffect(() => {
+    if (!sb || !playing) return;
+    const ch = sb.channel("social_" + EVENT)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "events", filter: "game_id=eq." + EVENT }, (payload: any) => {
+        const e = payload?.new; if (!e || e.kind !== "complete") return;
+        const me = gameRef.current?.name;
+        if (e.actor && e.actor !== me) showSocial(`🔥 ${e.actor} acabou de abrir o baú! Não fica pra trás — seja o próximo 🤠`);
+      }).subscribe();
+    return () => { try { sb.removeChannel(ch); } catch {} };
+  }, [sb, playing, showSocial]);
+
+  /* ---------- prova social periódica (1,3,5,10,20… min) ---------- */
+  useEffect(() => {
+    if (!sb || !playing) return;
+    let alive = true;
+    const fire = async () => {
+      if (!alive) return;
+      try {
+        const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        const { data: scans } = await sb.from("events").select("actor").eq("game_id", EVENT).eq("kind", "scan").gte("at", since);
+        const players = new Set((scans || []).map((r: any) => r.actor).filter(Boolean));
+        const { data: comps } = await sb.from("events").select("actor").eq("game_id", EVENT).eq("kind", "complete").order("at", { ascending: false }).limit(8);
+        const completes = (comps || []).map((r: any) => r.actor).filter(Boolean);
+        const opts: string[] = [];
+        if (players.size >= 3) opts.push(`🤠 ${players.size} caipiras estão caçando agora!`);
+        if (completes.length) opts.push(`🏆 ${completes[(Math.random() * completes.length) | 0]} já descobriu a senha — seja o próximo! 🔥`);
+        if (!opts.length) opts.push("🔥 A caçada tá rolando! Ache os 3 números e abra o baú 🎁");
+        if (alive) showSocial(opts[(Math.random() * opts.length) | 0]);
+      } catch { /* ignora */ }
+    };
+    const marks = [1, 3, 5, 10, 20, 30, 45, 60, 90, 120];
+    const timers = marks.map(m => setTimeout(fire, m * 60 * 1000));
+    return () => { alive = false; timers.forEach(clearTimeout); };
+  }, [sb, playing, showSocial]);
 
   /* ---------- confete ---------- */
   useEffect(() => {
@@ -429,6 +489,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const startHunt = useCallback(() => {
     const nm = name.trim();
     if (!nm) return;
+    if (!isNameClean(nm)) { vibrate([60, 40, 60]); setSplashMsg("Ô caipira! 😅 Vamos manter o arraiá pra toda a família — escolhe outro nome."); return; }
+    setSplashMsg("");
     goFullscreen();
     // easter egg: nome mágico
     const magic = nm.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -476,6 +538,40 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setView("chest");
   }, [persist, syncGame, burst, sbInsert, sbTop, sb, unsubAll, resetEggs, logEvent]);
 
+  const openMontar = useCallback(() => {
+    const g = gameRef.current!;
+    const items: Chip[] = [1, 2, 3].map(p => ({ digit: g.locks[1]?.[p] as number, pos: p }));
+    for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+    setMontarPool(items); setMontarSlots([null, null, null]); setMontarErr(false); setView("montar");
+  }, []);
+
+  const montarPlace = useCallback((chip: Chip) => {
+    vibrate(8); setMontarErr(false);
+    setMontarSlots(prev => { const i = prev.findIndex(s => s == null); if (i < 0) return prev; const next = prev.slice(); next[i] = chip; return next; });
+    setMontarPool(prev => prev.filter(c => c.pos !== chip.pos));
+  }, []);
+
+  const montarRemove = useCallback((i: number) => {
+    vibrate(8); setMontarErr(false);
+    setMontarSlots(prev => { const c = prev[i]; if (!c) return prev; setMontarPool(p => [...p, c]); const next = prev.slice(); next[i] = null; return next; });
+  }, []);
+
+  const montarCheck = useCallback(() => {
+    const ok = montarSlots.every((c, i) => c && c.pos === i + 1);
+    if (ok) { vibrate([40, 40, 120]); completeLock(1); }
+    else { vibrate([80, 50, 80]); setMontarErr(true); showToast("Quase! 🔥 Olha as pistas e tenta de novo"); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [montarSlots, completeLock, showToast]);
+
+  const shareWin = useCallback(async () => {
+    const txt = "Abri o baú do Arraiá do Tesouro do Marista! 🎁🔥 Bora caçar você também:";
+    const url = "https://festajuninamarista.vercel.app/";
+    try {
+      if ((navigator as any).share) await (navigator as any).share({ title: "Arraiá do Tesouro", text: txt, url });
+      else { await navigator.clipboard?.writeText(txt + " " + url); showToast("Link copiado! Cola no seu story 📲"); }
+    } catch { /* usuário cancelou */ }
+  }, [showToast]);
+
   const revealSenha = useCallback((card: Card) => {
     const g = gameRef.current!; const L = card.lock || 1, pos = card.position!, digit = card.digit!;
     if (!g.locks[L]) g.locks[L] = {};
@@ -485,17 +581,18 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     persist(); syncGame();
     vibrate([40, 30, 40, 30, 160]); burst(); setTimeout(burst, 300);
     const complete = lockComplete(g, L) && !g.doneLocks.includes(L);
+    const clue = POS_CLUE[pos];
     const node = (
       <div className="senha-reveal">
         <div className="senha-digit">{digit}</div>
-        <div className="senha-where">entra na <b>casa {pos}</b> do <b>cadeado</b></div>
+        <div className="senha-where"><span className="clue-emoji">{clue.emoji}</span> esse número <b>{clue.word}</b></div>
         {card.hint ? <p className="senha-hint">💬 {card.hint}</p> : null}
       </div>
     );
-    afterCardRef.current = complete ? () => completeLock(L) : renderHub;
-    setCardView({ kind: "senha", node, kicker: already ? "Você já tinha esse número 😉" : "Achou um número da senha!", cta: complete ? "Ver a senha do cadeado 🔐" : "Continuar a caçada 📡" });
+    afterCardRef.current = complete ? openMontar : renderHub;
+    setCardView({ kind: "senha", node, kicker: already ? "Você já tinha esse número 😉" : "Achou um número da senha!", cta: complete ? "🧩 Montar o código!" : "Continuar a caçada 📡" });
     setView("card");
-  }, [persist, syncGame, burst, completeLock, renderHub]);
+  }, [persist, syncGame, burst, openMontar, renderHub]);
 
   const revealCuriosidade = useCallback((card: Card) => {
     const g = gameRef.current; if (g && !g.seen.includes(card.code)) { g.seen.push(card.code); persist(); syncGame(); }
@@ -849,6 +946,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       <canvas id="confetti" ref={confettiRef} />
       <div className="hot-flash" ref={hotRef} aria-hidden />
       {toast ? <div className="toast show">{toast}</div> : null}
+      {social ? <div className="social-alert">{social}</div> : null}
 
       <div className={"app" + (mestre ? " mestre" : "") + (view === "admin" ? " admin-wide" : "")}>
         <Bunting />
@@ -861,7 +959,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <div className="kicker">Colégio Marista de Brasília</div>
           <h1 className="title">Arraiá<br />do Tesouro</h1>
           <p className="festa">Festa Junina <span className="ano">2026</span></p>
-          <p className="lead">Ache os cartões escondidos pela festa. Alguns abrem um <b>cadeado</b> com premiação; o resto são curiosidades. Bora?</p>
+          <p className="lead">Ache os cartões escondidos pela festa, monte a senha e abra o baú. Bora?</p>
+          <div className="premio-splash">🎁 Abra o baú e leve <b>{PREMIO}</b>!</div>
           <div className={"bonfire" + (fogueiraOut ? " out" : "") + (blowOn ? " listening" : "")} aria-hidden onClick={bonfireTap}>
             <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
             <div className="smoke"><span /><span /><span /></div>
@@ -890,17 +989,20 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         {/* HUB */}
         <section id="view-game" className={v("game")}>
           <div className="statline"><span>🤠 {g?.name || "—"}</span><span className="timer">{fmt(elapsed)}</span></div>
-          <p className="anyorder">🔀 Ache os cartões em <b>qualquer ordem</b> — cada número já vai pro lugar certo.</p>
+          <p className="anyorder">🔀 Ache os 3 números em <b>qualquer ordem</b> — no fim você <b>monta o código</b>!</p>
           {g ? (
             <div className={"lockpanel" + (lockDone ? " done" : "")}>
-              <div className="lockhead"><span>🔓 Senha do cadeado</span>{lockDone ? <span className="ok">✓ pronta!</span> : <span className="cnt">{filled === 0 ? "Faltam 3 números" : "Falta" + (3 - filled === 1 ? "" : "m") + " " + (3 - filled) + " número" + (3 - filled === 1 ? "" : "s")}</span>}</div>
+              <div className="lockhead"><span>🔓 Senha do cadeado</span>{lockDone ? <span className="ok">✓ achou os 3!</span> : <span className="cnt">{filled === 2 ? "Falta só 1! 🔥" : filled === 0 ? "Faltam 3 números" : "Faltam " + (3 - filled) + " números"}</span>}</div>
               <div className="cofre">
-                {[1, 2, 3].map(pos => {
-                  const val = g.locks[activeLock]?.[pos];
-                  return <div key={pos} className={"slot" + (val != null ? " filled" : "")}><span className="pos">{pos}ª</span>{val != null ? val : "🔒"}</div>;
-                })}
+                {(() => {
+                  const fp = [1, 2, 3].filter(p => g.locks[activeLock]?.[p] != null).sort((a, b) => (g.locks[activeLock]![a] as number) - (g.locks[activeLock]![b] as number));
+                  return (<>
+                    {fp.map(p => <div key={p} className="slot filled"><span className="pos">{POS_CLUE[p].emoji}</span>{g.locks[activeLock]![p]}</div>)}
+                    {Array.from({ length: 3 - fp.length }).map((_, i) => <div key={"l" + i} className="slot"><span className="pos">?</span>🔒</div>)}
+                  </>);
+                })()}
               </div>
-              {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => completeLock(activeLock)}>Ver a senha do cadeado 🔐</button> : null}
+              {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={openMontar}>🧩 Montar o código!</button> : null}
             </div>
           ) : null}
           <div className="spacer" />
@@ -931,13 +1033,40 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         {/* CHEST */}
         <section id="view-chest" className={v("chest") + " celebrate"}>
           <div className="chest">🧰</div>
-          <div className="big">Senha do cadeado!</div>
+          <div className="big">Você montou a senha! 🎉</div>
+          {(() => { const mp = chestRank.findIndex(e => e.id === myScoreId.current) + 1; return mp > 0 ? <div className="chest-pos">🏆 Você foi o <b>{mp}º</b> a abrir o baú!</div> : null; })()}
           <p className="lead" style={{ textAlign: "center" }}>Gire o cadeado para:</p>
           <div className="combo">{chest?.combo.map((d, i) => <div key={i} className="d">{d}</div>)}</div>
-          <p className="lead" style={{ textAlign: "center", marginTop: 14 }}>Boa, <b>{g?.name}</b>! Mostre a senha pro organizador e abra o baú deste cadeado. 🎁</p>
+          <p className="lead" style={{ textAlign: "center", marginTop: 14 }}>Boa, <b>{g?.name}</b>! Mostre pro organizador, abra o baú e pegue {PREMIO}. 🎁</p>
+          <button className="btn share noprint" onClick={shareWin}>📸 Postar nos stories que eu abri!</button>
           <ul className="rank">{chestRank.slice(0, 12).map((e, i) => <li key={e.id} className={e.id === myScoreId.current ? "me" : ""}><span className="pos">{["🥇", "🥈", "🥉"][i] || i + 1}</span><span className="nm">{e.name}</span><span className="tm">{fmt(e.ms)}</span></li>)}</ul>
           <div className="spacer" />
           <button className="btn fire" onClick={() => (chestBoth ? openRanking() : setView("game"))}>{chestBoth ? "Ver ranking 🏆" : "Continuar a caçada 📡"}</button>
+        </section>
+
+        {/* MONTAR O CÓDIGO */}
+        <section id="view-montar" className={v("montar")}>
+          <div className="kicker">Monte o código do cadeado</div>
+          <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
+          <p className="lead">Use as <b>pistas</b> e coloque os 3 números na ordem certa.</p>
+          <div className={"montar-slots" + (montarErr ? " err" : "")}>
+            {[1, 2, 3].map((p, i) => (
+              <div key={p} className={"mslot" + (montarSlots[i] ? " filled" : "")} onClick={() => montarRemove(i)}>
+                <span className="mclue">{POS_CLUE[p].emoji}</span>
+                <span className="mnum">{montarSlots[i] ? montarSlots[i]!.digit : "?"}</span>
+                <span className="mword">{POS_CLUE[p].word}</span>
+              </div>
+            ))}
+          </div>
+          <div className="montar-pool">
+            {montarPool.map(c => (
+              <button key={c.pos} className="mchip" onClick={() => montarPlace(c)}>{c.digit}</button>
+            ))}
+            {montarPool.length === 0 ? <span className="montar-ready">Tudo no lugar? Confere! 👇</span> : null}
+          </div>
+          <div className="spacer" />
+          <button className="btn fire" disabled={montarPool.length !== 0} onClick={montarCheck}>🔓 Conferir o código</button>
+          <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setView("game")}>Voltar</button>
         </section>
 
         {/* RANKING */}
