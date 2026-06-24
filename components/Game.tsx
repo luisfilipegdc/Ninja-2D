@@ -96,6 +96,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [elapsed, setElapsed] = useState(0);
   const [name, setName] = useState("");
   const [level, setLevel] = useState<Level>("medio");
+  const [splashStep, setSplashStep] = useState<1 | 2>(1);
   const [splashMsg, setSplashMsg] = useState("");
   const [toast, setToast] = useState("");
   const [social, setSocial] = useState("");
@@ -516,6 +517,13 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
   /* ===================== fluxo do jogo ===================== */
   const renderHub = useCallback(() => { setView("game"); }, []);
+
+  const goStep2 = useCallback(() => {
+    const nm = name.trim();
+    if (!nm) { setSplashMsg("Digite seu nome de caipira 😊"); return; }
+    if (!isNameClean(nm)) { vibrate([60, 40, 60]); setSplashMsg("Ô caipira! 😅 Vamos manter o arraiá pra toda a família — escolhe outro nome."); return; }
+    setSplashMsg(""); setSplashStep(2);
+  }, [name]);
 
   const startHunt = useCallback(() => {
     const nm = name.trim();
@@ -1092,26 +1100,31 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           {foundEggs.length ? <div className="eggs-badge">🏅 {foundEggs.length}/{EGGS_TOTAL} segredos juninos {foundEggs.length >= EGGS_TOTAL ? "· lenda do arraiá! 👑" : "descobertos"}</div> : null}
           <div className="install" style={{ display: "block" }}>{nfcNotice}</div>
           {splashMsg ? <div className="install warn" style={{ display: "block" }}>{splashMsg}</div> : null}
-          <label className="field" htmlFor="playerName">Seu nome de caipira</label>
-          <input id="playerName" type="text" maxLength={22} placeholder="Ex: Zé do Milho" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
-          <label className="field">Nível de dificuldade</label>
-          <div className="levels">
-            {LEVELS.map(l => (
-              <button key={l.id} type="button" className={"level-btn" + (level === l.id ? " sel" : "")} onClick={() => { setLevel(l.id); vibrate(8); }}>
-                <span className="lv-emoji">{l.emoji}</span>
-                <span className="lv-label">{l.label}</span>
-                <span className="lv-desc">{l.desc}</span>
-              </button>
-            ))}
-          </div>
-          {!flags.isStandalone && flags.isIOS ? (
-            <div className="install" style={{ display: "block" }}>📲 No iPhone, encoste na tag NFC que o jogo abre sozinho. Pra tela cheia: <b>Compartilhar</b> → <b>Adicionar à Tela de Início</b>.</div>
-          ) : null}
-          {!flags.isStandalone && flags.isAndroid ? (
-            <div className="install" style={{ display: "block" }}>📲 Pra <b>tela cheia garantida</b>, instale o app: menu <b>⋮</b> do navegador → <b>Instalar app</b>.</div>
-          ) : null}
-          <div className="spacer" />
-          <button className="btn fire" id="startBtn" onClick={startHunt}>Iniciar caçada 🔥</button>
+
+          {splashStep === 1 ? (
+            <>
+              <label className="field" htmlFor="playerName">Seu nome de caipira</label>
+              <input id="playerName" type="text" maxLength={22} placeholder="Ex: Zé do Milho" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") goStep2(); }} autoComplete="off" />
+              <div className="spacer" />
+              <button className="btn fire" id="startBtn" onClick={goStep2}>Continuar →</button>
+            </>
+          ) : (
+            <>
+              <label className="field">Escolha o nível, <b style={{ color: "var(--milho)" }}>{name.trim()}</b>:</label>
+              <div className="levels">
+                {LEVELS.map(l => (
+                  <button key={l.id} type="button" className={"level-btn" + (level === l.id ? " sel" : "")} onClick={() => { setLevel(l.id); vibrate(8); }}>
+                    <span className="lv-emoji">{l.emoji}</span>
+                    <span className="lv-label">{l.label}</span>
+                    <span className="lv-desc">{l.desc}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="spacer" />
+              <button className="btn fire" onClick={startHunt}>Iniciar caçada 🔥</button>
+              <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setSplashStep(1)}>← Voltar</button>
+            </>
+          )}
           <div className="linkbar">
             <a onClick={openRanking}>🏆 Ranking</a>
             <a onClick={openAdmin}>⚙️ Organizador</a>
@@ -1140,7 +1153,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <div className="spacer" />
           <button className="btn fire" onClick={openScanner}>Procurar próximo cartão 🔦</button>
           <p className="scanhint-sm">Pode ser um número da senha… ou uma curiosidade! 🎁</p>
-          <button className="btn ghost noprint" style={{ marginTop: 12 }} onClick={() => { gameRef.current = null; setGame(null); clearSession(); setName(""); setSplashMsg(""); setView("splash"); }}>Sair da caçada</button>
+          <button className="btn ghost noprint" style={{ marginTop: 12 }} onClick={() => { gameRef.current = null; setGame(null); clearSession(); setName(""); setSplashMsg(""); setSplashStep(1); setView("splash"); }}>Sair da caçada</button>
         </section>
 
         {/* SCAN (apenas NFC) */}
