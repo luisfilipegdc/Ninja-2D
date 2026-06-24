@@ -602,12 +602,6 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [montarSlots, completeLock, showToast, playSuccess, burst, montarReset]);
 
-  const shareWin = useCallback(() => {
-    const txt = "Eu abri o baú do Arraiá do Tesouro do Marista! 🎁🔥 Vem caçar o tesouro você também: https://festajuninamarista.vercel.app/";
-    try { window.open("https://wa.me/?text=" + encodeURIComponent(txt), "_blank"); }
-    catch { try { navigator.clipboard?.writeText(txt); showToast("Convite copiado! Cola no WhatsApp 📲"); } catch {} }
-  }, [showToast]);
-
   const revealSenha = useCallback((card: Card) => {
     const g = gameRef.current!; const L = card.lock || 1, pos = card.position!, digit = card.digit!;
     if (!g.locks[L]) g.locks[L] = {};
@@ -1120,7 +1114,6 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <p className="lead" style={{ textAlign: "center" }}>Gire o cadeado para:</p>
           <div className="combo">{chest?.combo.map((d, i) => <div key={i} className="d">{d}</div>)}</div>
           <p className="lead" style={{ textAlign: "center", marginTop: 14 }}>Boa, <b>{g?.name}</b>! Mostre pro organizador, abra o baú e pegue {PREMIO}. 🎁</p>
-          <button className="btn share noprint" onClick={shareWin}>📲 Você abriu! Chamar um amigo no WhatsApp</button>
           <ul className="rank">{chestRank.slice(0, 12).map((e, i) => <li key={e.id} className={e.id === myScoreId.current ? "me" : ""}><span className="pos">{["🥇", "🥈", "🥉"][i] || i + 1}</span><span className="nm">{e.name}</span><span className="tm">{fmt(e.ms)}</span></li>)}</ul>
           <div className="spacer" />
           <button className="btn fire" onClick={() => (chestBoth ? openRanking() : setView("game"))}>{chestBoth ? "Ver ranking 🏆" : "Continuar a caçada 📡"}</button>
@@ -1130,7 +1123,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         <section id="view-montar" className={v("montar")}>
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
-          <p className="lead">Use as <b>pistas</b> e coloque os 3 números na ordem certa.</p>
+          <p className="lead">Cada número leva o <b>desenho da sua pista</b>. Junte cada um no lugar certo! 🧩</p>
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => (
               <div key={p} className={"mslot" + (montarSlots[i] ? " filled" : "")} onClick={() => montarRemove(i)}>
@@ -1142,7 +1135,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           </div>
           <div className="montar-pool">
             {montarPool.map(c => (
-              <button key={c.pos} className="mchip" onClick={() => montarPlace(c)}>{c.digit}</button>
+              <button key={c.pos} className="mchip" onClick={() => montarPlace(c)}>
+                <span className="mchip-num">{c.digit}</span>
+                <span className="mchip-clue">{POS_CLUE[c.pos].emoji}</span>
+              </button>
             ))}
             {montarPool.length === 0 ? <span className="montar-ready">Tudo no lugar? Confere! 👇</span> : null}
           </div>

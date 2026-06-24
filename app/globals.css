@@ -219,8 +219,10 @@ select option{color:#1b1030;}
 .mslot.filled .mnum{color:var(--milho);text-shadow:0 2px 0 #b85c00;}
 .mslot .mword{font-size:.66rem;color:#aac3de;font-weight:800;text-align:center;line-height:1.1;}
 .montar-pool{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:22px;min-height:64px;align-items:center;}
-.mchip{width:62px;height:62px;border-radius:16px;border:2px solid rgba(255,255,255,.2);background:var(--papel);color:var(--tinta);
-  font-family:"Fredoka",cursive;font-size:2rem;font-weight:700;cursor:pointer;box-shadow:var(--sombra);transition:transform .08s;}
+.mchip{position:relative;width:66px;height:66px;border-radius:16px;border:2px solid rgba(255,255,255,.2);background:var(--papel);color:var(--tinta);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--sombra);transition:transform .08s;}
+.mchip .mchip-num{font-family:"Fredoka",cursive;font-size:2rem;font-weight:700;line-height:1;}
+.mchip .mchip-clue{position:absolute;right:-6px;bottom:-6px;font-size:1.25rem;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4));}
 .mchip:active{transform:scale(.92);}
 .montar-ready{color:#aac3de;font-weight:800;font-size:.95rem;}
 
