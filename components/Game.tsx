@@ -135,6 +135,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [montarSlots, setMontarSlots] = useState<(Chip | null)[]>([null, null, null]);
   const [montarPool, setMontarPool] = useState<Chip[]>([]);
   const [montarErr, setMontarErr] = useState(false);
+  // zoeiras do impossível (estilo Level Devil)
+  const [confDodge, setConfDodge] = useState(0);
+  const [confXY, setConfXY] = useState<{ x: number; y: number } | null>(null);
+  const [fakeOff, setFakeOff] = useState(false);
+  const fakeWinUsed = useRef(false);
 
   // ranking
   const [rank1, setRank1] = useState<ScoreRow[]>([]);
@@ -605,13 +610,19 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   }, []);
 
   const openMontar = useCallback(() => {
-    peekUsed.current = false;
+    peekUsed.current = false; fakeWinUsed.current = false; setConfDodge(0); setConfXY(null); setFakeOff(false);
     setMontarPool(buildChips(gameRef.current!)); setMontarSlots([null, null, null]); setMontarErr(false); setView("montar");
   }, [buildChips]);
 
   const montarPlace = useCallback((chip: Chip) => {
     vibrate(8); setMontarErr(false);
-    setMontarSlots(prev => { const i = prev.findIndex(s => s == null); if (i < 0) return prev; const next = prev.slice(); next[i] = chip; return next; });
+    const inverted = gameRef.current?.level === "impossivel"; // lógica espelhada (preenche da direita)
+    setMontarSlots(prev => {
+      let i = -1;
+      if (inverted) { for (let k = prev.length - 1; k >= 0; k--) if (prev[k] == null) { i = k; break; } }
+      else i = prev.findIndex(s => s == null);
+      if (i < 0) return prev; const next = prev.slice(); next[i] = chip; return next;
+    });
     setMontarPool(prev => prev.filter(c => c.id !== chip.id));
   }, []);
 
@@ -642,6 +653,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const montarCheck = useCallback(() => {
     const ok = montarSlots.every((c, i) => c && !c.decoy && c.pos === i + 1);
     if (ok) {
+      // falso "ganhou" (1x no impossível) — caminho falso seguro do Level Devil
+      if (gameRef.current?.level === "impossivel" && !fakeWinUsed.current) {
+        fakeWinUsed.current = true; vibrate([200]); showToast("🎉 VOCÊ GANHOU!… 😈 mentira!");
+        setTimeout(() => montarReset(), 1300); return;
+      }
       setMontarOk(true); vibrate([40, 40, 40, 40, 220]); playSuccess(); burst(); setTimeout(burst, 260);
       setTimeout(() => { setMontarOk(false); completeLock(1); }, 1200);
     } else {
@@ -650,6 +666,19 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [montarSlots, completeLock, showToast, playSuccess, burst, montarReset]);
+
+  // zoeiras do impossível enquanto monta: fichas fujonas + reset surpresa + fake desligar
+  useEffect(() => {
+    if (view !== "montar" || gameRef.current?.level !== "impossivel") return;
+    let n = 0;
+    const id = setInterval(() => {
+      n++;
+      setMontarPool(p => { const a = p.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; });
+      if (n % 4 === 0) { showToast("😈 Baguncei tudo!"); montarReset(); }
+      if (n % 6 === 0) { setFakeOff(true); setTimeout(() => setFakeOff(false), 1100); }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [view, montarReset, showToast]);
 
   const revealSenha = useCallback((card: Card) => {
     const g = gameRef.current!; const L = card.lock || 1, pos = card.position!, digit = card.digit!;
@@ -1132,6 +1161,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       <div className="hot-flash" ref={hotRef} aria-hidden />
       {toast ? <div className="toast show">{toast}</div> : null}
       {social ? <div className="social-alert">{social}</div> : null}
+      {fakeOff ? <div className="fake-off" aria-hidden /> : null}
 
       <div className={"app" + (mestre ? " mestre" : "") + (view === "admin" ? " admin-wide" : "")}>
         <Bunting />
@@ -1253,7 +1283,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         <section id="view-montar" className={v("montar")}>
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
-          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💀 <b>Sem pistas.</b> Resolva as continhas, descubra a ordem e <b>cuidado com as fichas falsas!</b></> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
+          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💀 <b>O capeta tá solto!</b> Continhas, fichas falsas, lógica invertida e armadilhas. Boa sorte… 😈</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
           {canPeek ? <button className="btn ghost noprint" style={{ marginTop: 8 }} onClick={montarPeek}>👀 Espiar a senha (2s) — coringa</button> : null}
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => {
@@ -1277,7 +1307,12 @@ export default function Game({ start }: { start?: "admin" } = {}) {
             {montarSlots.every(s => s) ? <span className="montar-ready">Confere! 👇</span> : null}
           </div>
           <div className="spacer" />
-          <button className="btn fire" disabled={montarSlots.some(s => s == null)} onClick={montarCheck}>🔓 Conferir o código</button>
+          <button className="btn fire" disabled={montarSlots.some(s => s == null)}
+            style={confXY ? { transform: `translate(${confXY.x}px,${confXY.y}px)`, transition: "transform .14s ease" } : undefined}
+            onClick={() => {
+              if (lvl === "impossivel" && confDodge < 2) { setConfDodge(confDodge + 1); setConfXY({ x: (Math.random() * 2 - 1) * 130, y: -(20 + Math.random() * 50) }); vibrate(15); return; }
+              setConfXY(null); montarCheck();
+            }}>🔓 Conferir o código</button>
           <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setView("game")}>Voltar</button>
         </section>
 
