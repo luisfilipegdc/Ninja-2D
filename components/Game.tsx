@@ -111,6 +111,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
   // "Monte o código" (gamificação da ordem da senha)
   type Chip = { digit: number; pos: number };
+  const [montarOk, setMontarOk] = useState(false);
   const [montarSlots, setMontarSlots] = useState<(Chip | null)[]>([null, null, null]);
   const [montarPool, setMontarPool] = useState<Chip[]>([]);
   const [montarErr, setMontarErr] = useState(false);
@@ -567,12 +568,39 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setMontarSlots(prev => { const c = prev[i]; if (!c) return prev; setMontarPool(p => [...p, c]); const next = prev.slice(); next[i] = null; return next; });
   }, []);
 
+  const playSuccess = useCallback(() => {
+    try {
+      const AC: any = (window as any).AudioContext || (window as any).webkitAudioContext;
+      const ctx = new AC(); const t0 = ctx.currentTime;
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = "triangle"; o.frequency.value = f; o.connect(g); g.connect(ctx.destination);
+        const t = t0 + i * 0.1;
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.28, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.34);
+        o.start(t); o.stop(t + 0.36);
+      });
+      setTimeout(() => { try { ctx.close(); } catch {} }, 1300);
+    } catch { /* sem áudio */ }
+  }, []);
+
+  const montarReset = useCallback(() => {
+    const g = gameRef.current!;
+    const items: Chip[] = [1, 2, 3].map(p => ({ digit: g.locks[1]?.[p] as number, pos: p }));
+    for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+    setMontarPool(items); setMontarSlots([null, null, null]);
+  }, []);
+
   const montarCheck = useCallback(() => {
     const ok = montarSlots.every((c, i) => c && c.pos === i + 1);
-    if (ok) { vibrate([40, 40, 120]); completeLock(1); }
-    else { vibrate([80, 50, 80]); setMontarErr(true); showToast("Quase! 🔥 Olha as pistas e tenta de novo"); }
+    if (ok) {
+      setMontarOk(true); vibrate([40, 40, 40, 40, 220]); playSuccess(); burst(); setTimeout(burst, 260);
+      setTimeout(() => { setMontarOk(false); completeLock(1); }, 1200);
+    } else {
+      vibrate([90, 60, 90, 60, 120]); setMontarErr(true); showToast("Quase! 🔥 Olha as pistas e tenta de novo");
+      setTimeout(() => { setMontarErr(false); montarReset(); }, 550);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [montarSlots, completeLock, showToast]);
+  }, [montarSlots, completeLock, showToast, playSuccess, burst, montarReset]);
 
   const shareWin = useCallback(() => {
     const txt = "Eu abri o baú do Arraiá do Tesouro do Marista! 🎁🔥 Vem caçar o tesouro você também: https://festajuninamarista.vercel.app/";
@@ -1103,7 +1131,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
           <p className="lead">Use as <b>pistas</b> e coloque os 3 números na ordem certa.</p>
-          <div className={"montar-slots" + (montarErr ? " err" : "")}>
+          <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => (
               <div key={p} className={"mslot" + (montarSlots[i] ? " filled" : "")} onClick={() => montarRemove(i)}>
                 <span className="mclue">{POS_CLUE[p].emoji}</span>
