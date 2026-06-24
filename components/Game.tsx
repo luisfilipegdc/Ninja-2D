@@ -1257,9 +1257,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => (lvl === "facil" ? completeLock(activeLock) : openMontar())}>{lvl === "facil" ? "Ver a senha do cadeado 🔐" : "🧩 Montar o código!"}</button> : null}
             </div>
           ) : null}
-          <div className="spacer" />
-          <button className="btn fire" onClick={openScanner}>Procurar próximo cartão 🔦</button>
+          <button className="btn fire" style={{ marginTop: 18 }} onClick={openScanner}>Procurar próximo cartão 🔦</button>
           <p className="scanhint-sm">Pode ser um número da senha… ou uma curiosidade! 🎁</p>
+          <div className="spacer" />
           <button className="btn ghost noprint" style={{ marginTop: 12 }} onClick={() => { gameRef.current = null; setGame(null); clearSession(); setName(""); setSplashMsg(""); setSplashStep(1); setView("splash"); }}>Sair da caçada</button>
         </section>
 
