@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import QRCode from "qrcode";
 import Bunting from "@/components/Bunting";
 import { getSupabase, EVENT } from "@/lib/supabase";
-import type { Card, EventRow, GameState, Media, ScoreRow } from "@/lib/types";
+import type { Card, EventRow, GameState, Level, Media, ScoreRow } from "@/lib/types";
 import { isNameClean } from "@/lib/badwords";
 
 /* ===================== helpers puros ===================== */
@@ -34,6 +34,24 @@ const POS_CLUE: Record<number, { emoji: string; word: string }> = {
   2: { emoji: "🪗", word: "fica no meio" },
   3: { emoji: "🔥", word: "fecha a senha" },
 };
+const ORDINAL: Record<number, string> = { 1: "1ª", 2: "2ª", 3: "3ª" };
+
+// Níveis de dificuldade (escolhidos na splash)
+const LEVELS: { id: Level; emoji: string; label: string; desc: string }[] = [
+  { id: "facil", emoji: "🐣", label: "Fácil", desc: "A senha vem pronta — ideal pros pequenos" },
+  { id: "medio", emoji: "🌽", label: "Médio", desc: "Monte a senha seguindo as pistas" },
+  { id: "dificil", emoji: "🔥", label: "Difícil", desc: "Sem pistas: descubra a ordem" },
+  { id: "impossivel", emoji: "💀", label: "Impossível", desc: "Sem pistas, com contas e pegadinhas" },
+];
+
+// "Continha" que resulta no dígito (nível impossível) — força decifrar
+function riddleFor(d: number): string {
+  const ops: string[] = [];
+  if (d >= 1) { const a = Math.floor(Math.random() * (d + 1)); ops.push(a + "+" + (d - a)); }
+  for (let a = 2; a < d; a++) if (d % a === 0) ops.push(a + "×" + (d / a));
+  const k = 1 + Math.floor(Math.random() * 5); ops.push((d + k) + "−" + k);
+  return ops[Math.floor(Math.random() * ops.length)] || String(d);
+}
 
 function fmt(ms: number) {
   const t = Math.max(0, Math.floor(ms / 1000));
@@ -77,6 +95,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const activeLock = 1; // cadeado único
   const [elapsed, setElapsed] = useState(0);
   const [name, setName] = useState("");
+  const [level, setLevel] = useState<Level>("medio");
   const [splashMsg, setSplashMsg] = useState("");
   const [toast, setToast] = useState("");
   const [social, setSocial] = useState("");
@@ -110,7 +129,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [chestBoth, setChestBoth] = useState(false);
 
   // "Monte o código" (gamificação da ordem da senha)
-  type Chip = { digit: number; pos: number };
+  type Chip = { id: string; digit: number; pos: number; label: string; decoy?: boolean };
   const [montarOk, setMontarOk] = useState(false);
   const [montarSlots, setMontarSlots] = useState<(Chip | null)[]>([null, null, null]);
   const [montarPool, setMontarPool] = useState<Chip[]>([]);
@@ -519,10 +538,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       vibrate([20, 40, 20, 40, 20]); balloonsRef.current();
       showToast("🎈 Balões pra você, " + nm + "! Voa alto 💙");
     }
-    const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {} }, seen: [], doneLocks: [], active: true };
+    const g: GameState = { name: nm, startedAt: Date.now(), gameId: EVENT, locks: { 1: {} }, seen: [], doneLocks: [], active: true, level, coringa: null };
     gameRef.current = g; setGame(g); persist(); vibrate([40, 40, 120]);
     setView("game");
-  }, [name, goFullscreen, persist, markEgg, showToast]);
+  }, [name, level, goFullscreen, persist, markEgg, showToast]);
 
   const completeLock = useCallback((L: number) => {
     const g = gameRef.current!; const combo: (number | string)[] = [];
@@ -550,17 +569,30 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setView("chest");
   }, [persist, syncGame, burst, sbInsert, sbTop, sb, unsubAll, resetEggs, logEvent]);
 
-  const openMontar = useCallback(() => {
-    const g = gameRef.current!;
-    const items: Chip[] = [1, 2, 3].map(p => ({ digit: g.locks[1]?.[p] as number, pos: p }));
+  const buildChips = useCallback((g: GameState): Chip[] => {
+    const lvl = g.level || "medio";
+    const items: Chip[] = [1, 2, 3].map(p => {
+      const d = g.locks[1]?.[p] as number;
+      return { id: "r" + p, digit: d, pos: p, label: lvl === "impossivel" ? riddleFor(d) : String(d) };
+    });
+    if (lvl === "impossivel") {
+      const real = new Set([1, 2, 3].map(p => g.locks[1]?.[p] as number));
+      const avail: number[] = []; for (let d = 0; d <= 9; d++) if (!real.has(d)) avail.push(d);
+      for (let i = avail.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [avail[i], avail[j]] = [avail[j], avail[i]]; }
+      avail.slice(0, 2).forEach((fake, k) => items.push({ id: "d" + k, digit: fake, pos: 0, label: riddleFor(fake), decoy: true }));
+    }
     for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
-    setMontarPool(items); setMontarSlots([null, null, null]); setMontarErr(false); setView("montar");
+    return items;
   }, []);
+
+  const openMontar = useCallback(() => {
+    setMontarPool(buildChips(gameRef.current!)); setMontarSlots([null, null, null]); setMontarErr(false); setView("montar");
+  }, [buildChips]);
 
   const montarPlace = useCallback((chip: Chip) => {
     vibrate(8); setMontarErr(false);
     setMontarSlots(prev => { const i = prev.findIndex(s => s == null); if (i < 0) return prev; const next = prev.slice(); next[i] = chip; return next; });
-    setMontarPool(prev => prev.filter(c => c.pos !== chip.pos));
+    setMontarPool(prev => prev.filter(c => c.id !== chip.id));
   }, []);
 
   const montarRemove = useCallback((i: number) => {
@@ -584,19 +616,16 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   }, []);
 
   const montarReset = useCallback(() => {
-    const g = gameRef.current!;
-    const items: Chip[] = [1, 2, 3].map(p => ({ digit: g.locks[1]?.[p] as number, pos: p }));
-    for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
-    setMontarPool(items); setMontarSlots([null, null, null]);
-  }, []);
+    setMontarPool(buildChips(gameRef.current!)); setMontarSlots([null, null, null]);
+  }, [buildChips]);
 
   const montarCheck = useCallback(() => {
-    const ok = montarSlots.every((c, i) => c && c.pos === i + 1);
+    const ok = montarSlots.every((c, i) => c && !c.decoy && c.pos === i + 1);
     if (ok) {
       setMontarOk(true); vibrate([40, 40, 40, 40, 220]); playSuccess(); burst(); setTimeout(burst, 260);
       setTimeout(() => { setMontarOk(false); completeLock(1); }, 1200);
     } else {
-      vibrate([90, 60, 90, 60, 120]); setMontarErr(true); showToast("Quase! 🔥 Olha as pistas e tenta de novo");
+      vibrate([90, 60, 90, 60, 120]); setMontarErr(true); showToast("Quase! 🔥 Tenta outra ordem");
       setTimeout(() => { setMontarErr(false); montarReset(); }, 550);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -611,18 +640,26 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     persist(); syncGame();
     vibrate([40, 30, 40, 30, 160]); burst(); setTimeout(burst, 300);
     const complete = lockComplete(g, L) && !g.doneLocks.includes(L);
+    const lvl = g.level || "medio";
     const clue = POS_CLUE[pos];
+    // a "pista de posição" só aparece no fácil (direta) e médio (temática)
+    const where = lvl === "facil"
+      ? <div className="senha-where">entra na <b>casa {pos}</b> do cadeado</div>
+      : lvl === "medio"
+        ? <div className="senha-where"><span className="clue-emoji">{clue.emoji}</span> esse número <b>{clue.word}</b></div>
+        : <div className="senha-where">Guarde esse número! 🤫</div>;
     const node = (
       <div className="senha-reveal">
         <div className="senha-digit">{digit}</div>
-        <div className="senha-where"><span className="clue-emoji">{clue.emoji}</span> esse número <b>{clue.word}</b></div>
+        {where}
         {card.hint ? <p className="senha-hint">💬 {card.hint}</p> : null}
       </div>
     );
-    afterCardRef.current = complete ? openMontar : renderHub;
-    setCardView({ kind: "senha", node, kicker: already ? "Você já tinha esse número 😉" : "Achou um número da senha!", cta: complete ? "🧩 Montar o código!" : "Continuar a caçada 📡" });
+    // fácil: senha vem pronta (vai direto pro baú); demais: monta o código
+    afterCardRef.current = complete ? (lvl === "facil" ? () => completeLock(L) : openMontar) : renderHub;
+    setCardView({ kind: "senha", node, kicker: already ? "Você já tinha esse número 😉" : "Achou um número da senha!", cta: complete ? (lvl === "facil" ? "Ver a senha do cadeado 🔐" : "🧩 Montar o código!") : "Continuar a caçada 📡" });
     setView("card");
-  }, [persist, syncGame, burst, openMontar, renderHub]);
+  }, [persist, syncGame, burst, openMontar, completeLock, renderHub]);
 
   const revealCuriosidade = useCallback((card: Card) => {
     const g = gameRef.current; if (g && !g.seen.includes(card.code)) { g.seen.push(card.code); persist(); syncGame(); }
@@ -997,6 +1034,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const v = (id: ViewId) => "view" + (view === id ? " active" : "");
   const filled = g ? lockFilled(g, activeLock) : 0;
   const lockDone = g ? lockComplete(g, activeLock) : false;
+  const lvl: Level = (g?.level as Level) || "medio";
+  const cofreLabel = (p: number) => lvl === "facil" ? ORDINAL[p] : lvl === "medio" ? POS_CLUE[p].emoji : "•";
 
   const logStats = useMemo(() => {
     const list = logs || [];
@@ -1055,6 +1094,16 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           {splashMsg ? <div className="install warn" style={{ display: "block" }}>{splashMsg}</div> : null}
           <label className="field" htmlFor="playerName">Seu nome de caipira</label>
           <input id="playerName" type="text" maxLength={22} placeholder="Ex: Zé do Milho" value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" />
+          <label className="field">Nível de dificuldade</label>
+          <div className="levels">
+            {LEVELS.map(l => (
+              <button key={l.id} type="button" className={"level-btn" + (level === l.id ? " sel" : "")} onClick={() => { setLevel(l.id); vibrate(8); }}>
+                <span className="lv-emoji">{l.emoji}</span>
+                <span className="lv-label">{l.label}</span>
+                <span className="lv-desc">{l.desc}</span>
+              </button>
+            ))}
+          </div>
           {!flags.isStandalone && flags.isIOS ? (
             <div className="install" style={{ display: "block" }}>📲 No iPhone, encoste na tag NFC que o jogo abre sozinho. Pra tela cheia: <b>Compartilhar</b> → <b>Adicionar à Tela de Início</b>.</div>
           ) : null}
@@ -1072,7 +1121,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         {/* HUB */}
         <section id="view-game" className={v("game")}>
           <div className="statline"><span>🤠 {g?.name || "—"}</span><span className="timer">{fmt(elapsed)}</span></div>
-          <p className="anyorder">🔀 Ache os 3 números em <b>qualquer ordem</b> — no fim você <b>monta o código</b>!</p>
+          <p className="anyorder">🔀 Ache os 3 números em <b>qualquer ordem</b>{lvl === "facil" ? " — a senha vem pronta!" : " — no fim você monta o código!"}</p>
           {g ? (
             <div className={"lockpanel" + (lockDone ? " done" : "")}>
               <div className="lockhead"><span>🔓 Senha do cadeado</span>{lockDone ? <span className="ok">✓ achou os 3!</span> : <span className="cnt">{filled === 2 ? "Falta só 1! 🔥" : filled === 0 ? "Faltam 3 números" : "Faltam " + (3 - filled) + " números"}</span>}</div>
@@ -1080,12 +1129,12 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                 {(() => {
                   const fp = [1, 2, 3].filter(p => g.locks[activeLock]?.[p] != null).sort((a, b) => (g.locks[activeLock]![a] as number) - (g.locks[activeLock]![b] as number));
                   return (<>
-                    {fp.map(p => <div key={p} className="slot filled"><span className="pos">{POS_CLUE[p].emoji}</span>{g.locks[activeLock]![p]}</div>)}
+                    {fp.map(p => <div key={p} className="slot filled"><span className="pos">{cofreLabel(p)}</span>{g.locks[activeLock]![p]}</div>)}
                     {Array.from({ length: 3 - fp.length }).map((_, i) => <div key={"l" + i} className="slot"><span className="pos">?</span>🔒</div>)}
                   </>);
                 })()}
               </div>
-              {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={openMontar}>🧩 Montar o código!</button> : null}
+              {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => (lvl === "facil" ? completeLock(activeLock) : openMontar())}>{lvl === "facil" ? "Ver a senha do cadeado 🔐" : "🧩 Montar o código!"}</button> : null}
             </div>
           ) : null}
           <div className="spacer" />
@@ -1130,27 +1179,27 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         <section id="view-montar" className={v("montar")}>
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
-          <p className="lead">Cada número leva o <b>desenho da sua pista</b>. Junte cada um no lugar certo! 🧩</p>
+          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💀 <b>Sem pistas.</b> Resolva as continhas, descubra a ordem e <b>cuidado com as fichas falsas!</b></> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => (
               <div key={p} className={"mslot" + (montarSlots[i] ? " filled" : "")} onClick={() => montarRemove(i)}>
-                <span className="mclue">{POS_CLUE[p].emoji}</span>
+                <span className="mclue">{lvl === "medio" ? POS_CLUE[p].emoji : ORDINAL[p]}</span>
                 <span className="mnum">{montarSlots[i] ? montarSlots[i]!.digit : "?"}</span>
-                <span className="mword">{POS_CLUE[p].word}</span>
+                {lvl === "medio" ? <span className="mword">{POS_CLUE[p].word}</span> : null}
               </div>
             ))}
           </div>
           <div className="montar-pool">
             {montarPool.map(c => (
-              <button key={c.pos} className="mchip" onClick={() => montarPlace(c)}>
-                <span className="mchip-num">{c.digit}</span>
-                <span className="mchip-clue">{POS_CLUE[c.pos].emoji}</span>
+              <button key={c.id} className={"mchip" + (c.decoy ? " decoy" : "")} onClick={() => montarPlace(c)}>
+                <span className="mchip-num">{c.label}</span>
+                {lvl === "medio" && !c.decoy ? <span className="mchip-clue">{POS_CLUE[c.pos].emoji}</span> : null}
               </button>
             ))}
-            {montarPool.length === 0 ? <span className="montar-ready">Tudo no lugar? Confere! 👇</span> : null}
+            {montarSlots.every(s => s) ? <span className="montar-ready">Confere! 👇</span> : null}
           </div>
           <div className="spacer" />
-          <button className="btn fire" disabled={montarPool.length !== 0} onClick={montarCheck}>🔓 Conferir o código</button>
+          <button className="btn fire" disabled={montarSlots.some(s => s == null)} onClick={montarCheck}>🔓 Conferir o código</button>
           <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setView("game")}>Voltar</button>
         </section>
 
