@@ -181,7 +181,36 @@ select option{color:#1b1030;}
 .btn.ghost{background:transparent;color:#d8e6f4;box-shadow:none;border:2px solid rgba(255,255,255,.22);font-weight:800;}
 .btn.ghost:active{transform:translateY(2px);}
 .btn:disabled{opacity:.5;}
+.btn.share{background:linear-gradient(135deg,#e84c97,#6e5ba6);margin-top:14px;}
 .spacer{flex:1;}
+
+/* Prêmio na splash */
+.premio-splash{align-self:flex-start;margin-top:12px;background:linear-gradient(135deg,rgba(249,194,26,.22),rgba(232,76,151,.18));
+  border:1.5px solid rgba(249,194,26,.6);color:#fff3c4;font-weight:800;border-radius:14px;padding:10px 15px;font-size:1rem;
+  box-shadow:0 6px 18px rgba(0,0,0,.2);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);}
+.premio-splash b{color:var(--milho);}
+
+/* Baú — posição */
+.chest-pos{font-family:"Fredoka",cursive;color:var(--milho);font-size:1.3rem;text-align:center;margin:6px 0 2px;
+  text-shadow:0 2px 0 #b85c00;}
+.chest-pos b{font-size:1.5rem;}
+
+/* Monte o código */
+.montar-slots{display:flex;gap:12px;justify-content:center;margin-top:18px;}
+.montar-slots.err{animation:wrong .4s;}
+@keyframes wrong{0%,100%{transform:translateX(0);}25%{transform:translateX(-8px);}75%{transform:translateX(8px);}}
+.mslot{flex:1;max-width:96px;background:rgba(255,255,255,.06);border:2px dashed rgba(255,255,255,.25);border-radius:16px;
+  padding:12px 6px 10px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}
+.mslot.filled{border-style:solid;border-color:var(--milho);background:rgba(249,194,26,.12);}
+.mslot .mclue{font-size:1.5rem;line-height:1;}
+.mslot .mnum{font-family:"Fredoka",cursive;font-size:2.4rem;line-height:1;color:#fff;}
+.mslot.filled .mnum{color:var(--milho);text-shadow:0 2px 0 #b85c00;}
+.mslot .mword{font-size:.66rem;color:#aac3de;font-weight:800;text-align:center;line-height:1.1;}
+.montar-pool{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:22px;min-height:64px;align-items:center;}
+.mchip{width:62px;height:62px;border-radius:16px;border:2px solid rgba(255,255,255,.2);background:var(--papel);color:var(--tinta);
+  font-family:"Fredoka",cursive;font-size:2rem;font-weight:700;cursor:pointer;box-shadow:var(--sombra);transition:transform .08s;}
+.mchip:active{transform:scale(.92);}
+.montar-ready{color:#aac3de;font-weight:800;font-size:.95rem;}
 
 .linkbar{display:flex;justify-content:center;gap:18px;margin-top:18px;}
 .linkbar a{color:#aac3de;font-weight:800;text-decoration:none;font-size:.92rem;opacity:.85;cursor:pointer;}
