@@ -12,6 +12,14 @@
 alter table public.cards add column if not exists subtitle  text;
 alter table public.cards add column if not exists image_url text;
 
+-- a imagem da curiosidade agora pode vir em image_url (não só no body),
+-- e cartões podem nascer como rascunho (conteúdo preenchido depois no /admin).
+-- Basta ter o tipo de mídia definido; o /admin valida o conteúdo ao salvar.
+alter table public.cards drop constraint if exists curio_fields;
+alter table public.cards add constraint curio_fields check (
+  kind <> 'curiosidade' or media is not null
+);
+
 -- Os 16 chips (serial do leitor) com o papel de cada um.
 -- Senhas seedadas com o cadeado 120 (casa1=1, casa2=2, casa3=0).
 -- Troque pra 476 a qualquer momento no /admin (botão de combo).
