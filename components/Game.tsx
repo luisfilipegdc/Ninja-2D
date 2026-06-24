@@ -605,7 +605,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const g = gameRef.current!;
     const correct: Chip[] = [1, 2, 3].map(p => ({ id: "r" + p, digit: g.locks[1]?.[p] as number, pos: p, label: String(g.locks[1]?.[p]) }));
     setMontarSlots(correct); setMontarPool([]); vibrate(20);
-    setTimeout(() => montarReset(), 2000);
+    setTimeout(() => montarReset(), 50); // pisca a senha por ~0,05s (zoeira)
+    setTimeout(() => showToast("👀 Piscou! Viu ou não viu? 😅"), 80);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -760,7 +761,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       }
     } else if (lvl === "medio") {
       effect = Math.random() < 0.5 ? "peek" : "hide:" + (1 + Math.floor(Math.random() * 3));
-      msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você poderá ESPIAR a senha por 2 segundos." : "😈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
+      msg = effect === "peek" ? "🍀 Sorte! Na hora de montar você pode dar uma PISCADA na senha… bem rapidinho 😅" : "😈 Pegadinha! Uma das pistas vai sumir na hora de montar.";
     } else if (lvl === "dificil") {
       effect = "blur:" + (1 + Math.floor(Math.random() * 3));
       titulo = "🃏 Coringa travesso!"; msg = "😈 Um dos números vai aparecer embaçado na hora de montar. Decifra!";
@@ -1304,7 +1305,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
           <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💀 <b>O capeta tá solto!</b> Continhas, fichas falsas, lógica invertida e armadilhas. Boa sorte… 😈</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
-          {canPeek ? <button className="btn ghost noprint" style={{ marginTop: 8 }} onClick={montarPeek}>👀 Espiar a senha (2s) — coringa</button> : null}
+          {canPeek ? <button className="btn ghost noprint" style={{ marginTop: 8 }} onClick={montarPeek}>👀 Piscar a senha (rapidinho!) 🃏</button> : null}
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => {
               const hidden = lvl === "medio" && hidePos === p;
