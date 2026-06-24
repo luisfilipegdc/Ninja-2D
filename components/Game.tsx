@@ -1063,6 +1063,42 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     }
   }, [flags.NFC_OK, showToast]);
 
+  // fluxo 1 toque: lê o serial da tag E grava o link ?c=<serial> na mesma tag
+  const scanAndWriteTag = useCallback(async () => {
+    if (!flags.NFC_OK) { setFormErr("Preparar tag só funciona no Chrome do Android. No iPhone, digite/cole o serial."); return; }
+    setFormErr(""); setScanningSerial(true);
+    let done = false;
+    try {
+      const reader = new (window as any).NDEFReader();
+      const ac = new AbortController();
+      const timer = setTimeout(() => { try { ac.abort(); } catch {} setScanningSerial(false); }, 25000);
+      await reader.scan({ signal: ac.signal });
+      reader.onreadingerror = () => { if (!done) setFormErr("Não consegui ler a tag. Aproxime de novo."); };
+      reader.onreading = async (ev: any) => {
+        if (done) return; done = true;
+        const serial = String(ev.serialNumber || "").replace(/[^0-9a-fA-F]/g, "").toLowerCase();
+        clearTimeout(timer);
+        if (!serial) { setScanningSerial(false); try { ac.abort(); } catch {} setFormErr("Tag lida, mas sem serial. Tente outra."); return; }
+        setForm((f) => (f ? { ...f, code: serial } : f));
+        const url = window.location.origin + "/?c=" + serial; // sempre aponta pra raiz do jogo
+        try {
+          await reader.write({ records: [{ recordType: "url", data: url }] });
+          vibrate([40, 30, 120]); showToast("✔ Tag pronta! Serial " + serial + " + link gravado");
+        } catch (e: any) {
+          const n = e?.name || "";
+          if (n === "NotSupportedError") setFormErr("Serial lido (" + serial + "), mas essa tag não aceita gravação web (Mifare Classic). Use NTAG213/215/216 — ou imprima o QR.");
+          else setFormErr("Serial lido (" + serial + "), mas o link não gravou (" + (n || "erro") + "). Toque em Gravar NFC depois de salvar.");
+        }
+        setScanningSerial(false); try { ac.abort(); } catch {}
+      };
+    } catch (err: any) {
+      setScanningSerial(false);
+      const n = err?.name || "";
+      if (n === "NotAllowedError") setFormErr("Permita o NFC e confira se ele está LIGADO (barra de cima → ícone NFC).");
+      else setFormErr("Ligue o NFC do celular e tente de novo.");
+    }
+  }, [flags.NFC_OK, showToast]);
+
   const uploadFile = useCallback(async (file: File, field: "body" | "image_url" = "body") => {
     if (!sb) { setFormErr("Supabase não configurado."); return; }
     if (file.size > 25 * 1024 * 1024) { setFormErr("Arquivo grande demais (máx. 25 MB)."); return; }
@@ -1561,7 +1597,12 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                     <button className="nfc-btn" style={{ flex: "none" }} onClick={scanTagSerial} disabled={scanningSerial} title="Escanear a tag e pegar o serial">{scanningSerial ? "📡…" : "📡"}</button>
                     <button className="nfc-btn" style={{ flex: "none" }} onClick={() => setForm({ ...form, code: randCode() })} title="Código aleatório">🎲</button>
                   </div>
-                  {scanningSerial ? <div className="install" style={{ display: "block", marginTop: 8 }}>📡 Encoste a tag na parte de trás do celular…</div> : null}
+                  {flags.NFC_OK ? (
+                    <button className="btn fire" style={{ marginTop: 10 }} onClick={scanAndWriteTag} disabled={scanningSerial}>
+                      {scanningSerial ? "📡 Encoste a tag e segure…" : "📡 Preparar tag (ler serial + gravar link)"}
+                    </button>
+                  ) : null}
+                  {scanningSerial ? <div className="install" style={{ display: "block", marginTop: 8 }}>📡 Encoste a tag na parte de trás do celular e segure até aparecer ✔…</div> : null}
                   <label className="field" htmlFor="fLoc">📍 Localização física</label>
                   <input id="fLoc" type="text" value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex: atrás da barraca da pescaria" />
                   <label className="field" htmlFor="fKind">Tipo</label>
