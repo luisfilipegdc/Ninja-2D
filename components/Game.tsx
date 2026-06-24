@@ -38,10 +38,10 @@ const ORDINAL: Record<number, string> = { 1: "1ª", 2: "2ª", 3: "3ª" };
 
 // Níveis de dificuldade (escolhidos na splash)
 const LEVELS: { id: Level; emoji: string; label: string; desc: string }[] = [
-  { id: "facil", emoji: "🐣", label: "Fácil", desc: "A senha vem pronta — ideal pros pequenos" },
-  { id: "medio", emoji: "🌽", label: "Médio", desc: "Monte a senha seguindo as pistas" },
-  { id: "dificil", emoji: "🔥", label: "Difícil", desc: "Sem pistas: descubra a ordem" },
-  { id: "impossivel", emoji: "💀", label: "Impossível", desc: "Sem pistas, com contas e pegadinhas" },
+  { id: "facil", emoji: "🐣", label: "Fácil", desc: "5 a 7 anos · senha vem pronta" },
+  { id: "medio", emoji: "🌽", label: "Médio", desc: "8 a 10 anos · monte com pistas" },
+  { id: "dificil", emoji: "🔥", label: "Difícil", desc: "11 a 13 anos · sem pistas" },
+  { id: "impossivel", emoji: "💀", label: "Impossível", desc: "14+ · contas, iscas e trolagem" },
 ];
 
 // "Continha" que resulta no dígito (nível impossível) — força decifrar
@@ -135,6 +135,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [montarSlots, setMontarSlots] = useState<(Chip | null)[]>([null, null, null]);
   const [montarPool, setMontarPool] = useState<Chip[]>([]);
   const [montarErr, setMontarErr] = useState(false);
+  // zoeiras do impossível (estilo Level Devil)
+  const [confDodge, setConfDodge] = useState(0);
+  const [confXY, setConfXY] = useState<{ x: number; y: number } | null>(null);
+  const [fakeOff, setFakeOff] = useState(false);
+  const fakeWinUsed = useRef(false);
 
   // ranking
   const [rank1, setRank1] = useState<ScoreRow[]>([]);
@@ -605,13 +610,19 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   }, []);
 
   const openMontar = useCallback(() => {
-    peekUsed.current = false;
+    peekUsed.current = false; fakeWinUsed.current = false; setConfDodge(0); setConfXY(null); setFakeOff(false);
     setMontarPool(buildChips(gameRef.current!)); setMontarSlots([null, null, null]); setMontarErr(false); setView("montar");
   }, [buildChips]);
 
   const montarPlace = useCallback((chip: Chip) => {
     vibrate(8); setMontarErr(false);
-    setMontarSlots(prev => { const i = prev.findIndex(s => s == null); if (i < 0) return prev; const next = prev.slice(); next[i] = chip; return next; });
+    const inverted = gameRef.current?.level === "impossivel"; // lógica espelhada (preenche da direita)
+    setMontarSlots(prev => {
+      let i = -1;
+      if (inverted) { for (let k = prev.length - 1; k >= 0; k--) if (prev[k] == null) { i = k; break; } }
+      else i = prev.findIndex(s => s == null);
+      if (i < 0) return prev; const next = prev.slice(); next[i] = chip; return next;
+    });
     setMontarPool(prev => prev.filter(c => c.id !== chip.id));
   }, []);
 
@@ -642,6 +653,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const montarCheck = useCallback(() => {
     const ok = montarSlots.every((c, i) => c && !c.decoy && c.pos === i + 1);
     if (ok) {
+      // falso "ganhou" (1x no impossível) — caminho falso seguro do Level Devil
+      if (gameRef.current?.level === "impossivel" && !fakeWinUsed.current) {
+        fakeWinUsed.current = true; vibrate([200]); showToast("🎉 VOCÊ GANHOU!… 😈 mentira!");
+        setTimeout(() => montarReset(), 1300); return;
+      }
       setMontarOk(true); vibrate([40, 40, 40, 40, 220]); playSuccess(); burst(); setTimeout(burst, 260);
       setTimeout(() => { setMontarOk(false); completeLock(1); }, 1200);
     } else {
@@ -650,6 +666,19 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [montarSlots, completeLock, showToast, playSuccess, burst, montarReset]);
+
+  // zoeiras do impossível enquanto monta: fichas fujonas + reset surpresa + fake desligar
+  useEffect(() => {
+    if (view !== "montar" || gameRef.current?.level !== "impossivel") return;
+    let n = 0;
+    const id = setInterval(() => {
+      n++;
+      setMontarPool(p => { const a = p.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; });
+      if (n % 4 === 0) { showToast("😈 Baguncei tudo!"); montarReset(); }
+      if (n % 6 === 0) { setFakeOff(true); setTimeout(() => setFakeOff(false), 1100); }
+    }, 3000);
+    return () => clearInterval(id);
+  }, [view, montarReset, showToast]);
 
   const revealSenha = useCallback((card: Card) => {
     const g = gameRef.current!; const L = card.lock || 1, pos = card.position!, digit = card.digit!;
@@ -716,13 +745,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const revealCoringa = useCallback(async (card: Card) => {
     const g = gameRef.current!;
     const lvl = g.level || "medio";
-    const alreadyUsed = g.seen.includes(card.code) && !!g.coringa;
     if (!g.seen.includes(card.code)) g.seen.push(card.code);
     vibrate([30, 40, 30]);
     let titulo = "🃏 Coringa!"; let msg = ""; let effect = g.coringa || "";
-    if (alreadyUsed) {
-      msg = "Você já usou o coringa nessa caçada 😉";
-    } else if (lvl === "facil") {
+    if (lvl === "facil") {
       const missing = [1, 2, 3].filter(p => g.locks[1]?.[p] == null);
       if (missing.length === 0) { msg = "Você já tem os 3 números — boa caçada! 🎁"; effect = "facil"; }
       else {
@@ -880,6 +906,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [admList, setAdmList] = useState<{ email: string; role: string }[] | null>(null);
   const [newAdmEmail, setNewAdmEmail] = useState(""); const [newAdmPass, setNewAdmPass] = useState("");
   const [admMgmtMsg, setAdmMgmtMsg] = useState("");
+  const [comboInput, setComboInput] = useState("");
 
   const fetchRole = useCallback(async (email: string) => {
     if (!sb || !email) { setMyRole("admin"); return; }
@@ -996,6 +1023,24 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   }, [sb, admEmail, admPass, loadCards, logEvent, fetchRole]);
 
   const doLogout = useCallback(async () => { if (sb) { try { await sb.auth.signOut(); } catch {} } setAuthed(false); }, [sb]);
+
+  const applyCombo = useCallback(async (combo: string) => {
+    if (!sb || !cards) return;
+    const c = (combo || "").replace(/\D/g, "");
+    if (c.length !== 3) { showToast("A senha precisa ter 3 dígitos 🔢"); return; }
+    const senhas = cards.filter(x => x.kind === "senha");
+    if (senhas.length < 3) { showToast("Cadastre as 3 tags de senha (casas 1, 2 e 3) primeiro 🔐"); return; }
+    try {
+      for (const s of senhas) {
+        const p = s.position; if (!p || p < 1 || p > 3) continue;
+        const { error } = await sb.from("cards").update({ digit: Number(c[p - 1]), lock: 1 }).eq("code", s.code);
+        if (error) throw error;
+      }
+      vibrate([30, 40, 30]); setComboInput(""); showToast(`🔒 Senha das tags definida: ${c}`);
+      logEvent("admin", { actor: adminUser, detail: "definiu a senha do cadeado: " + c });
+      loadCards();
+    } catch (e: any) { showToast("Não consegui aplicar: " + (e?.message || "erro")); }
+  }, [sb, cards, loadCards, showToast, logEvent, adminUser]);
 
   const randomizeTags = useCallback(async () => {
     if (!sb || !cards) return;
@@ -1120,10 +1165,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   }, [logs, logFilter]);
 
   const nfcNotice = flags.NFC_OK
-    ? <>📡 Pra ler os cartões por aproximação, <b>ligue o NFC</b> do celular (puxe a barra de cima → ícone <b>NFC</b>). Sem NFC? Use a câmera no QR.</>
+    ? <>📡 Pra ler os cartões por aproximação, <b>ligue o NFC</b> do celular (puxe a barra de cima → ícone <b>NFC</b>).</>
     : flags.isIOS
-      ? <>📡 Encoste o <b>topo do iPhone</b> no cartão pra ler. Não rolou? Use a câmera no QR.</>
-      : <>📷 Este aparelho não tem NFC. No celular, aponte a <b>câmera</b> no <b>QR do cartão</b> — ele abre o jogo sozinho.</>;
+      ? <>📡 Encoste o <b>topo do iPhone</b> no cartão pra ler.</>
+      : <>📡 Encoste o <b>topo do celular</b> no cartão pra ler. Se não rolar, ligue o <b>NFC</b> nos ajustes.</>;
 
   return (
     <>
@@ -1132,6 +1177,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       <div className="hot-flash" ref={hotRef} aria-hidden />
       {toast ? <div className="toast show">{toast}</div> : null}
       {social ? <div className="social-alert">{social}</div> : null}
+      {fakeOff ? <div className="fake-off" aria-hidden /> : null}
 
       <div className={"app" + (mestre ? " mestre" : "") + (view === "admin" ? " admin-wide" : "")}>
         <Bunting />
@@ -1148,7 +1194,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           {splashStep === 1 ? (
             <>
               <p className="festa">Festa Junina <span className="ano">2026</span></p>
-              <p className="lead">Ache os cartões escondidos pela festa, monte a senha e abra o baú. Bora?</p>
+              <p className="lead">Ache os cartões escondidos no estande, monte a senha e abra o baú. Bora?</p>
               <div className="premio-splash">🎁 Abra o baú e leve <b>{PREMIO}</b>!</div>
               <div className={"bonfire" + (fogueiraOut ? " out" : "") + (blowOn ? " listening" : "")} aria-hidden onClick={bonfireTap}>
                 <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
@@ -1211,9 +1257,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => (lvl === "facil" ? completeLock(activeLock) : openMontar())}>{lvl === "facil" ? "Ver a senha do cadeado 🔐" : "🧩 Montar o código!"}</button> : null}
             </div>
           ) : null}
-          <div className="spacer" />
-          <button className="btn fire" onClick={openScanner}>Procurar próximo cartão 🔦</button>
+          <button className="btn fire" style={{ marginTop: 18 }} onClick={openScanner}>Procurar próximo cartão 🔦</button>
           <p className="scanhint-sm">Pode ser um número da senha… ou uma curiosidade! 🎁</p>
+          <div className="spacer" />
           <button className="btn ghost noprint" style={{ marginTop: 12 }} onClick={() => { gameRef.current = null; setGame(null); clearSession(); setName(""); setSplashMsg(""); setSplashStep(1); setView("splash"); }}>Sair da caçada</button>
         </section>
 
@@ -1253,7 +1299,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         <section id="view-montar" className={v("montar")}>
           <div className="kicker">Monte o código do cadeado</div>
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
-          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💀 <b>Sem pistas.</b> Resolva as continhas, descubra a ordem e <b>cuidado com as fichas falsas!</b></> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
+          <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💀 <b>O capeta tá solto!</b> Continhas, fichas falsas, lógica invertida e armadilhas. Boa sorte… 😈</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
           {canPeek ? <button className="btn ghost noprint" style={{ marginTop: 8 }} onClick={montarPeek}>👀 Espiar a senha (2s) — coringa</button> : null}
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => {
@@ -1277,7 +1323,12 @@ export default function Game({ start }: { start?: "admin" } = {}) {
             {montarSlots.every(s => s) ? <span className="montar-ready">Confere! 👇</span> : null}
           </div>
           <div className="spacer" />
-          <button className="btn fire" disabled={montarSlots.some(s => s == null)} onClick={montarCheck}>🔓 Conferir o código</button>
+          <button className="btn fire" disabled={montarSlots.some(s => s == null)}
+            style={confXY ? { transform: `translate(${confXY.x}px,${confXY.y}px)`, transition: "transform .14s ease" } : undefined}
+            onClick={() => {
+              if (lvl === "impossivel" && confDodge < 2) { setConfDodge(confDodge + 1); setConfXY({ x: (Math.random() * 2 - 1) * 130, y: -(20 + Math.random() * 50) }); vibrate(15); return; }
+              setConfXY(null); montarCheck();
+            }}>🔓 Conferir o código</button>
           <button className="btn ghost" style={{ marginTop: 10 }} onClick={() => setView("game")}>Voltar</button>
         </section>
 
@@ -1309,7 +1360,21 @@ export default function Game({ start }: { start?: "admin" } = {}) {
             </div>
           ) : (
             <div>
-              <div className="note noprint">🔐 <b>Cadeado único.</b> As tags ficam fixas no lugar — use <b>Randomizar</b> pra embaralhar qual tag mostra qual conteúdo (senhas e curiosidades), sem precisar mexer nelas.</div>
+              <div className="note noprint">🔐 As <b>3 tags de senha</b> ficam fixas no lugar. Aqui você define <b>qual cadeado</b> elas revelam e pode <b>randomizar</b> qual tag mostra qual conteúdo — sem mexer nas tags.</div>
+
+              <div className="panel noprint">
+                <h3 className="panel-h">🔢 Senha das tags</h3>
+                <p className="panel-sub">Escolhe o cadeado físico que vale agora (vai pras 3 tags de senha):</p>
+                <div className="combo-presets">
+                  <button className="btn ghost" onClick={() => applyCombo("120")}>🔒 Cadeado 1 · <b>120</b></button>
+                  <button className="btn ghost" onClick={() => applyCombo("476")}>🔒 Cadeado 2 · <b>476</b></button>
+                </div>
+                <div className="field-row" style={{ marginTop: 10 }}>
+                  <input className="fld" inputMode="numeric" maxLength={3} value={comboInput} onChange={(e) => setComboInput(e.target.value.replace(/\D/g, "").slice(0, 3))} placeholder="Outra senha (3 dígitos)" />
+                  <button className="btn" onClick={() => applyCombo(comboInput)}>Aplicar</button>
+                </div>
+              </div>
+
               {cards && cards.length >= 2 ? (
                 <button className="btn fire noprint" style={{ marginTop: 12 }} onClick={randomizeTags}>🎲 Randomizar tags</button>
               ) : null}
