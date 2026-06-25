@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import styles from "./mapa.module.css";
 import {
   ASSETS,
@@ -46,6 +54,79 @@ async function compartilhar(texto: string) {
   }
 }
 
+/* ───────────────────────── Tela cheia (modo quiosque) ───────────────────────── */
+type FsDoc = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => void;
+};
+type FsEl = HTMLElement & { webkitRequestFullscreen?: () => void };
+
+function isFullscreen(): boolean {
+  if (typeof document === "undefined") return false;
+  const d = document as FsDoc;
+  return Boolean(d.fullscreenElement || d.webkitFullscreenElement);
+}
+function fullscreenSupported(): boolean {
+  if (typeof document === "undefined") return false;
+  const el = document.documentElement as FsEl;
+  return Boolean(el.requestFullscreen || el.webkitRequestFullscreen);
+}
+async function enterFullscreen() {
+  const el = document.documentElement as FsEl;
+  try {
+    if (el.requestFullscreen) await el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  } catch {
+    /* o navegador pode recusar — sem problema */
+  }
+}
+function exitFullscreen() {
+  const d = document as FsDoc;
+  try {
+    if (d.exitFullscreen) void d.exitFullscreen();
+    else if (d.webkitExitFullscreen) d.webkitExitFullscreen();
+  } catch {
+    /* ignora */
+  }
+}
+function useFullscreen(): boolean {
+  const [fs, setFs] = useState(false);
+  useEffect(() => {
+    const on = () => setFs(isFullscreen());
+    on();
+    document.addEventListener("fullscreenchange", on);
+    document.addEventListener("webkitfullscreenchange", on);
+    return () => {
+      document.removeEventListener("fullscreenchange", on);
+      document.removeEventListener("webkitfullscreenchange", on);
+    };
+  }, []);
+  return fs;
+}
+
+function FullscreenButton() {
+  const [mounted, setMounted] = useState(false);
+  const fs = useFullscreen();
+  useEffect(() => setMounted(true), []);
+  if (!mounted || !fullscreenSupported()) return null;
+  return (
+    <button
+      className={styles.fsBtn}
+      onClick={() => (fs ? exitFullscreen() : enterFullscreen())}
+      aria-label={fs ? "Sair da tela cheia" : "Entrar em tela cheia"}
+      title={fs ? "Sair da tela cheia" : "Tela cheia"}
+    >
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {fs ? (
+          <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+        ) : (
+          <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+        )}
+      </svg>
+    </button>
+  );
+}
+
 function screenFromHash(): Screen {
   if (typeof window === "undefined") return "capa";
   const h = window.location.hash.replace("#", "") as Screen;
@@ -76,6 +157,18 @@ export default function MapaInterativo() {
     return () => window.removeEventListener("hashchange", sync);
   }, []);
 
+  // tablet/iPad: entra em tela cheia já no primeiro toque (modo quiosque)
+  useEffect(() => {
+    if (!fullscreenSupported()) return;
+    const coarse = window.matchMedia?.("(pointer: coarse)")?.matches;
+    if (!coarse) return;
+    const once = () => {
+      if (!isFullscreen()) void enterFullscreen();
+    };
+    document.addEventListener("click", once, { once: true });
+    return () => document.removeEventListener("click", once);
+  }, []);
+
   const go = useCallback((s: Screen) => {
     setPonto(null);
     if (screenFromHash() === s) setScreen(s);
@@ -104,6 +197,7 @@ export default function MapaInterativo() {
           alt="Mapa da Festa Junina 2026"
           hotspots={mapaPontos}
           onSelect={abrirPonto}
+          selected={ponto}
         />
       )}
       {screen === "ginasio" && (
@@ -113,6 +207,7 @@ export default function MapaInterativo() {
           alt="Mapa do ginásio — setores e entradas"
           hotspots={ginasioPontos}
           onSelect={abrirPonto}
+          selected={ponto}
         />
       )}
       {screen === "programacao" && <Programacao />}
@@ -148,25 +243,38 @@ function ImageScreen({
   alt,
   hotspots,
   onSelect,
+  selected,
 }: {
   asset: { src: string; aspect: number };
   alt: string;
   hotspots: Hotspot[];
   onSelect: (h: Hotspot) => void;
+  selected: Hotspot | null;
 }) {
   const [zoom, setZoom] = useState(1);
   const [hints, setHints] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<HTMLButtonElement>(null);
 
   // ao trocar zoom para 1, volta para o topo/centro
   useEffect(() => {
     if (zoom === 1 && scrollRef.current) scrollRef.current.scrollTo({ top: 0, left: 0 });
   }, [zoom]);
 
+  // destaca no mapa o(s) ponto(s) selecionado(s) e centraliza na área visível
+  const activeLabel =
+    selected && hotspots.some((h) => h.id === selected.id) ? selected.label : null;
+  useEffect(() => {
+    if (activeLabel && activeRef.current) {
+      activeRef.current.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id]);
+
   const pontos = hotspots.filter((h) => h.kind !== "nav" && h.emoji);
 
   return (
-    <>
+    <div className={styles.imageScreen}>
       <div className={styles.stageHead}>
         <button
           className={`${styles.hintToggle} ${hints ? styles.on : ""}`}
@@ -176,6 +284,7 @@ function ImageScreen({
           {hints ? "💡 Pontos ativos" : "Mostrar pontos"}
         </button>
         <div className={styles.zoomCtrls}>
+          <FullscreenButton />
           <button
             className={styles.zbtn}
             onClick={() => setZoom((z) => Math.max(1, +(z - 0.5).toFixed(1)))}
@@ -198,22 +307,33 @@ function ImageScreen({
       <div className={styles.stageScroll} ref={scrollRef}>
         <div
           className={`${styles.stage} ${hints ? styles.showHints : ""}`}
-          style={{ width: `${zoom * 100}%`, aspectRatio: String(asset.aspect) }}
+          style={{ ["--zoom"]: zoom, ["--ar"]: asset.aspect } as CSSProperties}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset.src} alt={alt} draggable={false} />
-          {hotspots.map((h) => (
-            <button
-              key={h.id}
-              className={`${styles.hot} ${styles[h.kind ?? "zona"]}`}
-              style={{ left: `${h.x}%`, top: `${h.y}%`, width: `${h.w}%`, height: `${h.h}%` }}
-              onClick={() => onSelect(h)}
-              aria-label={h.label}
-              title={h.label}
-            >
-              <span className={styles.hotDot} />
-            </button>
-          ))}
+          {hotspots.map((h) => {
+            const isActive = activeLabel != null && h.label === activeLabel;
+            const isFirstActive =
+              isActive && hotspots.findIndex((x) => x.label === activeLabel) === hotspots.indexOf(h);
+            return (
+              <button
+                key={h.id}
+                ref={isFirstActive ? activeRef : undefined}
+                className={`${styles.hot} ${styles[h.kind ?? "zona"]} ${isActive ? styles.hotActive : ""}`}
+                style={{ left: `${h.x}%`, top: `${h.y}%`, width: `${h.w}%`, height: `${h.h}%` }}
+                onClick={() => onSelect(h)}
+                aria-label={h.label}
+                title={h.label}
+              >
+                <span className={styles.hotDot} />
+                {isActive && (
+                  <span className={styles.hotPin} aria-hidden>
+                    {h.emoji ?? "📍"}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -228,7 +348,7 @@ function ImageScreen({
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -368,6 +488,7 @@ function Programacao() {
         >
           📤
         </button>
+        <FullscreenButton />
       </header>
 
       <div className={styles.scroller}>
@@ -525,9 +646,10 @@ function Cardapio() {
         <h1 className={styles.topTitle}>
           <span className={styles.topSpark}>🍢</span> Cardápio
         </h1>
+        <FullscreenButton />
       </header>
 
-      <div className={styles.search} style={{ margin: "0 14px 8px" }}>
+      <div className={`${styles.search} ${styles.searchTop}`}>
         🔎
         <input
           value={q}
