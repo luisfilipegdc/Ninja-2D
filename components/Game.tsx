@@ -329,7 +329,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         processCode(c);
         return;
       }
-      setSplashMsg("Comece primeiro: toque em Iniciar caçada e digite seu nome. Depois é só encostar nos cartões. 😉");
+      setSplashMsg("Comece primeiro: toque em Iniciar caçada e digite seu nome. Depois é só encostar nas bandeirinhas. 😉");
     }
     // service worker
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -863,7 +863,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const processCode = useCallback(async (code: string) => {
     if (!gameRef.current) { setSplashMsg("Comece a caçada primeiro 😉"); setView("splash"); return; }
     await stopScan();
-    showToast("Lendo cartão…");
+    showToast("Lendo bandeirinha…");
     const card = await fetchCard(code);
     if (!card) { flashErr("Cartão não encontrado. Veja a conexão e tente de novo."); setView("game"); return; }
     logEvent("scan", { actor: gameRef.current?.name, code: card.code, detail: card.kind === "senha" ? `senha · casa ${card.position} = ${card.digit}` : card.kind === "coringa" ? "coringa" : `curiosidade · ${card.title || card.media || ""}` });
@@ -879,7 +879,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const onScanText = useCallback((text: string) => {
     if (!scanActiveRef.current) return;
     const code = extractCode(text);
-    if (!code) { flashErr("Esse cartão não é da caçada 🤔"); return; }
+    if (!code) { flashErr("Essa bandeirinha não é da caçada 🤔"); return; }
     processCode(code);
   }, [flashErr, processCode]);
 
@@ -888,7 +888,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       const reader = new (window as any).NDEFReader();
       const ac = new AbortController(); nfcAbortRef.current = ac;
       await reader.scan({ signal: ac.signal });
-      reader.onreadingerror = () => flashErr("Não consegui ler esse cartão. Tente de novo.");
+      reader.onreadingerror = () => flashErr("Não consegui ler essa bandeirinha. Tente de novo.");
       reader.onreading = (ev: any) => {
         for (const rec of ev.message.records) {
           let text: string | null = null;
@@ -906,9 +906,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
   const startMethod = useCallback(async (m: Method) => {
     setScanErr("");
-    if (m === "nfc") { setScanHint("Aproxime a parte de trás do celular do cartão. Mantenha o NFC ligado."); await startNFC(); }
-    else if (m === "nfctap") { setScanHint("Encoste o topo do iPhone no cartão — o jogo abre sozinho. Não precisa apertar nada."); }
-    else { setScanHint("Este aparelho não lê NFC. Use o QR do cartão pela câmera do próprio celular — ele abre o jogo sozinho."); }
+    if (m === "nfc") { setScanHint("Aproxime a parte de trás do celular da bandeirinha. Mantenha o NFC ligado."); await startNFC(); }
+    else if (m === "nfctap") { setScanHint("Encoste o topo do iPhone na bandeirinha — o jogo abre sozinho. Não precisa apertar nada."); }
+    else { setScanHint("Este aparelho não lê NFC. Use o QR da bandeirinha pela câmera do próprio celular — ele abre o jogo sozinho."); }
   }, [startNFC]);
 
   const stopScan = useCallback(async () => {
@@ -1297,10 +1297,10 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   }, [logs, logFilter]);
 
   const nfcNotice = flags.NFC_OK
-    ? <>📡 Pra ler os cartões por aproximação, <b>ligue o NFC</b> do celular (puxe a barra de cima → ícone <b>NFC</b>).</>
+    ? <>📡 Pra ler as bandeirinhas por aproximação, <b>ligue o NFC</b> do celular (puxe a barra de cima → ícone <b>NFC</b>).</>
     : flags.isIOS
-      ? <>📡 Encoste o <b>topo do iPhone</b> no cartão pra ler.</>
-      : <>📡 Encoste o <b>topo do celular</b> no cartão pra ler. Se não rolar, ligue o <b>NFC</b> nos ajustes.</>;
+      ? <>📡 Encoste o <b>topo do iPhone</b> na bandeirinha pra ler.</>
+      : <>📡 Encoste o <b>topo do celular</b> na bandeirinha pra ler. Se não rolar, ligue o <b>NFC</b> nos ajustes.</>;
 
   return (
     <>
@@ -1316,7 +1316,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
             <div className="tut-emoji">🤠🔥</div>
             <h2 className="tut-title">Como jogar</h2>
             <ol className="tut-steps">
-              <li><span className="tut-n">1</span><div><b>Ache os cartões escondidos</b> no estande e <b>encoste o celular</b> neles 📡<br /><small>No app, toque em <b>“Procurar próximo cartão 🔦”</b> pra ler.</small></div></li>
+              <li><span className="tut-n">1</span><div><b>Encoste o celular nas bandeirinhas</b> de festa junina 📡<br /><small>São as bandeirinhas de MDF com NFC. No app, toque em <b>“Ler a bandeirinha 🎏”</b>.</small></div></li>
               <li><span className="tut-n">2</span><div><b>Junte os 3 números</b> 🔢 — em qualquer ordem.</div></li>
               <li><span className="tut-n">3</span><div><b>Monte a senha</b> e abra o baú 🧰🎁</div></li>
             </ol>
@@ -1340,7 +1340,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           {splashStep === 1 ? (
             <>
               <p className="festa">Festa Junina <span className="ano">2026</span></p>
-              <p className="lead">Ache os cartões escondidos no estande, monte a senha e abra o baú. Bora?</p>
+              <p className="lead">Encoste o celular nas bandeirinhas de festa junina, monte a senha e abra o baú. Bora?</p>
               <div className="premio-splash">🎁 Abra o baú e leve <b>{PREMIO}</b>!</div>
               <div className={"bonfire" + (fogueiraOut ? " out" : "") + (blowOn ? " listening" : "")} aria-hidden onClick={bonfireTap}>
                 <div className="halo" /><div className="flame" /><div className="flame f2" /><div className="flame f3" />
@@ -1407,15 +1407,15 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => (lvl === "facil" ? completeLock(activeLock) : openMontar())}>{lvl === "facil" ? "Ver a senha do cadeado 🔐" : "🧩 Montar o código!"}</button> : null}
             </div>
           ) : null}
-          <button className={"btn fire" + (filled === 0 ? " pulse" : "")} style={{ marginTop: 18 }} onClick={openScanner}>Procurar próximo cartão 🔦</button>
-          <p className="scanhint-sm">{filled === 0 ? "👆 Toque aqui pra ler um cartão!" : "Pode ser um número da senha… ou uma curiosidade! 🎁"}</p>
+          <button className={"btn fire" + (filled === 0 ? " pulse" : "")} style={{ marginTop: 18 }} onClick={openScanner}>Ler a próxima bandeirinha 🎏</button>
+          <p className="scanhint-sm">{filled === 0 ? "👆 Toque aqui e encoste numa bandeirinha!" : "Pode ser um número da senha… ou uma curiosidade! 🎁"}</p>
           <div className="spacer" />
           <button className="btn ghost noprint" style={{ marginTop: 12 }} onClick={() => { gameRef.current = null; setGame(null); clearSession(); setName(""); setSplashMsg(""); setSplashStep(1); setView("splash"); }}>Sair da caçada</button>
         </section>
 
         {/* SCAN (apenas NFC) */}
         <section id="view-scan" className={v("scan")}>
-          <div className="kicker">Encoste na tag NFC</div>
+          <div className="kicker">Encoste na bandeirinha</div>
           <h1 className="title" style={{ fontSize: "2.2rem" }}>Procurando…</h1>
           <div className="nfcpanel"><div className="nfc-stage"><div className="ring" /><div className="ring" /><div className="ring" /><div className="nfc-phone">📱</div></div></div>
           {scanErr ? <div className="scan-err">{scanErr}</div> : null}

@@ -1,7 +1,7 @@
 {
   "name": "Arraiá do Tesouro",
   "short_name": "Arraiá",
-  "description": "Caça ao tesouro de festa junina com cartões NFC e QR.",
+  "description": "Caça ao tesouro de festa junina com bandeirinhas NFC e QR.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",

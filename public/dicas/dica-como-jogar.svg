@@ -24,15 +24,15 @@
     <rect x="60" y="330" width="700" height="150" rx="24" fill="#1d4470" stroke="#ffffff" stroke-opacity="0.12"/>
     <circle cx="140" cy="405" r="44" fill="#f9c21a"/>
     <text x="140" y="423" fill="#15375d" font-size="48" font-weight="800" text-anchor="middle">1</text>
-    <text x="215" y="395" fill="#ffffff" font-size="38" font-weight="800">Encoste o celular no cartão 📡</text>
-    <text x="215" y="445" fill="#bcd4ec" font-size="28">O jogo abre sozinho na tag.</text>
+    <text x="215" y="395" fill="#ffffff" font-size="38" font-weight="800">Encoste o celular na bandeirinha 📡</text>
+    <text x="215" y="445" fill="#bcd4ec" font-size="28">O jogo abre sozinho na bandeirinha de MDF.</text>
 
     <!-- 2 -->
     <rect x="60" y="510" width="700" height="150" rx="24" fill="#1d4470" stroke="#ffffff" stroke-opacity="0.12"/>
     <circle cx="140" cy="585" r="44" fill="#f9c21a"/>
     <text x="140" y="603" fill="#15375d" font-size="48" font-weight="800" text-anchor="middle">2</text>
     <text x="215" y="575" fill="#ffffff" font-size="38" font-weight="800">Ache os 3 números 🔢</text>
-    <text x="215" y="625" fill="#bcd4ec" font-size="28">Em qualquer ordem, espalhados pelo estande.</text>
+    <text x="215" y="625" fill="#bcd4ec" font-size="28">Em qualquer ordem, nas bandeirinhas do arraiá.</text>
 
     <!-- 3 -->
     <rect x="60" y="690" width="700" height="150" rx="24" fill="#1d4470" stroke="#ffffff" stroke-opacity="0.12"/>
