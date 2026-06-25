@@ -133,3 +133,25 @@ Setup do Supabase (uma vez), no **SQL Editor**:
    da caçada (2 cadeados de 3 dígitos) e o período ativo (qual cadeado vale agora).
 3. Crie o **usuário admin**: Authentication → Add user → e-mail + senha (marque
    "Auto Confirm"). É com ele que o painel do organizador entra pra gerenciar os cartões.
+
+## Mapa interativo da festa (`/mapa`)
+
+Versão **realmente interativa** do "Mapa Interativo Festa Junina 2026" — que antes
+era só um PDF com botões desenhados. Abra em `…/mapa` (ex.:
+`https://festajuninamarista.vercel.app/mapa`):
+
+- **Navegação por abas** (Mapa · Ginásio · Palco · Cardápio), **deep-link por hash**
+  (`/mapa#cardapio`) e suporte ao botão voltar do navegador.
+- **Mapa e Ginásio** com **pontos clicáveis** e **zoom/pan**: cada local abre um
+  cartão com descrição e atalhos contextuais (ex.: a Praça de Alimentação leva ao
+  cardápio; a Entrada do Ginásio troca de planta).
+- **Programação ao vivo**: destaca a apresentação que está **acontecendo agora** e
+  a **próxima** (com contagem regressiva), tem **busca por turma** (ex.: `5º C`,
+  `INF 3`) e botão de compartilhar.
+- **Cardápio interativo**: busca por item, filtro por barraca e **"minha sacola"**
+  com **total em R$** (salvo no aparelho via `localStorage`) e compartilhamento.
+
+Todo o conteúdo (locais, setores, programação e preços) foi transcrito do PDF para
+`app/mapa/data.ts` — é só editar lá para atualizar textos, horários ou preços. As
+artes ficam em `public/mapa/*.webp` (exportadas do PDF e otimizadas, ~320 KB no
+total). A experiência é client-side e funciona como PWA, igual ao resto do app.
