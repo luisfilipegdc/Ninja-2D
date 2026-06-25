@@ -16,6 +16,7 @@ const LS_RANK = "arraia.ranking.v1";
 const LS_CARDS = "arraia.cardcache.v1";
 const LS_MESTRE = "arraia.mestre";
 const LS_EGGS = "arraia.eggs.v1";
+const LS_TUT = "arraia.tutorial.v1";
 const EGGS_TOTAL = 3; // chuva, sopro, nome mágico
 
 // Nomes mágicos: cada um dispara uma animação temática correlata ao nome
@@ -170,6 +171,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [confXY, setConfXY] = useState<{ x: number; y: number } | null>(null);
   const [fakeOff, setFakeOff] = useState(false);
   const fakeWinUsed = useRef(false);
+  const [showTut, setShowTut] = useState(false);
+  const closeTut = useCallback(() => { setShowTut(false); try { localStorage.setItem(LS_TUT, "1"); } catch {} }, []);
 
   // ranking
   const [rank1, setRank1] = useState<ScoreRow[]>([]);
@@ -303,6 +306,12 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     const id = setInterval(() => { if (gameRef.current && !bothDone(gameRef.current)) setElapsed(Date.now() - gameRef.current.startedAt); }, 500);
     return () => clearInterval(id);
   }, [game]);
+
+  /* ---------- tutorial de início (1ª vez no hub) ---------- */
+  useEffect(() => {
+    if (view !== "game") return;
+    try { if (!localStorage.getItem(LS_TUT)) setShowTut(true); } catch {}
+  }, [view]);
 
   /* ---------- launch (?c=) ---------- */
   useEffect(() => {
@@ -1301,6 +1310,20 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       {toast ? <div className="toast show">{toast}</div> : null}
       {social ? <div className="social-alert">{social}</div> : null}
       {fakeOff ? <div className="fake-off" aria-hidden /> : null}
+      {showTut ? (
+        <div className="tut-overlay" onClick={closeTut}>
+          <div className="tut-card" onClick={(e) => e.stopPropagation()}>
+            <div className="tut-emoji">🤠🔥</div>
+            <h2 className="tut-title">Como jogar</h2>
+            <ol className="tut-steps">
+              <li><span className="tut-n">1</span><div><b>Ache os cartões escondidos</b> no estande e <b>encoste o celular</b> neles 📡<br /><small>No app, toque em <b>“Procurar próximo cartão 🔦”</b> pra ler.</small></div></li>
+              <li><span className="tut-n">2</span><div><b>Junte os 3 números</b> 🔢 — em qualquer ordem.</div></li>
+              <li><span className="tut-n">3</span><div><b>Monte a senha</b> e abra o baú 🧰🎁</div></li>
+            </ol>
+            <button className="btn fire" onClick={closeTut}>Bora caçar! 🔥</button>
+          </div>
+        </div>
+      ) : null}
 
       <div className={"app" + (mestre ? " mestre" : "") + (view === "admin" ? " admin-wide" : "")}>
         <Bunting />
@@ -1384,8 +1407,8 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               {lockDone ? <button className="btn fire" style={{ marginTop: 12 }} onClick={() => (lvl === "facil" ? completeLock(activeLock) : openMontar())}>{lvl === "facil" ? "Ver a senha do cadeado 🔐" : "🧩 Montar o código!"}</button> : null}
             </div>
           ) : null}
-          <button className="btn fire" style={{ marginTop: 18 }} onClick={openScanner}>Procurar próximo cartão 🔦</button>
-          <p className="scanhint-sm">Pode ser um número da senha… ou uma curiosidade! 🎁</p>
+          <button className={"btn fire" + (filled === 0 ? " pulse" : "")} style={{ marginTop: 18 }} onClick={openScanner}>Procurar próximo cartão 🔦</button>
+          <p className="scanhint-sm">{filled === 0 ? "👆 Toque aqui pra ler um cartão!" : "Pode ser um número da senha… ou uma curiosidade! 🎁"}</p>
           <div className="spacer" />
           <button className="btn ghost noprint" style={{ marginTop: 12 }} onClick={() => { gameRef.current = null; setGame(null); clearSession(); setName(""); setSplashMsg(""); setSplashStep(1); setView("splash"); }}>Sair da caçada</button>
         </section>
@@ -1428,6 +1451,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           <h1 className="title" style={{ fontSize: "2.1rem" }}>Que ordem é a senha? 🧩</h1>
           <p className="lead">{lvl === "medio" ? <>Cada número leva o <b>desenho da sua pista</b>. Junte no lugar certo! 🧩</> : lvl === "impossivel" ? <>💃 <b>A quadrilha embolou!</b> Continhas, fichas falsas, lógica invertida (<b>anarriê!</b>) e pegadinhas. Boa sorte… 😜</> : <>🔥 <b>Sem pistas.</b> Descubra sozinho a ordem certa!</>}</p>
           {canPeek ? <button className="btn ghost noprint" style={{ marginTop: 8 }} onClick={montarPeek}>👀 Piscar a senha (rapidinho!) 🃏</button> : null}
+          {lvl === "dificil" && blurPos ? <div className="install warn" style={{ display: "block", marginTop: 8 }}>🃏 <b>Coringa travesso:</b> um número aparece <b>embaçado de propósito</b> — decifra! Não é erro do jogo 😜</div> : null}
+          {lvl === "medio" && hidePos ? <div className="install warn" style={{ display: "block", marginTop: 8 }}>🃏 <b>Coringa:</b> uma pista <b>some de propósito</b> — faz parte, não é bug 🙈</div> : null}
+          {lvl === "impossivel" ? <div className="install warn" style={{ display: "block", marginTop: 8 }}>💃 <b>Anarriê!</b> No impossível a quadrilha <b>embola e reembaralha de propósito</b> — se virar do avesso, é a brincadeira, não é erro 😜</div> : null}
           <div className={"montar-slots" + (montarErr ? " err" : "") + (montarOk ? " ok" : "")}>
             {[1, 2, 3].map((p, i) => {
               const hidden = lvl === "medio" && hidePos === p;
