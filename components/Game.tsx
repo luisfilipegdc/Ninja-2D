@@ -102,7 +102,7 @@ function ytId(url: string): string | null {
   return m ? m[1] : null;
 }
 function mediaIcon(m: Media | null) {
-  return ({ texto: "📝", imagem: "🖼️", youtube: "▶️", spotify: "🎵", audio: "🔊" } as Record<string, string>)[m || ""] || "📜";
+  return ({ texto: "📝", imagem: "🖼️", youtube: "▶️", video: "🎬", spotify: "🎵", audio: "🔊" } as Record<string, string>)[m || ""] || "📜";
 }
 function spotifyEmbed(url: string): string | null {
   const m = String(url).match(/open\.spotify\.com\/(?:intl-[a-z]+\/)?(track|album|playlist|episode|show|artist)\/([A-Za-z0-9]+)/);
@@ -775,6 +775,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
         ? <div className={"curio-yt" + (short ? " short" : "")}><iframe src={"https://www.youtube.com/embed/" + id} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
         : <div className="curio-text">Não consegui carregar o vídeo. Confira o link no painel.</div>;
     }
+    else if (card.media === "video") media = <video className="curio-video" controls playsInline preload="metadata" src={body} />;
     else if (card.media === "spotify") {
       const e = spotifyEmbed(body);
       media = e
@@ -1062,7 +1063,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
 
   const uploadFile = useCallback(async (file: File, field: "body" | "image_url" = "body") => {
     if (!sb) { setFormErr("Supabase não configurado."); return; }
-    if (file.size > 25 * 1024 * 1024) { setFormErr("Arquivo grande demais (máx. 25 MB)."); return; }
+    if (file.size > 50 * 1024 * 1024) { setFormErr("Arquivo grande demais (máx. 50 MB)."); return; }
     setFormErr(""); setUploading(true);
     try {
       const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -1574,13 +1575,14 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                   <label className="field" htmlFor="fLoc">📍 Localização física</label>
                   <input id="fLoc" type="text" value={form.location || ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex: atrás da barraca da pescaria" />
                   <label className="field" htmlFor="fKind">Tipo de conteúdo</label>
-                  <select id="fKind" value={form.kind === "senha" ? "senha" : form.kind === "coringa" ? "coringa" : (form.media === "imagem" ? "imagem" : form.media === "youtube" ? "video" : "curiosidade")}
+                  <select id="fKind" value={form.kind === "senha" ? "senha" : form.kind === "coringa" ? "coringa" : (form.media === "imagem" ? "imagem" : form.media === "youtube" ? "video" : form.media === "video" ? "videofile" : "curiosidade")}
                     onChange={(e) => {
                       const v = e.target.value;
                       if (v === "senha") setForm({ ...form, kind: "senha" });
                       else if (v === "coringa") setForm({ ...form, kind: "coringa" });
                       else if (v === "imagem") setForm({ ...form, kind: "curiosidade", media: "imagem" });
                       else if (v === "video") setForm({ ...form, kind: "curiosidade", media: "youtube" });
+                      else if (v === "videofile") setForm({ ...form, kind: "curiosidade", media: "video" });
                       else setForm({ ...form, kind: "curiosidade", media: "texto" });
                     }}>
                     <option value="senha">🔐 Senha (1 número do cadeado)</option>
@@ -1588,6 +1590,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                     <option value="curiosidade">📜 Curiosidade (texto)</option>
                     <option value="imagem">🖼️ Imagem (com título)</option>
                     <option value="video">▶️ Vídeo do YouTube</option>
+                    <option value="videofile">🎬 Vídeo (arquivo / Reels)</option>
                   </select>
                   {form.kind === "senha" ? (
                     <>
@@ -1625,6 +1628,20 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                               {form.image_url ? <img className="upload-prev" src={form.image_url} alt="prévia" /> : null}
                               <label className="field" htmlFor="fBody">Descrição (opcional — deixe vazio p/ só imagem)</label>
                               <textarea id="fBody" value={form.body || ""} onChange={(e) => setForm({ ...form, body: e.target.value })} placeholder="Texto que aparece abaixo da imagem (opcional)" />
+                            </>
+                          ) : form.media === "video" ? (
+                            <>
+                              <label className="field">Vídeo (arquivo .mp4 — até 50 MB)</label>
+                              <div className="uploadbox">
+                                <label className="nfc-btn" style={{ display: "inline-block", cursor: "pointer" }}>
+                                  {uploading ? "Enviando…" : "📤 Enviar vídeo"}
+                                  <input type="file" accept="video/*" style={{ display: "none" }} disabled={uploading}
+                                    onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFile(f, "body"); e.currentTarget.value = ""; }} />
+                                </label>
+                                {form.body ? <span className="upload-ok">✔ pronto</span> : null}
+                              </div>
+                              {form.body ? <video className="upload-prev" controls playsInline preload="metadata" src={form.body} /> : null}
+                              <div className="install" style={{ display: "block", marginTop: 10 }}>🎬 Baixe o Reels do Instagram e suba o arquivo aqui. (Link do Instagram não toca embutido — por isso usamos o arquivo.)</div>
                             </>
                           ) : (
                             <>
