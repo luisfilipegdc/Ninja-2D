@@ -318,6 +318,7 @@ select option{color:#1b1030;}
 .senha-hint{color:#aac3de;margin-top:16px;font-weight:700;font-size:1.05rem;}
 /* Topo do cartão com respiro (não cola na bandeirinha) */
 #view-card{padding-top:34px;}
+#view-card .spacer{min-height:22px;}   /* gap garantido entre vídeo/imagem e o botão */
 #view-card .kicker{text-align:center;margin:0 auto;font-size:.78rem;letter-spacing:.3em;}
 #view-card .kicker::after{content:"";display:block;width:46px;height:3px;border-radius:3px;margin:10px auto 0;
   background:linear-gradient(90deg,transparent,var(--milho),transparent);opacity:.8;}
