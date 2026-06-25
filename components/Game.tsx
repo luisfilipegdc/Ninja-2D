@@ -970,6 +970,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const [cards, setCards] = useState<Card[] | null>(null);
   const [qrMap, setQrMap] = useState<Record<string, string>>({});
   const [form, setForm] = useState<Partial<Card> | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+  const editCard = useCallback((c: Partial<Card>) => {
+    setForm({ ...c });
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+  }, []);
   const [formErr, setFormErr] = useState("");
   const [writingTag, setWritingTag] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -1502,7 +1507,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                 <button className="btn fire noprint" style={{ marginTop: 12 }} onClick={randomizeTags}>🎲 Randomizar tags</button>
               ) : null}
               <div className="admin-toolbar noprint">
-                <button className="btn ghost" onClick={() => setForm({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto", location: "" })}>+ Nova tag</button>
+                <button className="btn ghost" onClick={() => editCard({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto", location: "" })}>+ Nova tag</button>
                 <button className={"btn ghost" + (showLogs ? " on" : "")} onClick={() => { const ns = !showLogs; setShowLogs(ns); if (ns) loadLogs(); }}>📋 Logs</button>
                 {myRole === "master" ? <button className={"btn ghost" + (showAdmins ? " on" : "")} onClick={() => { const ns = !showAdmins; setShowAdmins(ns); if (ns) loadAdmins(); }}>👑 Admins</button> : null}
               </div>
@@ -1560,7 +1565,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               ) : null}
 
               {form ? (
-                <div className="admin-row noprint">
+                <div className="admin-row noprint" ref={formRef}>
                   <label className="field" htmlFor="fCode">ID da tag (código gravado)</label>
                   <div style={{ display: "flex", gap: 8 }}>
                     <input id="fCode" type="text" value={form.code || ""} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="ex: 53bfb8a3500001 (digite o ID da tag)" />
@@ -1655,7 +1660,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                         {qrMap[c.code] ? <div className="qbox-mini"><img src={qrMap[c.code]} alt={c.code} /></div> : null}
                         <div className="card-actions noprint">
                           <button className="nfc-btn" onClick={(e) => writeTag(cardUrl(c.code), e.currentTarget)}>📡 Gravar NFC</button>
-                          <button className="nfc-btn" onClick={() => setForm({ ...c })}>✏️ Editar</button>
+                          <button className="nfc-btn" onClick={() => editCard(c)}>✏️ Editar</button>
                           <button className="nfc-btn danger" onClick={() => delCard(c.code)}>🗑️ Apagar</button>
                         </div>
                       </div>
