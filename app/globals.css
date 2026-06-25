@@ -512,3 +512,19 @@ video.upload-prev{width:100%;max-height:300px;border-radius:12px;margin-top:10px
   .admin-row{box-shadow:none;border:1px solid #ccc;color:#000;}
   .admin-row .rh{color:#000;}
 }
+
+/* Tutorial de início */
+.tut-overlay{position:fixed;inset:0;z-index:60;background:rgba(8,20,38,.82);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:22px;animation:tutfade .25s ease both;}
+@keyframes tutfade{from{opacity:0}to{opacity:1}}
+.tut-card{background:linear-gradient(180deg,#1d4470,#15375d);border:2px solid var(--milho);border-radius:22px;max-width:380px;width:100%;padding:24px 22px 22px;box-shadow:0 18px 50px rgba(0,0,0,.5);text-align:center;animation:tutpop .3s cubic-bezier(.2,1,.3,1) both;}
+@keyframes tutpop{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.tut-emoji{font-size:2.4rem;line-height:1;margin-bottom:6px;}
+.tut-title{font-family:"Fredoka",cursive;color:var(--milho);font-size:1.9rem;margin:.1em 0 .5em;text-shadow:0 2px 0 #b85c00;}
+.tut-steps{list-style:none;margin:0 0 18px;padding:0;text-align:left;display:flex;flex-direction:column;gap:14px;}
+.tut-steps li{display:flex;gap:12px;align-items:flex-start;color:#eaf2fb;font-size:1.02rem;line-height:1.4;}
+.tut-steps b{color:#fff;}
+.tut-steps small{color:#bcd4ec;font-size:.85rem;}
+.tut-n{flex:none;width:30px;height:30px;border-radius:50%;background:var(--milho);color:#15375d;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 0 #b85c00;}
+/* pisca o botão de procurar quando ainda não achou nenhum número */
+.btn.pulse{animation:btnpulse 1.3s ease-in-out infinite;}
+@keyframes btnpulse{0%,100%{transform:scale(1);box-shadow:0 6px 0 #b8431f}50%{transform:scale(1.04);box-shadow:0 6px 22px rgba(249,194,26,.6),0 6px 0 #b8431f}}
