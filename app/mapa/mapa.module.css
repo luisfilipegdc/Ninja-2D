@@ -87,7 +87,18 @@
   border-radius: 999px;
   box-shadow: 0 10px 26px -8px rgba(0, 0, 0, 0.6);
   animation: pulseUp 1.8s ease-in-out infinite;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   white-space: nowrap;
+}
+.capaHint small {
+  font-weight: 800;
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 0.85;
 }
 
 /* ─────────────── IMAGE MAP (mapa + ginásio) ─────────────── */
@@ -115,7 +126,23 @@
 }
 .zbtn:active { transform: scale(0.92); }
 .zbtn:disabled { opacity: 0.4; cursor: default; }
+.fsBtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex: none;
+  transition: transform 0.1s ease, background 0.2s ease;
+}
+.fsBtn:active { transform: scale(0.92); }
+.fsBtn svg { display: block; }
 
+.imageScreen { width: 100%; }
 .stageScroll {
   overflow-x: auto;
   overflow-y: hidden;
@@ -126,7 +153,9 @@
 .stage {
   position: relative;
   margin: 0 auto;
-  transition: width 0.25s ease;
+  width: calc(var(--zoom, 1) * 100%);
+  aspect-ratio: var(--ar, 0.75);
+  transition: width 0.2s ease, height 0.2s ease;
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 18px 40px -16px rgba(0, 0, 0, 0.7);
@@ -183,6 +212,34 @@
 }
 .showHints .hot.ponto .hotDot { opacity: 0.95; animation: dotPulse 2s ease-in-out infinite; }
 
+/* ponto destacado quando selecionado (anel + pin) */
+.hot.hotActive {
+  border-color: var(--milho);
+  background: rgba(249, 194, 26, 0.22);
+  box-shadow: 0 0 0 3px var(--milho), 0 0 26px 8px rgba(249, 194, 26, 0.55);
+  animation: hotActive 1.2s ease-in-out infinite;
+  z-index: 7;
+}
+@keyframes hotActive {
+  0%, 100% { box-shadow: 0 0 0 3px var(--milho), 0 0 20px 5px rgba(249, 194, 26, 0.45); }
+  50% { box-shadow: 0 0 0 5px var(--milho), 0 0 34px 14px rgba(249, 194, 26, 0.72); }
+}
+.hotPin {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(1.1rem, 3.4vw, 1.7rem);
+  line-height: 1;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.55));
+  animation: pinBounce 1.1s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes pinBounce {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -62%) scale(1.12); }
+}
+
 .hintToggle {
   display: inline-flex;
   align-items: center;
@@ -238,8 +295,8 @@
 .sheetBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(8, 20, 36, 0.55);
-  backdrop-filter: blur(2px);
+  background: rgba(8, 20, 36, 0.34);
+  backdrop-filter: blur(1px);
   z-index: 50;
   animation: fadeIn 0.2s ease both;
 }
@@ -374,6 +431,7 @@
   font-size: 1rem;
 }
 .search input::placeholder { color: rgba(255, 255, 255, 0.55); }
+.searchTop { margin: 0 14px 8px; }
 .searchClear {
   border: none;
   background: rgba(255, 255, 255, 0.14);
@@ -676,4 +734,175 @@
 @media (prefers-reduced-motion: reduce) {
   .capaHint, .liveDot, .hot, .fab, .sheet, .showHints .hot.zona, .showHints .hot.ponto,
   .showHints .hot.nav, .showHints .hot.ponto .hotDot { animation: none !important; }
+}
+
+/* ─────────────── AO VIVO / coach-mark / toast ─────────────── */
+.liveBadge {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 48;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100% - 26px);
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
+  background: rgba(13, 31, 54, 0.92);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.6);
+  animation: pop 0.3s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.liveBadge b { color: var(--milho); letter-spacing: 0.04em; }
+.liveBadge > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.liveOn { border-color: rgba(226, 59, 46, 0.5); }
+.liveOn b { color: #ff6a5a; }
+.liveDotBig {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  flex: none;
+  background: #38e08a;
+}
+.liveOn .liveDotBig {
+  background: #ff3b30;
+  animation: blink 1.3s ease-in-out infinite;
+}
+
+.toast {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 58px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 49;
+  background: var(--milho);
+  color: var(--noite);
+  font-weight: 900;
+  padding: 11px 18px;
+  border-radius: 14px;
+  box-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.5);
+  animation: toastIn 0.35s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+  max-width: calc(100% - 26px);
+  text-align: center;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, -12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.coach {
+  position: fixed;
+  inset: 0;
+  z-index: 47;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 20, 36, 0.4);
+  animation: fadeIn 0.25s ease both;
+  padding: 22px;
+}
+.coachCard {
+  background: linear-gradient(180deg, #1d4a7a, var(--noite));
+  border: 2px solid rgba(249, 194, 26, 0.55);
+  border-radius: 20px;
+  padding: 22px 22px 18px;
+  max-width: 360px;
+  text-align: center;
+  box-shadow: 0 22px 50px -12px rgba(0, 0, 0, 0.7);
+  animation: sheetUp 0.3s cubic-bezier(0.2, 1, 0.3, 1) both;
+}
+.coachEmoji { font-size: 2.6rem; display: block; animation: coachBounce 1.2s ease-in-out infinite; }
+.coachCard p { font-size: 1.08rem; line-height: 1.5; color: #eaf3fb; margin: 8px 0 16px; }
+@keyframes coachBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.previstoNote {
+  margin: -2px 0 12px;
+  font-size: 0.82rem;
+  color: #aecbe6;
+  text-align: center;
+}
+
+/* ─────────────── Responsivo: tablet / iPad ─────────────── */
+/* Acima de 760px o app deixa de ser uma coluna estreita centralizada e passa a
+   usar o espaço do dispositivo (iPad em retrato e paisagem). */
+@media (min-width: 760px) {
+  .wrap { max-width: 100%; }
+
+  .tabbar { max-width: 760px; }
+  .tab { font-size: 0.78rem; }
+  .tabIcon { font-size: 1.5rem; }
+
+  .sheet { max-width: 680px; }
+
+  .topbar { padding-left: 24px; padding-right: 24px; }
+  .topTitle { font-size: 1.7rem; }
+
+  /* Programação e Cardápio: conteúdo centralizado e em duas colunas */
+  .scroller {
+    max-width: 980px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 18px;
+    align-content: start;
+  }
+  .scroller > .clockBar,
+  .scroller > .search,
+  .scroller > .empty { grid-column: 1 / -1; }
+
+  .chips,
+  .searchTop { max-width: 980px; margin-left: auto; margin-right: auto; }
+  .searchTop { margin-bottom: 10px; }
+
+  .legend { max-width: 980px; margin: 0 auto; }
+  .legendGrid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+
+  .barraca { scroll-margin-top: 172px; }
+}
+
+/* iPad em paisagem: mapa grande à esquerda + painel de pontos à direita,
+   tudo cabendo na tela sem rolagem vertical. */
+@media (min-width: 900px) and (orientation: landscape) {
+  .imageScreen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) clamp(280px, 30%, 400px);
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "stage head"
+      "stage legend";
+    column-gap: 12px;
+    height: calc(100dvh - 86px);
+    padding: 0 8px;
+  }
+  .stageHead { grid-area: head; padding: 12px 0 6px; }
+  .stageScroll {
+    grid-area: stage;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 8px;
+  }
+  /* no modo paisagem o mapa é dimensionado pela altura (cabe inteiro) */
+  .stage { width: auto; height: calc(var(--zoom, 1) * 100%); }
+  .legend {
+    grid-area: legend;
+    height: 100%;
+    overflow-y: auto;
+    margin: 0;
+    max-width: none;
+    padding: 0 4px calc(env(safe-area-inset-bottom) + 16px);
+  }
+  .legendGrid { grid-template-columns: 1fr; }
+  .legendTitle { margin-top: 6px; }
 }
