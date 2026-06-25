@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Arraiá do Tesouro",
-  description: "Caça ao tesouro de festa junina com cartões NFC e QR.",
+  description: "Caça ao tesouro de festa junina com bandeirinhas NFC e QR.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
