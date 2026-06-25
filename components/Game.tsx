@@ -770,8 +770,9 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       : <div className="curio-text">Imagem ainda não configurada. Suba pelo /admin 🙂</div>;
     else if (card.media === "youtube") {
       const id = ytId(body);
+      const short = /\/shorts\//i.test(body); // Shorts = vídeo vertical
       media = id
-        ? <div className="curio-yt"><iframe src={"https://www.youtube.com/embed/" + id} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
+        ? <div className={"curio-yt" + (short ? " short" : "")}><iframe src={"https://www.youtube.com/embed/" + id} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>
         : <div className="curio-text">Não consegui carregar o vídeo. Confira o link no painel.</div>;
     }
     else if (card.media === "spotify") {
