@@ -20,10 +20,9 @@ import {
   type Hotspot,
   type Screen,
 } from "./data";
+import { getSupabase } from "@/lib/supabase";
 
 const SCREENS: Screen[] = ["capa", "mapa", "ginasio", "programacao", "cardapio"];
-
-const SACOLA_KEY = "festa_sacola_v1";
 
 // pontos do mapa que oferecem um atalho contextual para o cardápio
 const VER_CARDAPIO = new Set(["praca", "bebidas", "inflaveis", "brincadeiras"]);
@@ -133,18 +132,90 @@ function screenFromHash(): Screen {
   return SCREENS.includes(h) ? h : "capa";
 }
 
-// índice item->dados para a sacola
-type IndexItem = { nome: string; preco: number; barraca: string; emoji: string };
-const itemIndex: Record<string, IndexItem> = {};
-for (const b of cardapio) {
-  for (const it of b.itens) {
-    itemIndex[`${b.id}::${it.nome}`] = { nome: it.nome, preco: it.preco, barraca: b.nome, emoji: b.emoji };
-  }
+// hook compartilhado do "ao vivo": calcula a apresentação atual/próxima pelo relógio.
+// (fonte única — quando entrar o controle manual da equipe, troca-se só a origem aqui.)
+type AoVivoOverride = { modo: "auto" | "manual"; hora: string | null };
+
+function useAoVivo() {
+  const [nowMin, setNowMin] = useState<number | null>(null);
+  const [override, setOverride] = useState<AoVivoOverride | null>(null);
+
+  useEffect(() => {
+    const tick = () => {
+      const d = new Date();
+      setNowMin(d.getHours() * 60 + d.getMinutes());
+    };
+    tick();
+    const id = setInterval(tick, 15000);
+    return () => clearInterval(id);
+  }, []);
+
+  // controle manual da equipe (override em tempo real via Supabase). Sem Supabase
+  // configurado, cai no relógio automaticamente.
+  useEffect(() => {
+    const sb = getSupabase();
+    if (!sb) return;
+    let active = true;
+    const apply = (row: { modo?: string; hora?: string | null } | null) => {
+      if (active && row && (row.modo === "auto" || row.modo === "manual")) {
+        setOverride({ modo: row.modo, hora: row.hora ?? null });
+      }
+    };
+    sb.from("ao_vivo")
+      .select("modo,hora")
+      .eq("id", 1)
+      .maybeSingle()
+      .then(({ data }) => apply(data as { modo?: string; hora?: string | null } | null));
+    const ch = sb
+      .channel("ao_vivo")
+      .on("postgres_changes", { event: "*", schema: "public", table: "ao_vivo" }, (payload) =>
+        apply(payload.new as { modo?: string; hora?: string | null }),
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      sb.removeChannel(ch);
+    };
+  }, []);
+
+  const starts = useMemo(() => programacao.map((s) => horaParaMinutos(s.hora)), []);
+
+  const { agoraIdx, proxIdx } = useMemo(() => {
+    // o override manual da equipe tem prioridade sobre o relógio
+    if (override?.modo === "manual") {
+      if (!override.hora) return { agoraIdx: -1, proxIdx: -1 }; // intervalo declarado
+      const a = programacao.findIndex((s) => s.hora === override.hora);
+      const p = a >= 0 && a + 1 < programacao.length ? a + 1 : -1;
+      return { agoraIdx: a, proxIdx: p };
+    }
+    if (nowMin == null) return { agoraIdx: -1, proxIdx: -1 };
+    let a = -1;
+    for (let i = 0; i < programacao.length; i++) {
+      const st = starts[i];
+      const en = i + 1 < starts.length ? starts[i + 1] : st + 30;
+      if (nowMin >= st && nowMin < en) {
+        a = i;
+        break;
+      }
+    }
+    const p = starts.findIndex((st) => st > nowMin);
+    return { agoraIdx: a, proxIdx: p };
+  }, [override, nowMin, starts]);
+
+  const horaNow =
+    nowMin == null
+      ? "--:--"
+      : `${String(Math.floor(nowMin / 60)).padStart(2, "0")}:${String(nowMin % 60).padStart(2, "0")}`;
+  return { nowMin, starts, agoraIdx, proxIdx, horaNow, manual: override?.modo === "manual" };
 }
 
 export default function MapaInterativo() {
   const [screen, setScreen] = useState<Screen>("capa");
   const [ponto, setPonto] = useState<Hotspot | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [coachSeen, setCoachSeen] = useState(false);
+  const { agoraIdx, proxIdx } = useAoVivo();
+  const prevAgora = useRef<number | null>(null);
 
   // sincroniza tela com o hash (deep-link + botão voltar do navegador)
   useEffect(() => {
@@ -169,6 +240,31 @@ export default function MapaInterativo() {
     return () => document.removeEventListener("click", once);
   }, []);
 
+  // alerta (toast) quando troca a turma no palco
+  useEffect(() => {
+    const prev = prevAgora.current;
+    if (agoraIdx >= 0 && prev !== null && prev >= 0 && prev !== agoraIdx) {
+      setToast(`🎉 Subindo agora: ${programacao[agoraIdx].grupo}`);
+    }
+    prevAgora.current = agoraIdx;
+  }, [agoraIdx]);
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(null), 6000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  // coach-mark do mapa: reaparece a cada nova sessão (ao voltar pra capa) e some sozinho
+  useEffect(() => {
+    if (screen === "capa") setCoachSeen(false);
+  }, [screen]);
+  useEffect(() => {
+    if (screen === "mapa" && !coachSeen) {
+      const id = setTimeout(() => setCoachSeen(true), 8000);
+      return () => clearTimeout(id);
+    }
+  }, [screen, coachSeen]);
+
   const go = useCallback((s: Screen) => {
     setPonto(null);
     if (screenFromHash() === s) setScreen(s);
@@ -177,6 +273,7 @@ export default function MapaInterativo() {
 
   const abrirPonto = useCallback(
     (h: Hotspot) => {
+      setCoachSeen(true);
       if (h.goto) {
         go(h.goto);
         return;
@@ -215,6 +312,48 @@ export default function MapaInterativo() {
 
       {screen !== "capa" && <TabBar screen={screen} go={go} />}
 
+      {/* selo AO VIVO flutuante (some na própria tela de programação e no cardápio) */}
+      {(screen === "capa" || screen === "mapa" || screen === "ginasio") &&
+        (agoraIdx >= 0 || proxIdx >= 0) && (
+          <button
+            className={`${styles.liveBadge} ${agoraIdx >= 0 ? styles.liveOn : ""}`}
+            onClick={() => go("programacao")}
+            aria-label="Ver a programação ao vivo"
+          >
+            <span className={styles.liveDotBig} />
+            {agoraIdx >= 0 ? (
+              <span>
+                <b>AO VIVO</b> · no palco: {programacao[agoraIdx].grupo}
+              </span>
+            ) : (
+              <span>
+                <b>EM BREVE</b> · {programacao[proxIdx].hora} {programacao[proxIdx].grupo}
+              </span>
+            )}
+          </button>
+        )}
+
+      {toast && (
+        <div className={styles.toast} role="status">
+          {toast}
+        </div>
+      )}
+
+      {/* coach-mark: ensina que os pontos do mapa são tocáveis */}
+      {screen === "mapa" && !coachSeen && (
+        <div className={styles.coach}>
+          <div className={styles.coachCard}>
+            <span className={styles.coachEmoji}>👆</span>
+            <p>
+              Toque nos <b>pontos do mapa</b> para ver as informações de cada local.
+            </p>
+            <button className={styles.btnYellow} onClick={() => setCoachSeen(true)}>
+              Entendi
+            </button>
+          </div>
+        </div>
+      )}
+
       {ponto && (
         <InfoSheet
           ponto={ponto}
@@ -232,7 +371,10 @@ function Capa({ onStart }: { onStart: () => void }) {
     <button className={styles.capa} onClick={onStart} aria-label="Iniciar o mapa interativo">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={ASSETS.capa.src} alt="Capa — Mapa Interativo Festa Junina 2026" />
-      <span className={styles.capaHint}>👆 Toque para começar</span>
+      <span className={styles.capaHint}>
+        👆 Toque para começar
+        <small>Mapa · Apresentações ao vivo · Cardápio</small>
+      </span>
     </button>
   );
 }
@@ -400,36 +542,9 @@ function InfoSheet({
 
 /* ───────────────────────── Programação ───────────────────────── */
 function Programacao() {
-  const [nowMin, setNowMin] = useState<number | null>(null);
   const [q, setQ] = useState("");
   const agoraRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const tick = () => {
-      const d = new Date();
-      setNowMin(d.getHours() * 60 + d.getMinutes());
-    };
-    tick();
-    const id = setInterval(tick, 30000);
-    return () => clearInterval(id);
-  }, []);
-
-  const starts = useMemo(() => programacao.map((s) => horaParaMinutos(s.hora)), []);
-
-  const { agoraIdx, proxIdx } = useMemo(() => {
-    if (nowMin == null) return { agoraIdx: -1, proxIdx: -1 };
-    let a = -1;
-    for (let i = 0; i < programacao.length; i++) {
-      const st = starts[i];
-      const en = i + 1 < starts.length ? starts[i + 1] : st + 30;
-      if (nowMin >= st && nowMin < en) {
-        a = i;
-        break;
-      }
-    }
-    const p = starts.findIndex((st) => st > nowMin);
-    return { agoraIdx: a, proxIdx: p };
-  }, [nowMin, starts]);
+  const { nowMin, starts, agoraIdx, proxIdx, horaNow } = useAoVivo();
 
   const nq = norm(q);
   const matches = (turma: string) => nq.length > 0 && norm(turma).includes(nq);
@@ -439,11 +554,6 @@ function Programacao() {
     norm(programacao[i].grupo).includes(nq);
 
   const visiveis = programacao.map((_, i) => i).filter(slotMatch);
-
-  const horaNow =
-    nowMin == null
-      ? "--:--"
-      : `${String(Math.floor(nowMin / 60)).padStart(2, "0")}:${String(nowMin % 60).padStart(2, "0")}`;
 
   let clockMsg: ReactNode = "Confira quando cada turma sobe ao palco do ginásio.";
   if (nowMin != null) {
@@ -503,6 +613,9 @@ function Programacao() {
           <span className={styles.clockMsg}>{clockMsg}</span>
           <span className={styles.clockNow}>{horaNow}</span>
         </div>
+        <p className={styles.previstoNote}>
+          🕒 Horários previstos — a equipe ajusta o “ao vivo” em caso de atraso.
+        </p>
 
         <div className={styles.search}>
           🔎
@@ -571,40 +684,10 @@ function Programacao() {
   );
 }
 
-/* ───────────────────────── Cardápio ───────────────────────── */
-type Sacola = Record<string, number>;
-
+/* ───────────────────────── Cardápio (só preços) ───────────────────────── */
 function Cardapio() {
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState<string | null>(null);
-  const [sacola, setSacola] = useState<Sacola>({});
-  const [aberta, setAberta] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SACOLA_KEY);
-      if (raw) setSacola(JSON.parse(raw));
-    } catch {
-      /* ignora */
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(SACOLA_KEY, JSON.stringify(sacola));
-    } catch {
-      /* ignora */
-    }
-  }, [sacola]);
-
-  const add = (key: string, delta: number) =>
-    setSacola((s) => {
-      const n = (s[key] ?? 0) + delta;
-      const next = { ...s };
-      if (n <= 0) delete next[key];
-      else next[key] = n;
-      return next;
-    });
 
   const nq = norm(q);
   const lista = cardapio
@@ -614,12 +697,6 @@ function Cardapio() {
       itens: nq.length === 0 ? b.itens : b.itens.filter((it) => norm(it.nome).includes(nq)),
     }))
     .filter((b) => b.itens.length > 0);
-
-  const totalItens = Object.values(sacola).reduce((a, n) => a + n, 0);
-  const totalValor = Object.entries(sacola).reduce(
-    (a, [k, n]) => a + (itemIndex[k]?.preco ?? 0) * n,
-    0,
-  );
 
   const highlight = (nome: string) => {
     const i = nome.toLowerCase().indexOf(q.trim().toLowerCase());
@@ -631,13 +708,6 @@ function Cardapio() {
         {nome.slice(i + q.trim().length)}
       </>
     );
-  };
-
-  const compartilharSacola = () => {
-    const linhas = Object.entries(sacola)
-      .map(([k, n]) => `${n}x ${itemIndex[k]?.nome}`)
-      .join(", ");
-    compartilhar(`Minha sacola na Festa Junina 2026 🎉: ${linhas}. Total: ${brl(totalValor)}`);
   };
 
   return (
@@ -682,7 +752,7 @@ function Cardapio() {
         ))}
       </div>
 
-      <div className={styles.scroller} style={{ paddingBottom: 156 }}>
+      <div className={styles.scroller}>
         {lista.length === 0 && (
           <div className={styles.empty}>Nenhum item encontrado para “{q}”.</div>
         )}
@@ -693,93 +763,16 @@ function Cardapio() {
               <span className={styles.barracaNome}>{b.nome}</span>
               {b.tipo === "diversao" && <span className={styles.barracaTipo}>Diversão</span>}
             </div>
-            {b.itens.map((it) => {
-              const key = `${b.id}::${it.nome}`;
-              const qtd = sacola[key] ?? 0;
-              return (
-                <div key={key} className={styles.item}>
-                  <span className={styles.itemNome}>{highlight(it.nome)}</span>
-                  <span className={styles.itemPreco}>{brl(it.preco)}</span>
-                  {qtd > 0 && <span className={styles.qtyN}>{qtd}×</span>}
-                  <button
-                    className={`${styles.addBtn} ${b.tipo === "diversao" ? styles.diversao : ""}`}
-                    onClick={() => add(key, 1)}
-                    aria-label={`Adicionar ${it.nome} à sacola`}
-                  >
-                    +
-                  </button>
-                </div>
-              );
-            })}
+            {b.itens.map((it) => (
+              <div key={`${b.id}::${it.nome}`} className={styles.item}>
+                <span className={styles.itemNome}>{highlight(it.nome)}</span>
+                <span className={styles.itemPreco}>{brl(it.preco)}</span>
+              </div>
+            ))}
           </section>
         ))}
       </div>
 
-      {totalItens > 0 && (
-        <button className={styles.fab} onClick={() => setAberta(true)}>
-          🛍️ <span className={styles.fabCount}>{totalItens}</span>
-          <span className={styles.fabTotal}>{brl(totalValor)}</span>
-        </button>
-      )}
-
-      {aberta && (
-        <>
-          <div className={styles.sheetBackdrop} onClick={() => setAberta(false)} />
-          <div className={styles.sheet} role="dialog" aria-label="Minha sacola">
-            <div className={styles.grabber} />
-            <div className={styles.sheetHead}>
-              <div className={styles.sheetEmoji}>🛍️</div>
-              <h2 className={styles.sheetTitle}>Minha sacola</h2>
-            </div>
-            {totalItens === 0 ? (
-              <p className={styles.muted}>Sua sacola está vazia. Toque no “+” dos itens para montar seu rango! 😋</p>
-            ) : (
-              <>
-                {Object.entries(sacola).map(([k, n]) => {
-                  const it = itemIndex[k];
-                  if (!it) return null;
-                  return (
-                    <div key={k} className={styles.sacolaItem}>
-                      <div className={styles.sacolaNome}>
-                        {it.emoji} {it.nome}
-                        <small>{it.barraca}</small>
-                      </div>
-                      <div className={styles.qty}>
-                        <button className={styles.qtyBtn} onClick={() => add(k, -1)} aria-label="Menos um">
-                          −
-                        </button>
-                        <span className={styles.qtyN}>{n}</span>
-                        <button className={styles.qtyBtn} onClick={() => add(k, 1)} aria-label="Mais um">
-                          +
-                        </button>
-                      </div>
-                      <span className={styles.sacolaPreco}>{brl(it.preco * n)}</span>
-                    </div>
-                  );
-                })}
-                <div className={styles.totalRow}>
-                  <span>Total ({totalItens} {totalItens === 1 ? "item" : "itens"})</span>
-                  <b>{brl(totalValor)}</b>
-                </div>
-                <p className={styles.muted}>
-                  Estimativa para você se planejar — o pagamento é feito nas barracas/caixa da festa.
-                </p>
-                <div className={styles.sheetActions}>
-                  <button className={styles.btnYellow} onClick={compartilharSacola}>
-                    📤 Compartilhar
-                  </button>
-                  <button className={styles.btnGhost} onClick={() => setSacola({})}>
-                    🗑️ Limpar
-                  </button>
-                  <button className={styles.btnGhost} onClick={() => setAberta(false)}>
-                    Fechar
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </>
-      )}
     </>
   );
 }
