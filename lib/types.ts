@@ -1,5 +1,5 @@
 export type CardKind = "senha" | "curiosidade" | "coringa";
-export type Media = "texto" | "imagem" | "youtube" | "spotify" | "audio";
+export type Media = "texto" | "imagem" | "youtube" | "spotify" | "audio" | "video";
 
 export interface Card {
   code: string;
