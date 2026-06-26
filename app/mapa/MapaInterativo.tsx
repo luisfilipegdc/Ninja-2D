@@ -224,6 +224,12 @@ function useAoVivo() {
 
 const TURMA_KEY = "festa_turma_v1";
 const TODAS_TURMAS = Array.from(new Set(programacao.flatMap((s) => s.turmas)));
+const SEGMENTOS: { label: string; emoji: string; test: (t: string) => boolean }[] = [
+  { label: "Infantil", emoji: "🧸", test: (t) => t.startsWith("INF") },
+  { label: "1º ao 5º", emoji: "✏️", test: (t) => /^[1-5]º/.test(t) },
+  { label: "9º Ano", emoji: "📒", test: (t) => t.startsWith("9º") },
+  { label: "Ensino Médio", emoji: "🎓", test: (t) => /todas/i.test(t) },
+];
 const NUM_BARRACAS = cardapio.length;
 const NUM_APRES = programacao.length;
 const NUM_PONTOS =
@@ -462,6 +468,7 @@ export default function MapaInterativo() {
 
   const abrirPonto = useCallback(
     (h: Hotspot) => {
+      vibrar(12);
       setCoachSeen(true);
       if (h.goto) {
         go(h.goto);
@@ -477,6 +484,7 @@ export default function MapaInterativo() {
     (t: string | null) => {
       setSeguindo(t);
       if (!t) return;
+      vibrar(12);
       const st = statusDaTurma(t, { agoraIdx, nowMin, starts, manual });
       if (st.estado === "em_breve") setToast(`🔔 Acompanhando ${t} — sobe em ${st.minutos} min`);
       else if (st.estado === "passou") setToast(`🔔 ${t} já se apresentou hoje`);
@@ -605,8 +613,13 @@ function BoasVindas({
   onSkip: () => void;
 }) {
   const [q, setQ] = useState("");
+  const [seg, setSeg] = useState<number | null>(null);
   const nq = norm(q);
-  const lista = nq ? TODAS_TURMAS.filter((t) => norm(t).includes(nq)).slice(0, 30) : [];
+  const lista = nq
+    ? TODAS_TURMAS.filter((t) => norm(t).includes(nq)).slice(0, 40)
+    : seg != null
+      ? TODAS_TURMAS.filter(SEGMENTOS[seg].test)
+      : [];
   return (
     <div className={styles.welcome}>
       <div className={styles.welcomeInner}>
@@ -617,12 +630,37 @@ function BoasVindas({
           <b>quando ela subir</b> ao palco. 🔔
         </p>
 
+        {seguindo && !q && seg == null && (
+          <button className={`${styles.btnYellow} ${styles.welcomeCont}`} onClick={() => onPick(seguindo)}>
+            🔔 Continuar acompanhando {seguindo}
+          </button>
+        )}
+
+        <div className={styles.segRow}>
+          {SEGMENTOS.map((s, i) => (
+            <button
+              key={s.label}
+              className={`${styles.segBtn} ${seg === i ? styles.segOn : ""}`}
+              onClick={() => {
+                vibrar(10);
+                setQ("");
+                setSeg(seg === i ? null : i);
+              }}
+            >
+              <span aria-hidden>{s.emoji}</span> {s.label}
+            </button>
+          ))}
+        </div>
+
         <div className={`${styles.search} ${styles.welcomeSearch}`}>
           🔎
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Digite a turma (ex: 5º C, INF 3)"
+            onChange={(e) => {
+              setQ(e.target.value);
+              setSeg(null);
+            }}
+            placeholder="ou digite a turma (ex: 5º C)"
             inputMode="search"
           />
           {q && (
@@ -632,7 +670,7 @@ function BoasVindas({
           )}
         </div>
 
-        {q ? (
+        {(q || seg != null) && (
           <div className={styles.welcomeGrid}>
             {lista.length === 0 ? (
               <p className={styles.welcomeHint}>Nenhuma turma encontrada.</p>
@@ -644,12 +682,6 @@ function BoasVindas({
               ))
             )}
           </div>
-        ) : seguindo ? (
-          <button className={`${styles.btnYellow} ${styles.welcomeCont}`} onClick={() => onPick(seguindo)}>
-            🔔 Continuar acompanhando {seguindo}
-          </button>
-        ) : (
-          <p className={styles.welcomeHint}>Digite acima para encontrar a turma 👆</p>
         )}
 
         <button className={styles.welcomeSkip} onClick={onSkip}>
