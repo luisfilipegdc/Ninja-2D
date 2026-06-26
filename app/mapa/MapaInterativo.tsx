@@ -209,13 +209,143 @@ function useAoVivo() {
   return { nowMin, starts, agoraIdx, proxIdx, horaNow, manual: override?.modo === "manual" };
 }
 
+const TURMA_KEY = "festa_turma_v1";
+const NUM_BARRACAS = cardapio.length;
+const NUM_APRES = programacao.length;
+const NUM_PONTOS =
+  mapaPontos.filter((h) => h.emoji).length + ginasioPontos.filter((h) => h.emoji).length;
+
+type AvLite = { agoraIdx: number; nowMin: number | null; starts: number[]; manual: boolean };
+type SeguindoStatus = {
+  idx: number;
+  estado: "nenhum" | "agora" | "em_breve" | "aguardando" | "passou";
+  minutos: number;
+};
+
+function statusDaTurma(turma: string | null, av: AvLite): SeguindoStatus {
+  if (!turma) return { idx: -1, estado: "nenhum", minutos: 0 };
+  const idx = programacao.findIndex((s) => s.turmas.includes(turma));
+  if (idx < 0) return { idx: -1, estado: "nenhum", minutos: 0 };
+  if (idx === av.agoraIdx) return { idx, estado: "agora", minutos: 0 };
+  if (av.manual || av.nowMin == null) return { idx, estado: "aguardando", minutos: 0 };
+  const min = av.starts[idx] - av.nowMin;
+  if (min > 0) return { idx, estado: "em_breve", minutos: min };
+  return { idx, estado: "passou", minutos: 0 };
+}
+
+function badgeAoVivo(
+  seguindo: string | null,
+  segui: SeguindoStatus,
+  agoraIdx: number,
+  proxIdx: number,
+): { live: boolean; tag: string; txt: string } | null {
+  if (seguindo && segui.idx >= 0) {
+    if (segui.estado === "agora") return { live: true, tag: "AO VIVO", txt: `${seguindo} no palco! 🎉` };
+    if (segui.estado === "em_breve") return { live: false, tag: "SUA TURMA", txt: `${seguindo} em ${segui.minutos} min` };
+    if (segui.estado === "aguardando") return { live: false, tag: "SUA TURMA", txt: `${seguindo} — aguarde` };
+    return { live: false, tag: "SUA TURMA", txt: `${seguindo} já se apresentou` };
+  }
+  if (agoraIdx >= 0) return { live: true, tag: "AO VIVO", txt: `no palco: ${programacao[agoraIdx].grupo}` };
+  if (proxIdx >= 0) return { live: false, tag: "EM BREVE", txt: `${programacao[proxIdx].hora} ${programacao[proxIdx].grupo}` };
+  return null;
+}
+
+function vibrar(p: number | number[]) {
+  try {
+    navigator.vibrate?.(p);
+  } catch {
+    /* iOS Safari não vibra — sem problema */
+  }
+}
+
+function Confetti() {
+  const pecas = useMemo(
+    () =>
+      Array.from({ length: 38 }, (_, i) => ({
+        left: Math.random() * 100,
+        delay: Math.random() * 0.5,
+        dur: 2.4 + Math.random() * 1.8,
+        rot: 120 + Math.random() * 520,
+        size: 7 + Math.random() * 7,
+        cor: ["#f9c21a", "#e23b2e", "#28a8e0", "#2ec27e", "#e84c97", "#6e5ba6"][i % 6],
+      })),
+    [],
+  );
+  return (
+    <div className={styles.confetti} aria-hidden>
+      {pecas.map((p, i) => (
+        <span
+          key={i}
+          style={
+            {
+              left: `${p.left}%`,
+              width: p.size,
+              height: p.size,
+              background: p.cor,
+              animationDelay: `${p.delay}s`,
+              animationDuration: `${p.dur}s`,
+              ["--rot"]: `${p.rot}deg`,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+function CapaPainel({
+  agoraIdx,
+  proxIdx,
+  seguindo,
+  segui,
+  onGo,
+}: {
+  agoraIdx: number;
+  proxIdx: number;
+  seguindo: string | null;
+  segui: SeguindoStatus;
+  onGo: (s: Screen) => void;
+}) {
+  const b = badgeAoVivo(seguindo, segui, agoraIdx, proxIdx);
+  return (
+    <button className={styles.capaPainel} onClick={() => onGo("programacao")} aria-label="Ver a programação ao vivo">
+      <div className={`${styles.capaLive} ${b?.live ? styles.liveOn : ""}`}>
+        {b ? (
+          <>
+            <span className={styles.liveDotBig} />
+            <span>
+              <b>{b.tag}</b> · {b.txt}
+            </span>
+          </>
+        ) : (
+          <span>🎭 Veja a programação das apresentações</span>
+        )}
+      </div>
+      <div className={styles.capaStats}>
+        <span>🍢 {NUM_BARRACAS} barracas</span>
+        <span>🎭 {NUM_APRES} apresentações</span>
+        <span>📍 {NUM_PONTOS} pontos</span>
+      </div>
+    </button>
+  );
+}
+
 export default function MapaInterativo() {
   const [screen, setScreen] = useState<Screen>("capa");
   const [ponto, setPonto] = useState<Hotspot | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [coachSeen, setCoachSeen] = useState(false);
-  const { agoraIdx, proxIdx } = useAoVivo();
+  const [seguindo, setSeguindo] = useState<string | null>(null);
+  const [confete, setConfete] = useState(false);
+  const { agoraIdx, proxIdx, nowMin, starts, manual } = useAoVivo();
   const prevAgora = useRef<number | null>(null);
+  const prevEstado = useRef<string>("nenhum");
+  const alerta2min = useRef(false);
+
+  const segui = useMemo(
+    () => statusDaTurma(seguindo, { agoraIdx, nowMin, starts, manual }),
+    [seguindo, agoraIdx, nowMin, starts, manual],
+  );
 
   // sincroniza tela com o hash (deep-link + botão voltar do navegador)
   useEffect(() => {
@@ -265,6 +395,51 @@ export default function MapaInterativo() {
     }
   }, [screen, coachSeen]);
 
+  // turma acompanhada (persiste no aparelho)
+  useEffect(() => {
+    try {
+      const t = localStorage.getItem(TURMA_KEY);
+      if (t) setSeguindo(t);
+    } catch {
+      /* ignora */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      if (seguindo) localStorage.setItem(TURMA_KEY, seguindo);
+      else localStorage.removeItem(TURMA_KEY);
+    } catch {
+      /* ignora */
+    }
+  }, [seguindo]);
+
+  // alertas da turma acompanhada: confete quando sobe + aviso quando falta pouco
+  useEffect(() => {
+    if (!seguindo) {
+      prevEstado.current = "nenhum";
+      alerta2min.current = false;
+      return;
+    }
+    if (segui.estado === "agora" && prevEstado.current !== "agora") {
+      setConfete(true);
+      setToast(`🎉 ${seguindo} no palco AGORA!`);
+      vibrar([0, 90, 50, 130]);
+    }
+    if (segui.estado === "em_breve" && segui.minutos > 2) alerta2min.current = false;
+    if (segui.estado === "em_breve" && segui.minutos <= 2 && segui.minutos > 0 && !alerta2min.current) {
+      alerta2min.current = true;
+      setToast(`⏰ Já vai! ${seguindo} sobe em ${segui.minutos} min`);
+      vibrar(80);
+    }
+    prevEstado.current = segui.estado;
+  }, [segui.estado, segui.minutos, seguindo]);
+
+  useEffect(() => {
+    if (!confete) return;
+    const id = setTimeout(() => setConfete(false), 4200);
+    return () => clearTimeout(id);
+  }, [confete]);
+
   const go = useCallback((s: Screen) => {
     setPonto(null);
     if (screenFromHash() === s) setScreen(s);
@@ -282,6 +457,8 @@ export default function MapaInterativo() {
     },
     [go],
   );
+
+  const badge = badgeAoVivo(seguindo, segui, agoraIdx, proxIdx);
 
   return (
     <div className={styles.wrap}>
@@ -307,31 +484,31 @@ export default function MapaInterativo() {
           selected={ponto}
         />
       )}
-      {screen === "programacao" && <Programacao />}
+      {screen === "programacao" && <Programacao seguindo={seguindo} onSeguir={setSeguindo} />}
       {screen === "cardapio" && <Cardapio />}
 
       {screen !== "capa" && <TabBar screen={screen} go={go} />}
 
-      {/* selo AO VIVO flutuante (some na própria tela de programação e no cardápio) */}
-      {(screen === "capa" || screen === "mapa" || screen === "ginasio") &&
-        (agoraIdx >= 0 || proxIdx >= 0) && (
-          <button
-            className={`${styles.liveBadge} ${agoraIdx >= 0 ? styles.liveOn : ""}`}
-            onClick={() => go("programacao")}
-            aria-label="Ver a programação ao vivo"
-          >
-            <span className={styles.liveDotBig} />
-            {agoraIdx >= 0 ? (
-              <span>
-                <b>AO VIVO</b> · no palco: {programacao[agoraIdx].grupo}
-              </span>
-            ) : (
-              <span>
-                <b>EM BREVE</b> · {programacao[proxIdx].hora} {programacao[proxIdx].grupo}
-              </span>
-            )}
-          </button>
-        )}
+      {/* selo AO VIVO flutuante — prioriza a turma acompanhada (mapa/ginásio) */}
+      {(screen === "mapa" || screen === "ginasio") && badge && (
+        <button
+          className={`${styles.liveBadge} ${badge.live ? styles.liveOn : ""}`}
+          onClick={() => go("programacao")}
+          aria-label="Ver a programação ao vivo"
+        >
+          <span className={styles.liveDotBig} />
+          <span>
+            <b>{badge.tag}</b> · {badge.txt}
+          </span>
+        </button>
+      )}
+
+      {/* capa "viva": agora/a seguir + números da festa */}
+      {screen === "capa" && (
+        <CapaPainel agoraIdx={agoraIdx} proxIdx={proxIdx} seguindo={seguindo} segui={segui} onGo={go} />
+      )}
+
+      {confete && <Confetti />}
 
       {toast && (
         <div className={styles.toast} role="status">
@@ -541,10 +718,17 @@ function InfoSheet({
 }
 
 /* ───────────────────────── Programação ───────────────────────── */
-function Programacao() {
+function Programacao({
+  seguindo,
+  onSeguir,
+}: {
+  seguindo: string | null;
+  onSeguir: (t: string | null) => void;
+}) {
   const [q, setQ] = useState("");
   const agoraRef = useRef<HTMLDivElement>(null);
-  const { nowMin, starts, agoraIdx, proxIdx, horaNow } = useAoVivo();
+  const { nowMin, starts, agoraIdx, proxIdx, horaNow, manual } = useAoVivo();
+  const segui = statusDaTurma(seguindo, { agoraIdx, nowMin, starts, manual });
 
   const nq = norm(q);
   const matches = (turma: string) => nq.length > 0 && norm(turma).includes(nq);
@@ -617,6 +801,28 @@ function Programacao() {
           🕒 Horários previstos — a equipe ajusta o “ao vivo” em caso de atraso.
         </p>
 
+        {seguindo && segui.idx >= 0 ? (
+          <div className={`${styles.seguindoBar} ${segui.estado === "agora" ? styles.seguindoAgora : ""}`}>
+            <span className={styles.seguindoTxt}>
+              🔔 Acompanhando <b>{seguindo}</b>
+              {segui.estado === "agora"
+                ? " — no palco agora! 🎉"
+                : segui.estado === "em_breve"
+                  ? ` — sobe às ${programacao[segui.idx].hora} (faltam ${segui.minutos} min)`
+                  : segui.estado === "aguardando"
+                    ? ` — previsto às ${programacao[segui.idx].hora}`
+                    : " — já se apresentou"}
+            </span>
+            <button className={styles.seguindoX} onClick={() => onSeguir(null)} aria-label="Deixar de acompanhar">
+              ✕
+            </button>
+          </div>
+        ) : (
+          <p className={styles.followHint}>
+            🔔 Toque na <b>sua turma</b> abaixo para acompanhá-la e ser avisado quando ela subir.
+          </p>
+        )}
+
         <div className={styles.search}>
           🔎
           <input
@@ -658,9 +864,16 @@ function Programacao() {
                 {s.periodo && <div className={styles.slotPeriodo}>{s.periodo}</div>}
                 <div className={styles.turmas}>
                   {s.turmas.map((t) => (
-                    <span key={t} className={`${styles.turma} ${matches(t) ? styles.match : ""}`}>
+                    <button
+                      key={t}
+                      className={`${styles.turma} ${matches(t) ? styles.match : ""} ${
+                        seguindo === t ? styles.turmaSeguindo : ""
+                      }`}
+                      onClick={() => onSeguir(seguindo === t ? null : t)}
+                    >
+                      {seguindo === t ? "🔔 " : ""}
                       {t}
-                    </span>
+                    </button>
                   ))}
                 </div>
               </div>
