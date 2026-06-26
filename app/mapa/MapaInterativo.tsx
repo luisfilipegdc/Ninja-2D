@@ -548,10 +548,6 @@ function Capa({ onStart }: { onStart: () => void }) {
     <button className={styles.capa} onClick={onStart} aria-label="Iniciar o mapa interativo">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={ASSETS.capa.src} alt="Capa — Mapa Interativo Festa Junina 2026" />
-      <span className={styles.capaHint}>
-        👆 Toque para começar
-        <small>Mapa · Apresentações ao vivo · Cardápio</small>
-      </span>
     </button>
   );
 }
@@ -846,7 +842,7 @@ function Programacao({
           </div>
         )}
 
-        {visiveis.map((i) => {
+        {visiveis.map((i, pos) => {
           const s = programacao[i];
           const isAgora = i === agoraIdx && nq.length === 0;
           const isProx = i === proxIdx && agoraIdx >= 0 && nq.length === 0;
@@ -855,6 +851,7 @@ function Programacao({
               key={s.hora}
               ref={isAgora ? agoraRef : undefined}
               className={`${styles.slot} ${isAgora ? styles.agora : ""} ${isProx ? styles.proxima : ""}`}
+              style={{ animationDelay: `${Math.min(pos * 35, 480)}ms` }}
             >
               {isAgora && <span className={`${styles.tag} ${styles.tagAgora}`}>No palco</span>}
               {isProx && <span className={`${styles.tag} ${styles.tagProxima}`}>A seguir</span>}
@@ -969,8 +966,8 @@ function Cardapio() {
         {lista.length === 0 && (
           <div className={styles.empty}>Nenhum item encontrado para “{q}”.</div>
         )}
-        {lista.map((b) => (
-          <section key={b.id} className={styles.barraca}>
+        {lista.map((b, i) => (
+          <section key={b.id} className={styles.barraca} style={{ animationDelay: `${Math.min(i * 45, 480)}ms` }}>
             <div className={styles.barracaHead}>
               <span className={styles.barracaEmoji}>{b.emoji}</span>
               <span className={styles.barracaNome}>{b.nome}</span>

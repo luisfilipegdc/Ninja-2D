@@ -212,17 +212,22 @@
 }
 .showHints .hot.ponto .hotDot { opacity: 0.95; animation: dotPulse 2s ease-in-out infinite; }
 
-/* ponto destacado quando selecionado (anel + pin) */
+/* ponto selecionado: "sobe" do mapa com sombra de elevação (sem borrar o resto) */
 .hot.hotActive {
-  border-color: var(--milho);
-  background: rgba(249, 194, 26, 0.22);
-  box-shadow: 0 0 0 3px var(--milho), 0 0 26px 8px rgba(249, 194, 26, 0.55);
-  animation: hotActive 1.2s ease-in-out infinite;
-  z-index: 7;
+  border-color: #fff;
+  background: rgba(249, 194, 26, 0.12);
+  z-index: 9;
+  animation: hotLift 2.1s ease-in-out infinite;
 }
-@keyframes hotActive {
-  0%, 100% { box-shadow: 0 0 0 3px var(--milho), 0 0 20px 5px rgba(249, 194, 26, 0.45); }
-  50% { box-shadow: 0 0 0 5px var(--milho), 0 0 34px 14px rgba(249, 194, 26, 0.72); }
+@keyframes hotLift {
+  0%, 100% {
+    transform: scale(1.05) translateY(0);
+    box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.55), 0 0 0 3px var(--milho), 0 0 22px 6px rgba(249, 194, 26, 0.45);
+  }
+  50% {
+    transform: scale(1.09) translateY(-4px);
+    box-shadow: 0 26px 50px -8px rgba(0, 0, 0, 0.62), 0 0 0 4px var(--milho), 0 0 38px 14px rgba(249, 194, 26, 0.72);
+  }
 }
 .hotPin {
   position: absolute;
@@ -295,8 +300,7 @@
 .sheetBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(8, 20, 36, 0.34);
-  backdrop-filter: blur(1px);
+  background: rgba(8, 20, 36, 0.12);
   z-index: 50;
   animation: fadeIn 0.2s ease both;
 }
@@ -873,7 +877,7 @@
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(env(safe-area-inset-bottom) + 92px);
+  bottom: calc(env(safe-area-inset-bottom) + 22px);
   z-index: 20;
   width: min(92%, 460px);
   display: flex;
@@ -908,6 +912,28 @@
 }
 @keyframes confFall {
   to { transform: translateY(108vh) rotate(var(--rot, 240deg)); }
+}
+
+/* ─────────────── Movimento / transições ─────────────── */
+/* entrada da tela do mapa/ginásio */
+.imageScreen { animation: screenIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(14px) scale(0.992); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+/* entrada escalonada das listas (delay inline por item) */
+.slot, .barraca { animation: riseIn2 0.42s ease both; }
+@keyframes riseIn2 {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+/* pop do ícone da aba ativa */
+.tabIcon { transition: transform 0.25s cubic-bezier(0.2, 1.5, 0.4, 1); }
+.tabOn .tabIcon { transform: scale(1.16); }
+
+@media (prefers-reduced-motion: reduce) {
+  .imageScreen, .slot, .barraca, .hot.hotActive, .confetti span { animation: none !important; }
 }
 
 /* ─────────────── Responsivo: tablet / iPad ─────────────── */
