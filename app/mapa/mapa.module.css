@@ -10,6 +10,11 @@
   position: relative;
   color: #fff;
   padding: env(safe-area-inset-top) 0 0;
+  /* identidade da capa propagada: topo azul-festa fundindo no azul-marinho */
+  background-color: var(--noite);
+  background-image: linear-gradient(180deg, #1f9fe0 0%, #1670b4 14%, var(--noite) 40%);
+  background-repeat: no-repeat;
+  background-size: 100% 100dvh;
 }
 
 /* Barra de topo (telas de dados) */
@@ -20,8 +25,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: calc(env(safe-area-inset-top) + 10px) 14px 10px;
-  background: linear-gradient(180deg, rgba(21, 55, 93, 0.96) 60%, rgba(21, 55, 93, 0));
+  padding: calc(env(safe-area-inset-top) + 32px) 14px 10px;
+  background: linear-gradient(180deg, rgba(31, 159, 224, 0.97) 0%, rgba(22, 105, 175, 0.94) 44%, rgba(21, 55, 93, 0));
   backdrop-filter: blur(6px);
 }
 .back {
@@ -53,24 +58,319 @@
 }
 .topSpark { color: var(--milho); }
 
-/* ─────────────── CAPA ─────────────── */
+/* ─────────────── CAPA (montada com os elementos do PDF oficial) ─────────────── */
 .capa {
   position: relative;
   flex: 1;
-  cursor: pointer;
-  display: block;
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  border: none;
-  background: var(--noite);
-  padding: 0;
+  min-height: 100dvh;
   overflow: hidden;
-  animation: fadeIn 0.5s ease both;
+  /* sangra para trás do notch; o conteúdo respeita a safe-area */
+  margin-top: calc(-1 * env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
+  background:
+    radial-gradient(150% 80% at 50% 118%, rgba(255, 210, 58, 0.16), transparent 55%),
+    linear-gradient(180deg, #1f9fe0 0%, #1573b6 46%, var(--noite) 100%);
+  animation: fadeIn 0.45s ease both;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
-.capa img {
+.capaIndo { opacity: 0; transform: scale(1.05); }
+
+/* alvo de toque em tela cheia (botão vazio = HTML válido e acessível) */
+.capaHit {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
   width: 100%;
-  height: 100dvh;
-  object-fit: contain;
-  display: block;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* bandeirinhas (pennants) no topo, balançando */
+.capaBandeiras {
+  position: absolute;
+  top: env(safe-area-inset-top);
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0 6px;
+  pointer-events: none;
+}
+.capaBandeiras::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 1%;
+  right: 1%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 2px;
+}
+.bandeira {
+  width: 17px;
+  height: 22px;
+  margin-top: 4px;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.18));
+  transform-origin: top center;
+  animation: bandeiraSway 3.2s ease-in-out infinite;
+}
+@keyframes bandeiraSway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+
+/* confete flutuando devagar */
+.capaConfete { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.confeteDot {
+  position: absolute;
+  top: -6%;
+  border-radius: 2px;
+  opacity: 0;
+  animation-name: confeteFloat;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes confeteFloat {
+  0% { opacity: 0; transform: translateY(-12px) rotate(0); }
+  12% { opacity: 0.85; }
+  88% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(110vh) translateX(var(--drift, 12px)) rotate(var(--rodar, 200deg)); }
+}
+
+/* stickers recortados do PDF, emoldurando a cena (parte sangra pra fora) */
+.sticker {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  --rot: 0deg;
+  transform: rotate(var(--rot));
+  filter: drop-shadow(0 7px 11px rgba(0, 0, 0, 0.3));
+  animation: stickerIn 0.55s cubic-bezier(0.2, 1.5, 0.5, 1) both, stickerFloat 5s ease-in-out infinite;
+}
+.stChapeu   { --rot: -8deg; top: calc(env(safe-area-inset-top) + 16px); left: 2px; width: clamp(104px, 32vw, 150px); animation-delay: 0.05s, 0.7s; }
+.stGirassol { --rot: 8deg;  top: calc(env(safe-area-inset-top) + 54px); right: 4px; width: clamp(72px, 21vw, 106px); animation-delay: 0.16s, 1.1s; }
+.stCacto    { --rot: 5deg;  bottom: calc(env(safe-area-inset-bottom) + 66px); left: 4px; width: clamp(54px, 15vw, 78px); animation-delay: 0.26s, 0.95s; }
+.stIgreja   { --rot: -5deg; bottom: calc(env(safe-area-inset-bottom) + 64px); right: 2px; width: clamp(90px, 26vw, 126px); animation-delay: 0.36s, 1.3s; }
+@keyframes stickerIn {
+  0% { opacity: 0; transform: rotate(var(--rot)) scale(0.4) translateY(18px); }
+  100% { opacity: 1; transform: rotate(var(--rot)) scale(1) translateY(0); }
+}
+@keyframes stickerFloat {
+  0%, 100% { transform: rotate(var(--rot)) translateY(0); }
+  50% { transform: rotate(var(--rot)) translateY(-9px); }
+}
+
+/* cena central */
+.capaScene {
+  position: relative;
+  z-index: 3;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(2px, 0.8vh, 8px);
+  width: 100%;
+  margin: 0;
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+  padding: 60px 20px calc(env(safe-area-inset-bottom) + 96px);
+}
+.capaHero { display: flex; flex-direction: column; align-items: center; }
+
+/* selo "Mapa Interativo" — pílula vermelha com contorno branco (eco da caixa do PDF) */
+.capaSelo {
+  align-self: center;
+  background: var(--vermelha);
+  color: #fff;
+  font-family: "Fredoka", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(0.8rem, 3.5vw, 0.98rem);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  box-shadow: 0 4px 0 #b32a20, 0 9px 16px -6px rgba(0, 0, 0, 0.45);
+}
+
+/* lockup "Festa Junina 2026" recriado no estilo sticker (contorno branco/azul) */
+.capaFesta { display: flex; flex-direction: column; align-items: center; margin-top: 14px; line-height: 0.88; }
+.capaFestaTop {
+  font-family: "Fredoka", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(2.7rem, 13.5vw, 4.1rem);
+  color: #fff;
+  -webkit-text-stroke: 7px var(--noite);
+  paint-order: stroke fill;
+}
+.capaFestaBot {
+  font-family: "Pacifico", cursive;
+  color: var(--milho);
+  font-size: clamp(2.1rem, 10.5vw, 3.3rem);
+  -webkit-text-stroke: 6px #fff;
+  paint-order: stroke fill;
+  transform: rotate(-4deg);
+  margin-top: -4px;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.28));
+}
+.capaAno {
+  font-family: "Fredoka", system-ui, sans-serif;
+  font-weight: 700;
+  -webkit-text-stroke: 0;
+  font-size: 0.4em;
+  color: var(--noite);
+  background: var(--milho);
+  padding: 0.05em 0.32em;
+  border-radius: 9px;
+  border: 2px solid #fff;
+  transform: rotate(5deg);
+  display: inline-block;
+  vertical-align: 0.18em;
+  margin-left: 0.08em;
+  box-shadow: 0 3px 0 #c8860f;
+}
+.capaLead {
+  max-width: min(94%, 366px);
+  margin: 10px auto 0;
+  color: #eaf5ff;
+  font-weight: 600;
+  font-size: clamp(0.85rem, 3.5vw, 0.95rem);
+  line-height: 1.38;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.32);
+}
+
+/* CTA real "Toque para abrir o mapa" */
+.capaCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 15px 26px;
+  border-radius: 999px;
+  font-family: "Fredoka", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(1rem, 4.6vw, 1.16rem);
+  color: var(--noite);
+  background: linear-gradient(180deg, #ffd766, var(--milho));
+  border: 3px solid #fff;
+  box-shadow: 0 6px 0 #c8860f, 0 16px 28px -10px rgba(0, 0, 0, 0.5);
+  /* entra subindo + crescendo ~300ms, depois pulsa (acabamento premium) */
+  animation: capaCtaIn 0.34s cubic-bezier(0.2, 1.5, 0.45, 1) 0.2s both,
+    capaCtaPulse 2.6s ease-in-out 0.62s infinite;
+}
+.capaCtaArrow { font-size: 1.2rem; line-height: 1; }
+@keyframes capaCtaIn {
+  0% { opacity: 0; transform: translateY(22px) scale(0.86); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.capaHit:active ~ .capaScene .capaCta {
+  transform: translateY(3px);
+  box-shadow: 0 3px 0 #c8860f, 0 8px 16px -10px rgba(0, 0, 0, 0.5);
+}
+@keyframes capaCtaPulse {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* brasão do Colégio Marista (extraído do PDF, em branco) no rodapé */
+.capaMarista {
+  position: absolute;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom) + 14px);
+  transform: translateX(-50%);
+  width: min(48%, 176px);
+  height: auto;
+  opacity: 1;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.3));
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* faísca/confete ao tocar para abrir */
+.capaFaisca {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 56%, rgba(255, 240, 190, 0.9), rgba(255, 180, 40, 0.35) 28%, transparent 58%);
+  animation: capaFaisca 0.4s ease-out both;
+}
+@keyframes capaFaisca {
+  0% { opacity: 0; transform: scale(0.35); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: scale(1.8); }
+}
+
+/* selo vivo no topo — substitui o card flutuante */
+/* telas maiores (iPad / kiosk): elementos crescem para preencher melhor */
+@media (min-width: 680px) {
+  .capaScene { gap: clamp(14px, 2.4vh, 28px); padding-top: 96px; }
+  .capaSelo { font-size: 1.05rem; padding: 8px 22px; }
+  .capaFesta { margin-top: 20px; }
+  .capaFestaTop { font-size: clamp(3.6rem, 9vw, 5.4rem); -webkit-text-stroke-width: 9px; }
+  .capaFestaBot { font-size: clamp(2.9rem, 7.4vw, 4.4rem); -webkit-text-stroke-width: 8px; }
+  .capaLead { font-size: 1.2rem; max-width: 34ch; margin-top: 18px; }
+  .capaCta { font-size: 1.3rem; padding: 18px 34px; }
+  .stChapeu { width: clamp(180px, 27vw, 264px); }
+  .stGirassol { width: clamp(120px, 18vw, 182px); }
+  .stCacto { width: clamp(108px, 16vw, 168px); }
+  .stIgreja { width: clamp(150px, 22vw, 224px); }
+  .capaMarista { width: min(30%, 212px); }
+  .bandeira { width: 24px; height: 30px; }
+}
+
+.capaLivePill {
+  position: absolute;
+  z-index: 6;
+  top: calc(env(safe-area-inset-top) + 56px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(92%, 420px);
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(13, 31, 54, 0.86);
+  backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 9px 12px 9px 14px;
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.7);
+  animation: capaPillIn 0.5s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.capaLivePill b { color: var(--milho); letter-spacing: 0.04em; }
+.capaLivePill > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.capaLivePill.liveOn {
+  border-color: rgba(226, 59, 46, 0.55);
+  animation: capaPillIn 0.5s cubic-bezier(0.2, 1.3, 0.4, 1) both, capaPillGlow 2.2s ease-in-out 0.6s infinite;
+}
+.capaLivePill.liveOn b { color: #ff6a5a; }
+.capaLiveArrow { color: var(--milho); font-weight: 900; font-size: 1.15rem; line-height: 1; }
+@keyframes capaPillIn {
+  from { opacity: 0; transform: translate(-50%, -14px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+@keyframes capaPillGlow {
+  0%, 100% { box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.7), 0 0 0 0 rgba(226, 59, 46, 0); }
+  50% { box-shadow: 0 12px 26px -12px rgba(0, 0, 0, 0.7), 0 0 16px 1px rgba(226, 59, 46, 0.45); }
 }
 .capaHint {
   position: absolute;
@@ -739,7 +1039,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .capaHint, .liveDot, .hot, .fab, .sheet, .showHints .hot.zona, .showHints .hot.ponto,
-  .showHints .hot.nav, .showHints .hot.ponto .hotDot { animation: none !important; }
+  .showHints .hot.nav, .showHints .hot.ponto .hotDot,
+  .capaFaisca, .capaCta, .sticker, .bandeira, .confeteDot { animation: none !important; }
+  .confeteDot { opacity: 0 !important; }
+  .capaLivePill.liveOn { animation: capaPillIn 0.5s ease both !important; }
 }
 
 /* ─────────────── AO VIVO / coach-mark / toast ─────────────── */
@@ -875,33 +1178,6 @@
   cursor: pointer;
 }
 
-.capaPainel {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(env(safe-area-inset-bottom) + 22px);
-  z-index: 20;
-  width: min(92%, 460px);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: rgba(13, 31, 54, 0.82);
-  backdrop-filter: blur(8px);
-  border: 1.5px solid rgba(255, 255, 255, 0.16);
-  border-radius: 16px;
-  padding: 12px 14px;
-  color: #fff;
-  font: inherit;
-  cursor: pointer;
-  box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.6);
-  animation: pop 0.4s cubic-bezier(0.2, 1.3, 0.4, 1) both;
-}
-.capaLive { display: flex; align-items: center; justify-content: center; gap: 9px; font-weight: 800; font-size: 0.96rem; }
-.capaLive b { color: var(--milho); letter-spacing: 0.04em; }
-.capaLive.liveOn b { color: #ff6a5a; }
-.capaStats { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; font-size: 0.78rem; font-weight: 700; color: #cfe0f1; }
-.capaStats span { background: rgba(255, 255, 255, 0.08); border-radius: 999px; padding: 4px 9px; }
-
 .confetti { position: fixed; inset: 0; pointer-events: none; z-index: 70; overflow: hidden; }
 .confetti span {
   position: absolute;
@@ -952,11 +1228,12 @@
 
 /* ─────────────── Boas-vindas (escolher a turma) ─────────────── */
 .welcome {
+  position: relative;
   flex: 1;
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: calc(env(safe-area-inset-top) + 24px) 22px calc(env(safe-area-inset-bottom) + 24px);
+  padding: calc(env(safe-area-inset-top) + 40px) 22px calc(env(safe-area-inset-bottom) + 24px);
   animation: fadeIn 0.4s ease both;
 }
 .welcomeInner {
@@ -971,8 +1248,9 @@
   font-weight: 700;
   font-size: clamp(1.8rem, 7vw, 2.4rem);
   margin: 6px 0;
-  color: var(--milho);
-  text-shadow: 0 2px 0 #b85c00;
+  color: #fff;
+  -webkit-text-stroke: 5px var(--noite);
+  paint-order: stroke fill;
 }
 .welcomeSub { color: #d8e6f4; line-height: 1.5; margin: 0 0 18px; font-size: 1.02rem; }
 .welcomeSub b { color: #fff; }

@@ -230,11 +230,6 @@ const SEGMENTOS: { label: string; emoji: string; test: (t: string) => boolean }[
   { label: "9º Ano", emoji: "📒", test: (t) => t.startsWith("9º") },
   { label: "Ensino Médio", emoji: "🎓", test: (t) => /todas/i.test(t) },
 ];
-const NUM_BARRACAS = cardapio.length;
-const NUM_APRES = programacao.length;
-const NUM_PONTOS =
-  mapaPontos.filter((h) => h.emoji).length + ginasioPontos.filter((h) => h.emoji).length;
-
 type AvLite = { agoraIdx: number; nowMin: number | null; starts: number[]; manual: boolean };
 type SeguindoStatus = {
   idx: number;
@@ -310,43 +305,6 @@ function Confetti() {
         />
       ))}
     </div>
-  );
-}
-
-function CapaPainel({
-  agoraIdx,
-  proxIdx,
-  seguindo,
-  segui,
-  onGo,
-}: {
-  agoraIdx: number;
-  proxIdx: number;
-  seguindo: string | null;
-  segui: SeguindoStatus;
-  onGo: (s: Screen) => void;
-}) {
-  const b = badgeAoVivo(seguindo, segui, agoraIdx, proxIdx);
-  return (
-    <button className={styles.capaPainel} onClick={() => onGo("programacao")} aria-label="Ver a programação ao vivo">
-      <div className={`${styles.capaLive} ${b?.live ? styles.liveOn : ""}`}>
-        {b ? (
-          <>
-            <span className={styles.liveDotBig} />
-            <span>
-              <b>{b.tag}</b> · {b.txt}
-            </span>
-          </>
-        ) : (
-          <span>🎭 Veja a programação das apresentações</span>
-        )}
-      </div>
-      <div className={styles.capaStats}>
-        <span>🍢 {NUM_BARRACAS} barracas</span>
-        <span>🎭 {NUM_APRES} apresentações</span>
-        <span>📍 {NUM_PONTOS} pontos</span>
-      </div>
-    </button>
   );
 }
 
@@ -508,7 +466,7 @@ export default function MapaInterativo() {
 
   return (
     <div className={styles.wrap}>
-      {screen === "capa" && <Capa onStart={() => go("inicio")} />}
+      {screen === "capa" && <Capa onStart={() => go("inicio")} badge={badge} onGo={go} />}
 
       {screen === "inicio" && (
         <BoasVindas seguindo={seguindo} onPick={pickTurmaEStart} onSkip={() => go("mapa")} />
@@ -553,11 +511,6 @@ export default function MapaInterativo() {
         </button>
       )}
 
-      {/* capa "viva": agora/a seguir + números da festa */}
-      {screen === "capa" && (
-        <CapaPainel agoraIdx={agoraIdx} proxIdx={proxIdx} seguindo={seguindo} segui={segui} onGo={go} />
-      )}
-
       {confete && <Confetti />}
 
       {toast && (
@@ -570,10 +523,12 @@ export default function MapaInterativo() {
       {screen === "mapa" && !coachSeen && (
         <div className={styles.coach}>
           <div className={styles.coachCard}>
-            <span className={styles.coachEmoji}>💡</span>
+            <span className={styles.coachEmoji}>👆</span>
             <p>
-              Toque no <b>💡</b> no topo para <b>acender os pontos</b> do mapa — depois é só
-              tocar em cada um para ver o local. 👆
+              O mapa <b>já é interativo</b>: toque em qualquer ponto para ver o local —
+              barracas, palco, banheiros e mais. Se quiser, o <b>💡</b> lá em cima
+              {" "}
+              <b>destaca os pontos</b>.
             </p>
             <button className={styles.btnYellow} onClick={() => setCoachSeen(true)}>
               Entendi
@@ -594,12 +549,157 @@ export default function MapaInterativo() {
 }
 
 /* ───────────────────────── Capa ───────────────────────── */
-function Capa({ onStart }: { onStart: () => void }) {
+// elementos do PDF oficial recortados como stickers — a identidade da festa
+const CAPA_STICKERS: { src: string; cls: "stChapeu" | "stGirassol" | "stCacto" | "stIgreja" }[] = [
+  { src: "/mapa/stickers/chapeu.png", cls: "stChapeu" },
+  { src: "/mapa/stickers/girassol.png", cls: "stGirassol" },
+  { src: "/mapa/stickers/cacto.png", cls: "stCacto" },
+  { src: "/mapa/stickers/igreja.png", cls: "stIgreja" },
+];
+// cores do convite Festa Junina Marista 2026
+const CAPA_CORES = ["#e23b2e", "#f9c21a", "#e84c97", "#28a8e0", "#6e5ba6", "#2ec27e"];
+const CAPA_BANDEIRAS = Array.from({ length: 14 }, (_, i) => ({
+  cor: CAPA_CORES[i % CAPA_CORES.length],
+  delay: ((i % 6) * 0.16).toFixed(2),
+}));
+// confete que flutua devagar — padrão fixo (sem Math.random no render → hidratação ok)
+const CAPA_CONFETE = Array.from({ length: 16 }, (_, i) => ({
+  left: (i * 61 + 5) % 100,
+  cor: CAPA_CORES[(i + 2) % CAPA_CORES.length],
+  delay: (((i * 7) % 11) * 0.7).toFixed(2),
+  dur: 7 + ((i * 5) % 6),
+  size: 6 + (i % 3) * 3,
+  drift: (i % 2 ? 1 : -1) * (10 + (i % 4) * 8),
+  rodar: 180 + (i % 4) * 120,
+}));
+
+function CapaBandeiras() {
   return (
-    <button className={styles.capa} onClick={onStart} aria-label="Iniciar o mapa interativo">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={ASSETS.capa.src} alt="Capa — Mapa Interativo Festa Junina 2026" />
-    </button>
+    <div className={styles.capaBandeiras} aria-hidden>
+      {CAPA_BANDEIRAS.map((b, i) => (
+        <span
+          key={i}
+          className={styles.bandeira}
+          style={{ background: b.cor, animationDelay: `${b.delay}s` } as CSSProperties}
+        />
+      ))}
+    </div>
+  );
+}
+
+function CapaConfete() {
+  return (
+    <div className={styles.capaConfete} aria-hidden>
+      {CAPA_CONFETE.map((c, i) => (
+        <span
+          key={i}
+          className={styles.confeteDot}
+          style={
+            {
+              left: `${c.left}%`,
+              width: c.size,
+              height: c.size,
+              background: c.cor,
+              animationDelay: `${c.delay}s`,
+              animationDuration: `${c.dur}s`,
+              ["--drift"]: `${c.drift}px`,
+              ["--rodar"]: `${c.rodar}deg`,
+            } as CSSProperties
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+function Capa({
+  onStart,
+  badge,
+  onGo,
+}: {
+  onStart: () => void;
+  badge: { live: boolean; tag: string; txt: string } | null;
+  onGo: (s: Screen) => void;
+}) {
+  const [acendendo, setAcendendo] = useState(false);
+  const iniciar = useCallback(() => {
+    if (acendendo) return;
+    vibrar([16, 28, 16]);
+    const reduz =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduz) {
+      onStart();
+      return;
+    }
+    setAcendendo(true);
+    window.setTimeout(onStart, 380);
+  }, [acendendo, onStart]);
+
+  return (
+    <div className={`${styles.capa} ${acendendo ? styles.capaIndo : ""}`}>
+      <CapaConfete />
+      <CapaBandeiras />
+
+      {/* stickers recortados do PDF, emoldurando a cena */}
+      {CAPA_STICKERS.map((s) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={s.cls} className={`${styles.sticker} ${styles[s.cls]}`} src={s.src} alt="" aria-hidden />
+      ))}
+
+      <button
+        className={styles.capaHit}
+        onClick={iniciar}
+        aria-label="Abrir o mapa interativo da Festa Junina"
+      />
+
+      <div className={styles.capaScene}>
+        <div className={styles.capaHero}>
+          <span className={styles.capaSelo}>Mapa Interativo</span>
+          <div className={styles.capaFesta}>
+            <span className={styles.capaFestaTop}>Festa</span>
+            <span className={styles.capaFestaBot}>
+              Junina <span className={styles.capaAno}>2026</span>
+            </span>
+          </div>
+          <p className={styles.capaLead}>
+            A festa toda no seu celular: as barracas, o palco e o ginásio no mapa.
+          </p>
+        </div>
+
+        <span className={styles.capaCta}>
+          <span>Toque para abrir o mapa</span>
+          <span className={styles.capaCtaArrow} aria-hidden>
+            →
+          </span>
+        </span>
+
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          className={styles.capaMarista}
+          src="/mapa/marista-branco.png"
+          alt="Colégio Marista de Brasília"
+        />
+      </div>
+
+      {badge && (
+        <button
+          className={`${styles.capaLivePill} ${badge.live ? styles.liveOn : ""}`}
+          onClick={() => onGo("programacao")}
+          aria-label="Ver a programação ao vivo"
+        >
+          <span className={styles.liveDotBig} />
+          <span>
+            <b>{badge.tag}</b> · {badge.txt}
+          </span>
+          <span className={styles.capaLiveArrow} aria-hidden>
+            ›
+          </span>
+        </button>
+      )}
+
+      {acendendo && <span className={styles.capaFaisca} aria-hidden />}
+    </div>
   );
 }
 
@@ -623,6 +723,7 @@ function BoasVindas({
       : [];
   return (
     <div className={styles.welcome}>
+      <CapaBandeiras />
       <div className={styles.welcomeInner}>
         <span className={styles.welcomeEmoji}>👋</span>
         <h1 className={styles.welcomeTitle}>Quem você veio ver?</h1>
@@ -909,6 +1010,7 @@ function Programacao({
   return (
     <>
       <header className={styles.topbar}>
+        <CapaBandeiras />
         <h1 className={styles.topTitle}>
           <span className={styles.topSpark}>🎭</span> Apresentações
         </h1>
@@ -1068,6 +1170,7 @@ function Cardapio() {
   return (
     <>
       <header className={styles.topbar}>
+        <CapaBandeiras />
         <h1 className={styles.topTitle}>
           <span className={styles.topSpark}>🍢</span> Cardápio
         </h1>
