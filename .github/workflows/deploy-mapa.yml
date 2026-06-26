@@ -15,25 +15,34 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 15m
           script: |
             set -e
 
-            # Detecta onde o Codex instalou o app (pluzy ou festajuninamarista)
-            if [ -d /var/www/pluzy ]; then
+            # Detecta onde o app foi instalado
+            if [ -d /var/www/pluzy/.git ]; then
               APP_DIR=/var/www/pluzy
-            else
+            elif [ -d /var/www/festajuninamarista/.git ]; then
               APP_DIR=/var/www/festajuninamarista
+            else
+              git clone https://github.com/luisfilipegdc/festajuninamarista.git /var/www/pluzy
+              APP_DIR=/var/www/pluzy
             fi
 
             cd "$APP_DIR"
 
-            git pull origin main
+            # Espelha exatamente o GitHub (recupera arquivos deletados)
+            git fetch origin main
+            git reset --hard origin/main
 
-            npm ci --omit=dev
+            npm ci
 
-            # Usa o .env.local já presente no servidor (configurado pelo Codex)
+            # Build limpo: remove o .next antigo para não sobrar chunk obsoleto
+            rm -rf .next
             npm run build
 
-            pm2 reload mapa --update-env || pm2 start ecosystem.config.js || \
-              pm2 start node_modules/.bin/next --name mapa -- start
+            # Restart COMPLETO (não reload): garante que o processo em execução
+            # sirva exatamente o build novo — evita ChunkLoadError / 400 nos chunks.
+            pm2 delete mapa 2>/dev/null || true
+            pm2 start ecosystem.config.js
             pm2 save
