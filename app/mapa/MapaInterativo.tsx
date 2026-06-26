@@ -523,10 +523,12 @@ export default function MapaInterativo() {
       {screen === "mapa" && !coachSeen && (
         <div className={styles.coach}>
           <div className={styles.coachCard}>
-            <span className={styles.coachEmoji}>💡</span>
+            <span className={styles.coachEmoji}>👆</span>
             <p>
-              Toque no <b>💡</b> no topo para <b>acender os pontos</b> do mapa — depois é só
-              tocar em cada um para ver o local. 👆
+              O mapa <b>já é interativo</b>: toque em qualquer ponto para ver o local —
+              barracas, palco, banheiros e mais. Se quiser, o <b>💡</b> lá em cima
+              {" "}
+              <b>destaca os pontos</b>.
             </p>
             <button className={styles.btnYellow} onClick={() => setCoachSeen(true)}>
               Entendi
