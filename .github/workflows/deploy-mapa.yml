@@ -15,23 +15,30 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
+          command_timeout: 15m
           script: |
             set -e
 
             # Detecta onde o app foi instalado (Codex usou /var/www/pluzy)
-            if [ -d /var/www/pluzy ]; then
+            if [ -d /var/www/pluzy/.git ]; then
               APP_DIR=/var/www/pluzy
-            else
+            elif [ -d /var/www/festajuninamarista/.git ]; then
               APP_DIR=/var/www/festajuninamarista
+            else
+              # Clone inicial se ainda não existe
+              git clone https://github.com/luisfilipegdc/festajuninamarista.git /var/www/pluzy
+              APP_DIR=/var/www/pluzy
             fi
 
             cd "$APP_DIR"
 
-            git pull origin main
+            # Força o working tree a espelhar exatamente o GitHub (recupera arquivos deletados)
+            git fetch origin main
+            git reset --hard origin/main
 
-            npm ci --omit=dev
+            npm ci
 
-            # Usa o .env.local já presente no servidor (configurado anteriormente)
+            # Usa o .env.local já presente no servidor (configurado pelo Codex)
             npm run build
 
             pm2 reload mapa --update-env || pm2 start ecosystem.config.js || \
