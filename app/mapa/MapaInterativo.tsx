@@ -41,10 +41,20 @@ const norm = (s: string) =>
 // Busca com fronteira de palavra: "5c" não retorna "INF 5 C" (inf5c) porque o "5c"
 // está precedido por letra — só bate onde o padrão começa em posição inicial ou
 // após caractere não-alfanumérico.
+// Implementado com indexOf (sem regex lookbehind): o lookbehind não é suportado
+// no Safari iOS < 16.4 e quebrava o app em celulares antigos durante a busca.
 function matchTurma(turma: string, nq: string): boolean {
   if (!nq) return false;
   const nt = norm(turma);
-  return new RegExp(`(?<![a-z0-9])${nq}`).test(nt);
+  for (let from = 0; ; ) {
+    const i = nt.indexOf(nq, from);
+    if (i < 0) return false;
+    if (i === 0) return true; // começa no início → é fronteira de palavra
+    const prev = nt[i - 1];
+    const prevEhPalavra = (prev >= "a" && prev <= "z") || (prev >= "0" && prev <= "9");
+    if (!prevEhPalavra) return true; // precedido por caractere não-alfanumérico
+    from = i + 1;
+  }
 }
 
 // Formata uma duração em minutos: até 59 min mostra "X min"; a partir de 1h
