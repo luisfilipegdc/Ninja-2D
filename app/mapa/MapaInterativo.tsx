@@ -12,6 +12,7 @@ import {
 import styles from "./mapa.module.css";
 import {
   ASSETS,
+  EVENTO_DATA,
   cardapio,
   ginasioPontos,
   horaParaMinutos,
@@ -36,6 +37,15 @@ const norm = (s: string) =>
     .replace(/(\d)[ºo°]/gi, "$1") // ordinal tolerante: 5º / 5° / 5o -> 5
     .replace(/[º°\s]/g, "")
     .toLowerCase();
+
+// Busca com fronteira de palavra: "5c" não retorna "INF 5 C" (inf5c) porque o "5c"
+// está precedido por letra — só bate onde o padrão começa em posição inicial ou
+// após caractere não-alfanumérico.
+function matchTurma(turma: string, nq: string): boolean {
+  if (!nq) return false;
+  const nt = norm(turma);
+  return new RegExp(`(?<![a-z0-9])${nq}`).test(nt);
+}
 
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -147,6 +157,9 @@ function useAoVivo() {
   useEffect(() => {
     const tick = () => {
       const d = new Date();
+      // "ao vivo" pelo relógio só ativa no dia do evento; fora dele mostra horários estáticos
+      const localDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      if (localDate !== EVENTO_DATA) { setNowMin(null); return; }
       setNowMin(d.getHours() * 60 + d.getMinutes());
     };
     tick();
@@ -466,7 +479,7 @@ export default function MapaInterativo() {
 
   return (
     <div className={styles.wrap}>
-      {screen === "capa" && <Capa onStart={() => go("inicio")} badge={badge} onGo={go} />}
+      {screen === "capa" && <Capa onStart={() => go("mapa")} badge={badge} onGo={go} />}
 
       {screen === "inicio" && (
         <BoasVindas seguindo={seguindo} onPick={pickTurmaEStart} onSkip={() => go("mapa")} />
@@ -717,7 +730,7 @@ function BoasVindas({
   const [seg, setSeg] = useState<number | null>(null);
   const nq = norm(q);
   const lista = nq
-    ? TODAS_TURMAS.filter((t) => norm(t).includes(nq)).slice(0, 40)
+    ? TODAS_TURMAS.filter((t) => matchTurma(t, nq)).slice(0, 40)
     : seg != null
       ? TODAS_TURMAS.filter(SEGMENTOS[seg].test)
       : [];
@@ -971,7 +984,7 @@ function Programacao({
   const segui = statusDaTurma(seguindo, { agoraIdx, nowMin, starts, manual });
 
   const nq = norm(q);
-  const matches = (turma: string) => nq.length > 0 && norm(turma).includes(nq);
+  const matches = (turma: string) => nq.length > 0 && matchTurma(turma, nq);
   const slotMatch = (i: number) =>
     nq.length === 0 ||
     programacao[i].turmas.some((t) => matches(t)) ||
@@ -1040,7 +1053,7 @@ function Programacao({
             <span className={styles.clockNow}>{horaNow}</span>
           </div>
           <div className={styles.clockCaveat}>
-            Horários previstos — a equipe ajusta o “ao vivo” em caso de atraso.
+            Horários previstos — a equipe ajusta o "ao vivo" em caso de atraso.
           </div>
         </div>
 
@@ -1083,9 +1096,9 @@ function Programacao({
 
         {visiveis.length === 0 && (
           <div className={styles.empty}>
-            Nenhuma turma encontrada para “{q}”.
+            Nenhuma turma encontrada para "{q}".
             <br />
-            Tente “5C”, “INF 3” ou “9º A”.
+            Tente "5C", "INF 3" ou "9º A".
           </div>
         )}
 
@@ -1212,7 +1225,7 @@ function Cardapio() {
 
       <div className={styles.scroller}>
         {lista.length === 0 && (
-          <div className={styles.empty}>Nenhum item encontrado para “{q}”.</div>
+          <div className={styles.empty}>Nenhum item encontrado para "{q}".</div>
         )}
         {lista.map((b, i) => (
           <section key={b.id} className={styles.barraca} style={{ animationDelay: `${Math.min(i * 45, 480)}ms` }}>
