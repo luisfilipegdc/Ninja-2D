@@ -721,6 +721,7 @@ function BoasVindas({
       : [];
   return (
     <div className={styles.welcome}>
+      <CapaBandeiras />
       <div className={styles.welcomeInner}>
         <span className={styles.welcomeEmoji}>👋</span>
         <h1 className={styles.welcomeTitle}>Quem você veio ver?</h1>
@@ -1007,6 +1008,7 @@ function Programacao({
   return (
     <>
       <header className={styles.topbar}>
+        <CapaBandeiras />
         <h1 className={styles.topTitle}>
           <span className={styles.topSpark}>🎭</span> Apresentações
         </h1>
@@ -1166,6 +1168,7 @@ function Cardapio() {
   return (
     <>
       <header className={styles.topbar}>
+        <CapaBandeiras />
         <h1 className={styles.topTitle}>
           <span className={styles.topSpark}>🍢</span> Cardápio
         </h1>

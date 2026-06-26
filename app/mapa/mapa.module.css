@@ -10,6 +10,11 @@
   position: relative;
   color: #fff;
   padding: env(safe-area-inset-top) 0 0;
+  /* identidade da capa propagada: topo azul-festa fundindo no azul-marinho */
+  background-color: var(--noite);
+  background-image: linear-gradient(180deg, #1f9fe0 0%, #1670b4 14%, var(--noite) 40%);
+  background-repeat: no-repeat;
+  background-size: 100% 100dvh;
 }
 
 /* Barra de topo (telas de dados) */
@@ -20,8 +25,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: calc(env(safe-area-inset-top) + 10px) 14px 10px;
-  background: linear-gradient(180deg, rgba(21, 55, 93, 0.96) 60%, rgba(21, 55, 93, 0));
+  padding: calc(env(safe-area-inset-top) + 32px) 14px 10px;
+  background: linear-gradient(180deg, rgba(31, 159, 224, 0.97) 0%, rgba(22, 105, 175, 0.94) 44%, rgba(21, 55, 93, 0));
   backdrop-filter: blur(6px);
 }
 .back {
@@ -1223,11 +1228,12 @@
 
 /* ─────────────── Boas-vindas (escolher a turma) ─────────────── */
 .welcome {
+  position: relative;
   flex: 1;
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: calc(env(safe-area-inset-top) + 24px) 22px calc(env(safe-area-inset-bottom) + 24px);
+  padding: calc(env(safe-area-inset-top) + 40px) 22px calc(env(safe-area-inset-bottom) + 24px);
   animation: fadeIn 0.4s ease both;
 }
 .welcomeInner {
@@ -1242,8 +1248,9 @@
   font-weight: 700;
   font-size: clamp(1.8rem, 7vw, 2.4rem);
   margin: 6px 0;
-  color: var(--milho);
-  text-shadow: 0 2px 0 #b85c00;
+  color: #fff;
+  -webkit-text-stroke: 5px var(--noite);
+  paint-order: stroke fill;
 }
 .welcomeSub { color: #d8e6f4; line-height: 1.5; margin: 0 0 18px; font-size: 1.02rem; }
 .welcomeSub b { color: #fff; }
