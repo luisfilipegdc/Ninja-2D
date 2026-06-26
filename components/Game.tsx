@@ -907,7 +907,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const startMethod = useCallback(async (m: Method) => {
     setScanErr("");
     if (m === "nfc") { setScanHint("Aproxime a parte de trás do celular da bandeirinha. Mantenha o NFC ligado."); await startNFC(); }
-    else if (m === "nfctap") { setScanHint("Encoste o topo do iPhone na bandeirinha — o jogo abre sozinho. Não precisa apertar nada."); }
+    else if (m === "nfctap") { setScanHint("Encoste o topo do iPhone na bandeirinha. Vai surgir um aviso no alto da tela — toque nele pra abrir o jogo."); }
     else { setScanHint("Este aparelho não lê NFC. Use o QR da bandeirinha pela câmera do próprio celular — ele abre o jogo sozinho."); }
   }, [startNFC]);
 
@@ -1299,7 +1299,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
   const nfcNotice = flags.NFC_OK
     ? <>📡 Pra ler as bandeirinhas por aproximação, <b>ligue o NFC</b> do celular (puxe a barra de cima → ícone <b>NFC</b>).</>
     : flags.isIOS
-      ? <>📡 Encoste o <b>topo do iPhone</b> na bandeirinha pra ler.</>
+      ? <>📡 Encoste o <b>topo do iPhone</b> na bandeirinha e <b>toque no aviso</b> que aparece no alto da tela pra abrir.</>
       : <>📡 Encoste o <b>topo do celular</b> na bandeirinha pra ler. Se não rolar, ligue o <b>NFC</b> nos ajustes.</>;
 
   return (
@@ -1318,7 +1318,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
             <ol className="tut-steps">
               <li><span className="tut-n">1</span><div><b>Ache uma bandeirinha</b> de festa junina 🎏 <small>(as de MDF com NFC)</small><br />
                 {flags.isIOS && !flags.NFC_OK
-                  ? <small>Depois <b>encoste o topo do iPhone</b> na bandeirinha — o jogo abre sozinho. ✨</small>
+                  ? <small>Depois <b>encoste o topo do iPhone</b> na bandeirinha e <b>toque no aviso</b> que aparecer no alto da tela pra abrir o jogo. 📲</small>
                   : <small>Depois toque no botão <b>“Ler a próxima bandeirinha 🎏”</b> e <b>encoste a traseira do celular</b> na bandeirinha — o sensor NFC fica no <b>meio ou no topo das costas</b> do aparelho. <b>Sempre use o botão!</b> 👍</small>}
               </div></li>
               <li><span className="tut-n">2</span><div><b>Junte os 3 números</b> 🔢 — em qualquer ordem.</div></li>
@@ -1715,7 +1715,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               </div>
 
               <div className="noprint">
-                <div className="note">Crie os cartões, grave cada um numa <b>tag NFC</b> (Android) e/ou imprima o <b>QR</b>. A mesma tag funciona no iPhone (abre sozinho) e no Android.</div>
+                <div className="note">Crie os cartões, grave cada um numa <b>tag NFC</b> (Android) e/ou imprima o <b>QR</b>. A mesma tag funciona no iPhone (encosta e toca no aviso) e no Android.</div>
                 {cards && cards.length ? <button className="btn fire" style={{ marginTop: 14 }} onClick={() => window.print()}>Imprimir os QR Codes 🖨️</button> : null}
                 {myRole === "master" ? <button className="btn danger-btn" style={{ marginTop: 12 }} onClick={resetRanking}>🗑️ Zerar ranking</button> : null}
                 <button className="btn ghost" style={{ marginTop: 12 }} onClick={doLogout}>Sair do admin</button>
