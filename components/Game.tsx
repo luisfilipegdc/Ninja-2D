@@ -1316,7 +1316,11 @@ export default function Game({ start }: { start?: "admin" } = {}) {
             <div className="tut-emoji">🤠🔥</div>
             <h2 className="tut-title">Como jogar</h2>
             <ol className="tut-steps">
-              <li><span className="tut-n">1</span><div><b>Encoste o celular nas bandeirinhas</b> de festa junina 📡<br /><small>São as bandeirinhas de MDF com NFC. No app, toque em <b>“Ler a bandeirinha 🎏”</b>.</small></div></li>
+              <li><span className="tut-n">1</span><div><b>Ache uma bandeirinha</b> de festa junina 🎏 <small>(as de MDF com NFC)</small><br />
+                {flags.isIOS && !flags.NFC_OK
+                  ? <small>Depois <b>encoste o topo do iPhone</b> na bandeirinha — o jogo abre sozinho. ✨</small>
+                  : <small>Depois toque no botão <b>“Ler a próxima bandeirinha 🎏”</b> e <b>encoste a traseira do celular</b> na bandeirinha — o sensor NFC fica no <b>meio ou no topo das costas</b> do aparelho. <b>Sempre use o botão!</b> 👍</small>}
+              </div></li>
               <li><span className="tut-n">2</span><div><b>Junte os 3 números</b> 🔢 — em qualquer ordem.</div></li>
               <li><span className="tut-n">3</span><div><b>Monte a senha</b> e abra o baú 🧰🎁</div></li>
             </ol>
