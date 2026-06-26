@@ -595,8 +595,10 @@ function ImageScreen({
           className={`${styles.hintToggle} ${hints ? styles.on : ""}`}
           onClick={() => setHints((v) => !v)}
           aria-pressed={hints}
+          aria-label={hints ? "Ocultar destaque dos pontos" : "Mostrar destaque dos pontos"}
+          title="Destaque dos pontos"
         >
-          {hints ? "💡 Pontos ativos" : "Mostrar pontos"}
+          💡
         </button>
         <div className={styles.zoomCtrls}>
           <FullscreenButton />
@@ -701,7 +703,7 @@ function InfoSheet({
           )}
           {VER_PROGRAMACAO.has(ponto.id) && (
             <button className={styles.btnYellow} onClick={() => onGo("programacao")}>
-              🎭 Ver programação
+              🎭 Ver apresentações
             </button>
           )}
           <button className={styles.btnGhost} onClick={onClose}>
@@ -783,19 +785,21 @@ function Programacao({
 
       <div className={styles.scroller}>
         <div className={styles.clockBar}>
-          {agoraIdx >= 0 ? (
-            <span className={styles.live}>
-              <span className={styles.liveDot} /> Ao vivo
-            </span>
-          ) : (
-            <span className={styles.live}>🕒 Horário</span>
-          )}
-          <span className={styles.clockMsg}>{clockMsg}</span>
-          <span className={styles.clockNow}>{horaNow}</span>
+          <div className={styles.clockRow}>
+            {agoraIdx >= 0 ? (
+              <span className={styles.live}>
+                <span className={styles.liveDot} /> Ao vivo
+              </span>
+            ) : (
+              <span className={styles.live}>🕒 Horário</span>
+            )}
+            <span className={styles.clockMsg}>{clockMsg}</span>
+            <span className={styles.clockNow}>{horaNow}</span>
+          </div>
+          <div className={styles.clockCaveat}>
+            Horários previstos — a equipe ajusta o “ao vivo” em caso de atraso.
+          </div>
         </div>
-        <p className={styles.previstoNote}>
-          🕒 Horários previstos — a equipe ajusta o “ao vivo” em caso de atraso.
-        </p>
 
         {seguindo && segui.idx >= 0 ? (
           <div className={`${styles.seguindoBar} ${segui.estado === "agora" ? styles.seguindoAgora : ""}`}>
@@ -992,7 +996,7 @@ function TabBar({ screen, go }: { screen: Screen; go: (s: Screen) => void }) {
   const tabs: { id: Screen; icon: string; label: string }[] = [
     { id: "mapa", icon: "🗺️", label: "Mapa" },
     { id: "ginasio", icon: "🏟️", label: "Ginásio" },
-    { id: "programacao", icon: "🎭", label: "Palco" },
+    { id: "programacao", icon: "🎭", label: "Apresentações" },
     { id: "cardapio", icon: "🍢", label: "Cardápio" },
   ];
   return (
