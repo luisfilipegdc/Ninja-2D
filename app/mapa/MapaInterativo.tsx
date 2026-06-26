@@ -136,9 +136,12 @@ function screenFromHash(): Screen {
 // (fonte única — quando entrar o controle manual da equipe, troca-se só a origem aqui.)
 type AoVivoOverride = { modo: "auto" | "manual"; hora: string | null };
 
+let aoVivoChannelSeq = 0;
 function useAoVivo() {
   const [nowMin, setNowMin] = useState<number | null>(null);
   const [override, setOverride] = useState<AoVivoOverride | null>(null);
+  const chanIdRef = useRef<number>();
+  if (chanIdRef.current == null) chanIdRef.current = ++aoVivoChannelSeq;
 
   useEffect(() => {
     const tick = () => {
@@ -161,20 +164,29 @@ function useAoVivo() {
         setOverride({ modo: row.modo, hora: row.hora ?? null });
       }
     };
-    sb.from("ao_vivo")
-      .select("modo,hora")
-      .eq("id", 1)
-      .maybeSingle()
-      .then(({ data }) => apply(data as { modo?: string; hora?: string | null } | null));
-    const ch = sb
-      .channel("ao_vivo")
-      .on("postgres_changes", { event: "*", schema: "public", table: "ao_vivo" }, (payload) =>
-        apply(payload.new as { modo?: string; hora?: string | null }),
-      )
-      .subscribe();
+    let ch: ReturnType<typeof sb.channel> | null = null;
+    try {
+      sb.from("ao_vivo")
+        .select("modo,hora")
+        .eq("id", 1)
+        .maybeSingle()
+        .then(({ data }) => apply(data as { modo?: string; hora?: string | null } | null));
+      ch = sb
+        .channel(`ao_vivo_${chanIdRef.current}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "ao_vivo" }, (payload) =>
+          apply(payload.new as { modo?: string; hora?: string | null }),
+        )
+        .subscribe();
+    } catch {
+      /* realtime indisponível — segue no relógio */
+    }
     return () => {
       active = false;
-      sb.removeChannel(ch);
+      try {
+        if (ch) sb.removeChannel(ch);
+      } catch {
+        /* ignora */
+      }
     };
   }, []);
 
