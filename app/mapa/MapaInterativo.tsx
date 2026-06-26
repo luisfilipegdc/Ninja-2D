@@ -22,7 +22,7 @@ import {
 } from "./data";
 import { getSupabase } from "@/lib/supabase";
 
-const SCREENS: Screen[] = ["capa", "mapa", "ginasio", "programacao", "cardapio"];
+const SCREENS: Screen[] = ["capa", "inicio", "mapa", "ginasio", "programacao", "cardapio"];
 
 // pontos do mapa que oferecem um atalho contextual para o cardápio
 const VER_CARDAPIO = new Set(["praca", "bebidas", "inflaveis", "brincadeiras"]);
@@ -33,6 +33,7 @@ const norm = (s: string) =>
   s
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
+    .replace(/(\d)[ºo°]/gi, "$1") // ordinal tolerante: 5º / 5° / 5o -> 5
     .replace(/[º°\s]/g, "")
     .toLowerCase();
 
@@ -222,6 +223,7 @@ function useAoVivo() {
 }
 
 const TURMA_KEY = "festa_turma_v1";
+const TODAS_TURMAS = Array.from(new Set(programacao.flatMap((s) => s.turmas)));
 const NUM_BARRACAS = cardapio.length;
 const NUM_APRES = programacao.length;
 const NUM_PONTOS =
@@ -352,7 +354,7 @@ export default function MapaInterativo() {
   const { agoraIdx, proxIdx, nowMin, starts, manual } = useAoVivo();
   const prevAgora = useRef<number | null>(null);
   const prevEstado = useRef<string>("nenhum");
-  const alerta2min = useRef(false);
+  const alerta10 = useRef(false);
 
   const segui = useMemo(
     () => statusDaTurma(seguindo, { agoraIdx, nowMin, starts, manual }),
@@ -429,7 +431,7 @@ export default function MapaInterativo() {
   useEffect(() => {
     if (!seguindo) {
       prevEstado.current = "nenhum";
-      alerta2min.current = false;
+      alerta10.current = false;
       return;
     }
     if (segui.estado === "agora" && prevEstado.current !== "agora") {
@@ -437,10 +439,10 @@ export default function MapaInterativo() {
       setToast(`🎉 ${seguindo} no palco AGORA!`);
       vibrar([0, 90, 50, 130]);
     }
-    if (segui.estado === "em_breve" && segui.minutos > 2) alerta2min.current = false;
-    if (segui.estado === "em_breve" && segui.minutos <= 2 && segui.minutos > 0 && !alerta2min.current) {
-      alerta2min.current = true;
-      setToast(`⏰ Já vai! ${seguindo} sobe em ${segui.minutos} min`);
+    if (segui.estado === "em_breve" && segui.minutos > 10) alerta10.current = false;
+    if (segui.estado === "em_breve" && segui.minutos <= 10 && segui.minutos > 0 && !alerta10.current) {
+      alerta10.current = true;
+      setToast(`⏰ Falta pouco! ${seguindo} sobe em ${segui.minutos} min`);
       vibrar(80);
     }
     prevEstado.current = segui.estado;
@@ -485,11 +487,24 @@ export default function MapaInterativo() {
     [agoraIdx, nowMin, starts, manual],
   );
 
+  // boas-vindas: escolher a turma e já entrar no mapa
+  const pickTurmaEStart = useCallback(
+    (t: string) => {
+      seguirTurma(t);
+      go("mapa");
+    },
+    [seguirTurma, go],
+  );
+
   const badge = badgeAoVivo(seguindo, segui, agoraIdx, proxIdx);
 
   return (
     <div className={styles.wrap}>
-      {screen === "capa" && <Capa onStart={() => go("mapa")} />}
+      {screen === "capa" && <Capa onStart={() => go("inicio")} />}
+
+      {screen === "inicio" && (
+        <BoasVindas seguindo={seguindo} onPick={pickTurmaEStart} onSkip={() => go("mapa")} />
+      )}
 
       {screen === "mapa" && (
         <ImageScreen
@@ -514,7 +529,7 @@ export default function MapaInterativo() {
       {screen === "programacao" && <Programacao seguindo={seguindo} onSeguir={seguirTurma} />}
       {screen === "cardapio" && <Cardapio />}
 
-      {screen !== "capa" && <TabBar screen={screen} go={go} />}
+      {screen !== "capa" && screen !== "inicio" && <TabBar screen={screen} go={go} />}
 
       {/* selo AO VIVO flutuante — prioriza a turma acompanhada (mapa/ginásio) */}
       {(screen === "mapa" || screen === "ginasio") && badge && (
@@ -576,6 +591,72 @@ function Capa({ onStart }: { onStart: () => void }) {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={ASSETS.capa.src} alt="Capa — Mapa Interativo Festa Junina 2026" />
     </button>
+  );
+}
+
+/* ───────────────────────── Boas-vindas (escolher a turma) ───────────────────────── */
+function BoasVindas({
+  seguindo,
+  onPick,
+  onSkip,
+}: {
+  seguindo: string | null;
+  onPick: (t: string) => void;
+  onSkip: () => void;
+}) {
+  const [q, setQ] = useState("");
+  const nq = norm(q);
+  const lista = nq ? TODAS_TURMAS.filter((t) => norm(t).includes(nq)).slice(0, 30) : [];
+  return (
+    <div className={styles.welcome}>
+      <div className={styles.welcomeInner}>
+        <span className={styles.welcomeEmoji}>👋</span>
+        <h1 className={styles.welcomeTitle}>Quem você veio ver?</h1>
+        <p className={styles.welcomeSub}>
+          Escolha a turma que vai se apresentar e a gente te avisa <b>10 min antes</b> e{" "}
+          <b>quando ela subir</b> ao palco. 🔔
+        </p>
+
+        <div className={`${styles.search} ${styles.welcomeSearch}`}>
+          🔎
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Digite a turma (ex: 5º C, INF 3)"
+            inputMode="search"
+          />
+          {q && (
+            <button className={styles.searchClear} onClick={() => setQ("")} aria-label="Limpar">
+              ×
+            </button>
+          )}
+        </div>
+
+        {q ? (
+          <div className={styles.welcomeGrid}>
+            {lista.length === 0 ? (
+              <p className={styles.welcomeHint}>Nenhuma turma encontrada.</p>
+            ) : (
+              lista.map((t) => (
+                <button key={t} className={styles.welcomeChip} onClick={() => onPick(t)}>
+                  {t}
+                </button>
+              ))
+            )}
+          </div>
+        ) : seguindo ? (
+          <button className={`${styles.btnYellow} ${styles.welcomeCont}`} onClick={() => onPick(seguindo)}>
+            🔔 Continuar acompanhando {seguindo}
+          </button>
+        ) : (
+          <p className={styles.welcomeHint}>Digite acima para encontrar a turma 👆</p>
+        )}
+
+        <button className={styles.welcomeSkip} onClick={onSkip}>
+          Pular por agora ›
+        </button>
+      </div>
+    </div>
   );
 }
 
