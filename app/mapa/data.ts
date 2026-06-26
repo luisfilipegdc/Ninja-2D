@@ -36,6 +36,9 @@ export type Barraca = {
   itens: ItemCardapio[];
 };
 
+// Data do evento — o "ao vivo" só ativa neste dia; nos outros dias mostra horários estáticos.
+export const EVENTO_DATA = "2026-06-27";
+
 // As imagens são 3:4 (mesma proporção do PDF). aspect = largura/altura.
 export const ASSETS = {
   capa: { src: "/mapa/capa.webp", aspect: 1500 / 2001 },
@@ -60,11 +63,11 @@ export const mapaPontos: Hotspot[] = [
   { id: "caixa", label: "Caixa", emoji: "💳", kind: "ponto",
     desc: "Compre suas fichas/cartão de consumo aqui antes de ir às barracas.",
     x: 50, y: 45, w: 18, h: 6 },
-  { id: "ban1", label: "Banheiros", emoji: "🚻", kind: "ponto",
-    desc: "Sanitários disponíveis para o público.",
+  { id: "ban1", label: "Banheiros — esquerda", emoji: "🚻", kind: "ponto",
+    desc: "Sanitários do bloco esquerdo (perto dos infláveis e das danças).",
     x: 13, y: 48, w: 11, h: 10 },
-  { id: "ban2", label: "Banheiros", emoji: "🚻", kind: "ponto",
-    desc: "Sanitários disponíveis para o público.",
+  { id: "ban2", label: "Banheiros — direita", emoji: "🚻", kind: "ponto",
+    desc: "Sanitários do bloco direito (perto das bebidas e das brincadeiras).",
     x: 63, y: 45, w: 10, h: 8 },
   { id: "patio-aberto", label: "Pátio Aberto", emoji: "⛲", kind: "zona",
     desc: "Área de convivência ao ar livre, no coração da festa.",
