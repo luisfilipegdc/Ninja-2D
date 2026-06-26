@@ -470,6 +470,21 @@ export default function MapaInterativo() {
     [go],
   );
 
+  // confirma na hora (toast inferior, sempre visível) ao escolher acompanhar a turma
+  const seguirTurma = useCallback(
+    (t: string | null) => {
+      setSeguindo(t);
+      if (!t) return;
+      const st = statusDaTurma(t, { agoraIdx, nowMin, starts, manual });
+      if (st.estado === "em_breve") setToast(`🔔 Acompanhando ${t} — sobe em ${st.minutos} min`);
+      else if (st.estado === "passou") setToast(`🔔 ${t} já se apresentou hoje`);
+      else if (st.estado === "aguardando")
+        setToast(`🔔 Acompanhando ${t} (previsto às ${programacao[st.idx].hora})`);
+      // estado "agora" → o efeito de alerta cuida (confete + toast)
+    },
+    [agoraIdx, nowMin, starts, manual],
+  );
+
   const badge = badgeAoVivo(seguindo, segui, agoraIdx, proxIdx);
 
   return (
@@ -496,7 +511,7 @@ export default function MapaInterativo() {
           selected={ponto}
         />
       )}
-      {screen === "programacao" && <Programacao seguindo={seguindo} onSeguir={setSeguindo} />}
+      {screen === "programacao" && <Programacao seguindo={seguindo} onSeguir={seguirTurma} />}
       {screen === "cardapio" && <Cardapio />}
 
       {screen !== "capa" && <TabBar screen={screen} go={go} />}
