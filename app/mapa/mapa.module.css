@@ -937,6 +937,71 @@
   .imageScreen, .slot, .barraca, .hot.hotActive, .confetti span { animation: none !important; }
 }
 
+/* ─────────────── Boas-vindas (escolher a turma) ─────────────── */
+.welcome {
+  flex: 1;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: calc(env(safe-area-inset-top) + 24px) 22px calc(env(safe-area-inset-bottom) + 24px);
+  animation: fadeIn 0.4s ease both;
+}
+.welcomeInner {
+  width: 100%;
+  max-width: 440px;
+  text-align: center;
+  animation: screenIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.welcomeEmoji { font-size: 3rem; display: block; animation: coachBounce 1.4s ease-in-out infinite; }
+.welcomeTitle {
+  font-family: "Fredoka", system-ui, sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.8rem, 7vw, 2.4rem);
+  margin: 6px 0;
+  color: var(--milho);
+  text-shadow: 0 2px 0 #b85c00;
+}
+.welcomeSub { color: #d8e6f4; line-height: 1.5; margin: 0 0 18px; font-size: 1.02rem; }
+.welcomeSub b { color: #fff; }
+.welcomeSearch { margin: 0 0 12px; }
+.welcomeGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 16px;
+  max-height: 40dvh;
+  overflow-y: auto;
+}
+.welcomeChip {
+  border: 1.5px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.95rem;
+  border-radius: 999px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.welcomeChip:active { transform: scale(0.93); }
+.welcomeChip:hover { background: rgba(249, 194, 26, 0.18); border-color: rgba(249, 194, 26, 0.6); }
+.welcomeCont { width: 100%; margin-bottom: 14px; }
+.welcomeHint { color: #aecbe6; font-size: 0.92rem; margin: 6px 0 16px; }
+.welcomeSkip {
+  border: none;
+  background: transparent;
+  color: #aecbe6;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  padding: 8px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* ─────────────── Responsivo: tablet / iPad ─────────────── */
 /* Acima de 760px o app deixa de ser uma coluna estreita centralizada e passa a
    usar o espaço do dispositivo (iPad em retrato e paisagem). */

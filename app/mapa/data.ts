@@ -1,7 +1,7 @@
 // Dados do Mapa Interativo — Festa Junina 2026 · Colégio Marista de Brasília
 // Transcritos fielmente do PDF "Mapa Interativo Festa Junina 2026 (FINAL)".
 
-export type Screen = "capa" | "mapa" | "ginasio" | "programacao" | "cardapio";
+export type Screen = "capa" | "inicio" | "mapa" | "ginasio" | "programacao" | "cardapio";
 
 export type Hotspot = {
   id: string;
