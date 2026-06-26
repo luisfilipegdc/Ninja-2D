@@ -548,10 +548,6 @@ function Capa({ onStart }: { onStart: () => void }) {
     <button className={styles.capa} onClick={onStart} aria-label="Iniciar o mapa interativo">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={ASSETS.capa.src} alt="Capa — Mapa Interativo Festa Junina 2026" />
-      <span className={styles.capaHint}>
-        👆 Toque para começar
-        <small>Mapa · Apresentações ao vivo · Cardápio</small>
-      </span>
     </button>
   );
 }
@@ -599,8 +595,10 @@ function ImageScreen({
           className={`${styles.hintToggle} ${hints ? styles.on : ""}`}
           onClick={() => setHints((v) => !v)}
           aria-pressed={hints}
+          aria-label={hints ? "Ocultar destaque dos pontos" : "Mostrar destaque dos pontos"}
+          title="Destaque dos pontos"
         >
-          {hints ? "💡 Pontos ativos" : "Mostrar pontos"}
+          💡
         </button>
         <div className={styles.zoomCtrls}>
           <FullscreenButton />
@@ -705,7 +703,7 @@ function InfoSheet({
           )}
           {VER_PROGRAMACAO.has(ponto.id) && (
             <button className={styles.btnYellow} onClick={() => onGo("programacao")}>
-              🎭 Ver programação
+              🎭 Ver apresentações
             </button>
           )}
           <button className={styles.btnGhost} onClick={onClose}>
@@ -787,19 +785,21 @@ function Programacao({
 
       <div className={styles.scroller}>
         <div className={styles.clockBar}>
-          {agoraIdx >= 0 ? (
-            <span className={styles.live}>
-              <span className={styles.liveDot} /> Ao vivo
-            </span>
-          ) : (
-            <span className={styles.live}>🕒 Horário</span>
-          )}
-          <span className={styles.clockMsg}>{clockMsg}</span>
-          <span className={styles.clockNow}>{horaNow}</span>
+          <div className={styles.clockRow}>
+            {agoraIdx >= 0 ? (
+              <span className={styles.live}>
+                <span className={styles.liveDot} /> Ao vivo
+              </span>
+            ) : (
+              <span className={styles.live}>🕒 Horário</span>
+            )}
+            <span className={styles.clockMsg}>{clockMsg}</span>
+            <span className={styles.clockNow}>{horaNow}</span>
+          </div>
+          <div className={styles.clockCaveat}>
+            Horários previstos — a equipe ajusta o “ao vivo” em caso de atraso.
+          </div>
         </div>
-        <p className={styles.previstoNote}>
-          🕒 Horários previstos — a equipe ajusta o “ao vivo” em caso de atraso.
-        </p>
 
         {seguindo && segui.idx >= 0 ? (
           <div className={`${styles.seguindoBar} ${segui.estado === "agora" ? styles.seguindoAgora : ""}`}>
@@ -846,7 +846,7 @@ function Programacao({
           </div>
         )}
 
-        {visiveis.map((i) => {
+        {visiveis.map((i, pos) => {
           const s = programacao[i];
           const isAgora = i === agoraIdx && nq.length === 0;
           const isProx = i === proxIdx && agoraIdx >= 0 && nq.length === 0;
@@ -855,6 +855,7 @@ function Programacao({
               key={s.hora}
               ref={isAgora ? agoraRef : undefined}
               className={`${styles.slot} ${isAgora ? styles.agora : ""} ${isProx ? styles.proxima : ""}`}
+              style={{ animationDelay: `${Math.min(pos * 35, 480)}ms` }}
             >
               {isAgora && <span className={`${styles.tag} ${styles.tagAgora}`}>No palco</span>}
               {isProx && <span className={`${styles.tag} ${styles.tagProxima}`}>A seguir</span>}
@@ -969,8 +970,8 @@ function Cardapio() {
         {lista.length === 0 && (
           <div className={styles.empty}>Nenhum item encontrado para “{q}”.</div>
         )}
-        {lista.map((b) => (
-          <section key={b.id} className={styles.barraca}>
+        {lista.map((b, i) => (
+          <section key={b.id} className={styles.barraca} style={{ animationDelay: `${Math.min(i * 45, 480)}ms` }}>
             <div className={styles.barracaHead}>
               <span className={styles.barracaEmoji}>{b.emoji}</span>
               <span className={styles.barracaNome}>{b.nome}</span>
@@ -995,7 +996,7 @@ function TabBar({ screen, go }: { screen: Screen; go: (s: Screen) => void }) {
   const tabs: { id: Screen; icon: string; label: string }[] = [
     { id: "mapa", icon: "🗺️", label: "Mapa" },
     { id: "ginasio", icon: "🏟️", label: "Ginásio" },
-    { id: "programacao", icon: "🎭", label: "Palco" },
+    { id: "programacao", icon: "🎭", label: "Apresentações" },
     { id: "cardapio", icon: "🍢", label: "Cardápio" },
   ];
   return (
