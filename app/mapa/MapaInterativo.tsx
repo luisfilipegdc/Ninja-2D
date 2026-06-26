@@ -47,6 +47,15 @@ function matchTurma(turma: string, nq: string): boolean {
   return new RegExp(`(?<![a-z0-9])${nq}`).test(nt);
 }
 
+// Formata uma duração em minutos: até 59 min mostra "X min"; a partir de 1h
+// vira "Xh" (em ponto) ou "XhYY" (ex.: 229 min → "3h49").
+function fmtMin(m: number): string {
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return min === 0 ? `${h}h` : `${h}h${String(min).padStart(2, "0")}`;
+}
+
 const brl = (n: number) =>
   n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -235,7 +244,8 @@ function useAoVivo() {
   return { nowMin, starts, agoraIdx, proxIdx, horaNow, manual: override?.modo === "manual" };
 }
 
-const TURMA_KEY = "festa_turma_v1";
+const TURMA_KEY = "festa_turmas_v2"; // lista de turmas acompanhadas (vários filhos)
+const TURMA_KEY_OLD = "festa_turma_v1"; // formato antigo (uma única turma) — migrado
 const TODAS_TURMAS = Array.from(new Set(programacao.flatMap((s) => s.turmas)));
 const SEGMENTOS: { label: string; emoji: string; test: (t: string) => boolean }[] = [
   { label: "Infantil", emoji: "🧸", test: (t) => t.startsWith("INF") },
@@ -261,17 +271,25 @@ function statusDaTurma(turma: string | null, av: AvLite): SeguindoStatus {
   return { idx, estado: "passou", minutos: 0 };
 }
 
+type SeguidoItem = { turma: string; st: SeguindoStatus };
+
 function badgeAoVivo(
-  seguindo: string | null,
-  segui: SeguindoStatus,
+  seguidos: SeguidoItem[],
   agoraIdx: number,
   proxIdx: number,
 ): { live: boolean; tag: string; txt: string } | null {
-  // turma que já se apresentou não fica fixa no selo — volta a mostrar o que está no palco
-  if (seguindo && segui.idx >= 0 && segui.estado !== "passou") {
-    if (segui.estado === "agora") return { live: true, tag: "AO VIVO", txt: `${seguindo} no palco! 🎉` };
-    if (segui.estado === "em_breve") return { live: false, tag: "SUA TURMA", txt: `${seguindo} em ${segui.minutos} min` };
-    if (segui.estado === "aguardando") return { live: false, tag: "SUA TURMA", txt: `${seguindo} — aguarde` };
+  // alguma turma acompanhada já está no palco? (prioridade máxima)
+  const agora = seguidos.find((s) => s.st.estado === "agora");
+  if (agora) return { live: true, tag: "AO VIVO", txt: `${agora.turma} no palco! 🎉` };
+  // senão, a próxima turma acompanhada que ainda vai subir (a mais cedo)
+  const futuras = seguidos
+    .filter((s) => s.st.estado === "em_breve" || s.st.estado === "aguardando")
+    .sort((a, b) => a.st.idx - b.st.idx);
+  const prox = futuras[0];
+  if (prox) {
+    if (prox.st.estado === "em_breve")
+      return { live: false, tag: "SUA TURMA", txt: `${prox.turma} em ${fmtMin(prox.st.minutos)}` };
+    return { live: false, tag: "SUA TURMA", txt: `${prox.turma} — aguarde` };
   }
   if (agoraIdx >= 0) return { live: true, tag: "AO VIVO", txt: `no palco: ${programacao[agoraIdx].grupo}` };
   if (proxIdx >= 0) return { live: false, tag: "EM BREVE", txt: `${programacao[proxIdx].hora} ${programacao[proxIdx].grupo}` };
@@ -326,16 +344,21 @@ export default function MapaInterativo() {
   const [ponto, setPonto] = useState<Hotspot | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [coachSeen, setCoachSeen] = useState(false);
-  const [seguindo, setSeguindo] = useState<string | null>(null);
+  const [seguindo, setSeguindo] = useState<string[]>([]);
   const [confete, setConfete] = useState(false);
   const { agoraIdx, proxIdx, nowMin, starts, manual } = useAoVivo();
   const prevAgora = useRef<number | null>(null);
-  const prevEstado = useRef<string>("nenhum");
-  const alerta10 = useRef(false);
+  const prevEstados = useRef<Record<string, string>>({});
+  const alertou30 = useRef<Record<string, boolean>>({});
+  const alertou10 = useRef<Record<string, boolean>>({});
 
-  const segui = useMemo(
-    () => statusDaTurma(seguindo, { agoraIdx, nowMin, starts, manual }),
-    [seguindo, agoraIdx, nowMin, starts, manual],
+  const av = useMemo(
+    () => ({ agoraIdx, nowMin, starts, manual }),
+    [agoraIdx, nowMin, starts, manual],
+  );
+  const seguidos = useMemo(
+    () => seguindo.map((t) => ({ turma: t, st: statusDaTurma(t, av) })),
+    [seguindo, av],
   );
 
   // sincroniza tela com o hash (deep-link + botão voltar do navegador)
@@ -386,44 +409,77 @@ export default function MapaInterativo() {
     }
   }, [screen, coachSeen]);
 
-  // turma acompanhada (persiste no aparelho)
+  // turmas acompanhadas (persistem no aparelho) — suporta vários filhos
   useEffect(() => {
     try {
-      const t = localStorage.getItem(TURMA_KEY);
-      if (t) setSeguindo(t);
+      const raw = localStorage.getItem(TURMA_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setSeguindo(arr.filter((x) => typeof x === "string"));
+      } else {
+        // migra do formato antigo (uma única turma)
+        const antigo = localStorage.getItem(TURMA_KEY_OLD);
+        if (antigo) setSeguindo([antigo]);
+      }
     } catch {
       /* ignora */
     }
   }, []);
   useEffect(() => {
     try {
-      if (seguindo) localStorage.setItem(TURMA_KEY, seguindo);
+      if (seguindo.length) localStorage.setItem(TURMA_KEY, JSON.stringify(seguindo));
       else localStorage.removeItem(TURMA_KEY);
     } catch {
       /* ignora */
     }
   }, [seguindo]);
 
-  // alertas da turma acompanhada: confete quando sobe + aviso quando falta pouco
+  // alertas por turma acompanhada (vale para cada filho):
+  //  • confete + aviso quando a turma sobe ao palco
+  //  • 30 min antes → hora de ir para a CONCENTRAÇÃO (o grande diferencial)
+  //  • 10 min antes → lembrete final
   useEffect(() => {
-    if (!seguindo) {
-      prevEstado.current = "nenhum";
-      alerta10.current = false;
-      return;
+    // limpa o histórico de turmas que deixaram de ser acompanhadas
+    const ativos = new Set(seguindo);
+    for (const k of Object.keys(prevEstados.current)) {
+      if (!ativos.has(k)) {
+        delete prevEstados.current[k];
+        delete alertou30.current[k];
+        delete alertou10.current[k];
+      }
     }
-    if (segui.estado === "agora" && prevEstado.current !== "agora") {
-      setConfete(true);
-      setToast(`🎉 ${seguindo} no palco AGORA!`);
-      vibrar([0, 90, 50, 130]);
+
+    for (const { turma, st } of seguidos) {
+      const prev = prevEstados.current[turma] ?? "nenhum";
+
+      if (st.estado === "agora" && prev !== "agora") {
+        setConfete(true);
+        setToast(`🎉 ${turma} no palco AGORA!`);
+        vibrar([0, 90, 50, 130]);
+      }
+
+      if (st.estado === "em_breve") {
+        // rearma os avisos enquanto ainda falta bastante tempo
+        if (st.minutos > 30) alertou30.current[turma] = false;
+        if (st.minutos > 10) alertou10.current[turma] = false;
+
+        // ALERTA PRINCIPAL: 30 min antes → ir para a concentração
+        if (st.minutos <= 30 && st.minutos > 10 && !alertou30.current[turma]) {
+          alertou30.current[turma] = true;
+          setToast(`📣 ${turma}: hora de ir para a CONCENTRAÇÃO! Sobe ao palco em ${fmtMin(st.minutos)}.`);
+          vibrar([0, 120, 60, 120]);
+        }
+        // lembrete final faltando 10 min
+        if (st.minutos <= 10 && st.minutos > 0 && !alertou10.current[turma]) {
+          alertou10.current[turma] = true;
+          setToast(`⏰ Falta pouco! ${turma} sobe em ${fmtMin(st.minutos)}.`);
+          vibrar(80);
+        }
+      }
+
+      prevEstados.current[turma] = st.estado;
     }
-    if (segui.estado === "em_breve" && segui.minutos > 10) alerta10.current = false;
-    if (segui.estado === "em_breve" && segui.minutos <= 10 && segui.minutos > 0 && !alerta10.current) {
-      alerta10.current = true;
-      setToast(`⏰ Falta pouco! ${seguindo} sobe em ${segui.minutos} min`);
-      vibrar(80);
-    }
-    prevEstado.current = segui.estado;
-  }, [segui.estado, segui.minutos, seguindo]);
+  }, [seguidos, seguindo]);
 
   useEffect(() => {
     if (!confete) return;
@@ -450,39 +506,43 @@ export default function MapaInterativo() {
     [go],
   );
 
-  // confirma na hora (toast inferior, sempre visível) ao escolher acompanhar a turma
-  const seguirTurma = useCallback(
-    (t: string | null) => {
-      setSeguindo(t);
-      if (!t) return;
-      vibrar(12);
-      const st = statusDaTurma(t, { agoraIdx, nowMin, starts, manual });
-      if (st.estado === "em_breve") setToast(`🔔 Acompanhando ${t} — sobe em ${st.minutos} min`);
-      else if (st.estado === "passou") setToast(`🔔 ${t} já se apresentou hoje`);
-      else if (st.estado === "aguardando")
-        setToast(`🔔 Acompanhando ${t} (previsto às ${programacao[st.idx].hora})`);
-      // estado "agora" → o efeito de alerta cuida (confete + toast)
+  // adiciona/remove uma turma da lista de acompanhadas (toast ao adicionar)
+  const toggleTurma = useCallback(
+    (t: string) => {
+      setSeguindo((prev) => {
+        if (prev.includes(t)) return prev.filter((x) => x !== t);
+        vibrar(12);
+        const st = statusDaTurma(t, av);
+        if (st.estado === "agora") setToast(`🔔 Acompanhando ${t} — no palco agora! 🎉`);
+        else if (st.estado === "em_breve")
+          setToast(`🔔 Acompanhando ${t} — sobe em ${fmtMin(st.minutos)}`);
+        else if (st.estado === "passou") setToast(`🔔 ${t} já se apresentou hoje`);
+        else if (st.estado === "aguardando")
+          setToast(`🔔 Acompanhando ${t} (previsto às ${programacao[st.idx].hora})`);
+        else setToast(`🔔 Acompanhando ${t}`);
+        return [...prev, t];
+      });
     },
-    [agoraIdx, nowMin, starts, manual],
+    [av],
   );
 
-  // boas-vindas: escolher a turma e já entrar no mapa
-  const pickTurmaEStart = useCallback(
-    (t: string) => {
-      seguirTurma(t);
+  // boas-vindas: confirma a(s) turma(s) escolhida(s) e entra no mapa
+  const confirmarTurmas = useCallback(
+    (lista: string[]) => {
+      setSeguindo(lista);
       go("mapa");
     },
-    [seguirTurma, go],
+    [go],
   );
 
-  const badge = badgeAoVivo(seguindo, segui, agoraIdx, proxIdx);
+  const badge = badgeAoVivo(seguidos, agoraIdx, proxIdx);
 
   return (
     <div className={styles.wrap}>
       {screen === "capa" && <Capa onStart={() => go("mapa")} badge={badge} onGo={go} />}
 
       {screen === "inicio" && (
-        <BoasVindas seguindo={seguindo} onPick={pickTurmaEStart} onSkip={() => go("mapa")} />
+        <BoasVindas seguindo={seguindo} onConfirm={confirmarTurmas} onSkip={() => go("mapa")} />
       )}
 
       {screen === "mapa" && (
@@ -505,7 +565,7 @@ export default function MapaInterativo() {
           selected={ponto}
         />
       )}
-      {screen === "programacao" && <Programacao seguindo={seguindo} onSeguir={seguirTurma} />}
+      {screen === "programacao" && <Programacao seguindo={seguindo} onSeguir={toggleTurma} />}
       {screen === "cardapio" && <Cardapio />}
 
       {screen !== "capa" && screen !== "inicio" && <TabBar screen={screen} go={go} />}
@@ -719,21 +779,26 @@ function Capa({
 /* ───────────────────────── Boas-vindas (escolher a turma) ───────────────────────── */
 function BoasVindas({
   seguindo,
-  onPick,
+  onConfirm,
   onSkip,
 }: {
-  seguindo: string | null;
-  onPick: (t: string) => void;
+  seguindo: string[];
+  onConfirm: (lista: string[]) => void;
   onSkip: () => void;
 }) {
   const [q, setQ] = useState("");
   const [seg, setSeg] = useState<number | null>(null);
+  const [sel, setSel] = useState<string[]>(seguindo);
   const nq = norm(q);
   const lista = nq
     ? TODAS_TURMAS.filter((t) => matchTurma(t, nq)).slice(0, 40)
     : seg != null
       ? TODAS_TURMAS.filter(SEGMENTOS[seg].test)
       : [];
+  const toggle = (t: string) => {
+    vibrar(10);
+    setSel((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]));
+  };
   return (
     <div className={styles.welcome}>
       <CapaBandeiras />
@@ -741,14 +806,28 @@ function BoasVindas({
         <span className={styles.welcomeEmoji}>👋</span>
         <h1 className={styles.welcomeTitle}>Quem você veio ver?</h1>
         <p className={styles.welcomeSub}>
-          Escolha a turma que vai se apresentar e a gente te avisa <b>10 min antes</b> e{" "}
-          <b>quando ela subir</b> ao palco. 🔔
+          Escolha a turma do seu filho e a gente avisa <b>30 min antes</b> para ir à{" "}
+          <b>concentração</b> e <b>quando ele subir</b> ao palco. 🔔
+          <br />
+          Tem mais de um filho? <b>Marque todas as turmas</b> — acompanhamos cada uma. 👨‍👩‍👧‍👦
         </p>
 
-        {seguindo && !q && seg == null && (
-          <button className={`${styles.btnYellow} ${styles.welcomeCont}`} onClick={() => onPick(seguindo)}>
-            🔔 Continuar acompanhando {seguindo}
-          </button>
+        {sel.length > 0 && (
+          <div className={styles.welcomeSelWrap}>
+            <span className={styles.welcomeSelTitle}>Acompanhando ({sel.length}):</span>
+            <div className={styles.welcomeSelChips}>
+              {sel.map((t) => (
+                <button
+                  key={t}
+                  className={styles.welcomeSelChip}
+                  onClick={() => toggle(t)}
+                  aria-label={`Remover ${t}`}
+                >
+                  🔔 {t} <span aria-hidden>✕</span>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         <div className={styles.segRow}>
@@ -790,17 +869,31 @@ function BoasVindas({
             {lista.length === 0 ? (
               <p className={styles.welcomeHint}>Nenhuma turma encontrada.</p>
             ) : (
-              lista.map((t) => (
-                <button key={t} className={styles.welcomeChip} onClick={() => onPick(t)}>
-                  {t}
-                </button>
-              ))
+              lista.map((t) => {
+                const ativo = sel.includes(t);
+                return (
+                  <button
+                    key={t}
+                    className={`${styles.welcomeChip} ${ativo ? styles.welcomeChipOn : ""}`}
+                    onClick={() => toggle(t)}
+                  >
+                    {ativo ? "🔔 " : ""}
+                    {t}
+                  </button>
+                );
+              })
             )}
           </div>
         )}
 
+        {sel.length > 0 && (
+          <button className={`${styles.btnYellow} ${styles.welcomeCont}`} onClick={() => onConfirm(sel)}>
+            Ver o mapa · acompanhando {sel.length} turma{sel.length > 1 ? "s" : ""} →
+          </button>
+        )}
+
         <button className={styles.welcomeSkip} onClick={onSkip}>
-          Pular por agora ›
+          {sel.length > 0 ? "Pular por agora ›" : "Ver o mapa sem acompanhar ›"}
         </button>
       </div>
     </div>
@@ -975,13 +1068,24 @@ function Programacao({
   seguindo,
   onSeguir,
 }: {
-  seguindo: string | null;
-  onSeguir: (t: string | null) => void;
+  seguindo: string[];
+  onSeguir: (t: string) => void;
 }) {
   const [q, setQ] = useState("");
   const agoraRef = useRef<HTMLDivElement>(null);
   const { nowMin, starts, agoraIdx, proxIdx, horaNow, manual } = useAoVivo();
-  const segui = statusDaTurma(seguindo, { agoraIdx, nowMin, starts, manual });
+  const seguidos = seguindo
+    .map((t) => ({ turma: t, st: statusDaTurma(t, { agoraIdx, nowMin, starts, manual }) }))
+    .filter((s) => s.st.idx >= 0)
+    .sort((a, b) => a.st.idx - b.st.idx);
+  const textoStatus = (st: SeguindoStatus) =>
+    st.estado === "agora"
+      ? "no palco agora! 🎉"
+      : st.estado === "em_breve"
+        ? `sobe às ${programacao[st.idx].hora} (faltam ${fmtMin(st.minutos)})`
+        : st.estado === "aguardando"
+          ? `previsto às ${programacao[st.idx].hora}`
+          : "já se apresentou";
 
   const nq = norm(q);
   const matches = (turma: string) => nq.length > 0 && matchTurma(turma, nq);
@@ -1012,7 +1116,7 @@ function Programacao({
       const s = programacao[proxIdx];
       clockMsg = (
         <>
-          Próxima apresentação às <b>{s.hora}</b> ({s.grupo}) — começa em {falta} min
+          Próxima apresentação às <b>{s.hora}</b> ({s.grupo}) — começa em {fmtMin(falta)}
         </>
       );
     } else {
@@ -1057,25 +1161,30 @@ function Programacao({
           </div>
         </div>
 
-        {seguindo && segui.idx >= 0 ? (
-          <div className={`${styles.seguindoBar} ${segui.estado === "agora" ? styles.seguindoAgora : ""}`}>
-            <span className={styles.seguindoTxt}>
-              🔔 Acompanhando <b>{seguindo}</b>
-              {segui.estado === "agora"
-                ? " — no palco agora! 🎉"
-                : segui.estado === "em_breve"
-                  ? ` — sobe às ${programacao[segui.idx].hora} (faltam ${segui.minutos} min)`
-                  : segui.estado === "aguardando"
-                    ? ` — previsto às ${programacao[segui.idx].hora}`
-                    : " — já se apresentou"}
-            </span>
-            <button className={styles.seguindoX} onClick={() => onSeguir(null)} aria-label="Deixar de acompanhar">
-              ✕
-            </button>
+        {seguidos.length > 0 ? (
+          <div className={styles.seguindoLista}>
+            {seguidos.map(({ turma, st }) => (
+              <div
+                key={turma}
+                className={`${styles.seguindoBar} ${st.estado === "agora" ? styles.seguindoAgora : ""}`}
+              >
+                <span className={styles.seguindoTxt}>
+                  🔔 Acompanhando <b>{turma}</b> — {textoStatus(st)}
+                </span>
+                <button
+                  className={styles.seguindoX}
+                  onClick={() => onSeguir(turma)}
+                  aria-label={`Deixar de acompanhar ${turma}`}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
           </div>
         ) : (
           <p className={styles.followHint}>
-            🔔 Toque na <b>sua turma</b> abaixo para acompanhá-la e ser avisado quando ela subir.
+            🔔 Toque na <b>sua turma</b> abaixo para acompanhá-la e ser avisado <b>30 min antes</b>.
+            Tem mais de um filho? Pode marcar <b>várias turmas</b>.
           </p>
         )}
 
@@ -1120,18 +1229,21 @@ function Programacao({
                 <div className={styles.slotGrupo}>{s.grupo}</div>
                 {s.periodo && <div className={styles.slotPeriodo}>{s.periodo}</div>}
                 <div className={styles.turmas}>
-                  {s.turmas.map((t) => (
-                    <button
-                      key={t}
-                      className={`${styles.turma} ${matches(t) ? styles.match : ""} ${
-                        seguindo === t ? styles.turmaSeguindo : ""
-                      }`}
-                      onClick={() => onSeguir(seguindo === t ? null : t)}
-                    >
-                      {seguindo === t ? "🔔 " : ""}
-                      {t}
-                    </button>
-                  ))}
+                  {s.turmas.map((t) => {
+                    const ativo = seguindo.includes(t);
+                    return (
+                      <button
+                        key={t}
+                        className={`${styles.turma} ${matches(t) ? styles.match : ""} ${
+                          ativo ? styles.turmaSeguindo : ""
+                        }`}
+                        onClick={() => onSeguir(t)}
+                      >
+                        {ativo ? "🔔 " : ""}
+                        {t}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
               <button

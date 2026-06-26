@@ -1164,6 +1164,8 @@
   border-color: #ff3b30;
   background: linear-gradient(135deg, rgba(255, 59, 48, 0.2), rgba(255, 122, 24, 0.12));
 }
+.seguindoLista { display: flex; flex-direction: column; gap: 8px; margin: 2px 0 12px; }
+.seguindoLista .seguindoBar { margin: 0; }
 .seguindoTxt { flex: 1; font-size: 0.98rem; line-height: 1.35; }
 .seguindoTxt b { color: var(--milho); }
 .seguindoX {
@@ -1293,6 +1295,33 @@
 }
 .welcomeChip:active { transform: scale(0.93); }
 .welcomeChip:hover { background: rgba(249, 194, 26, 0.18); border-color: rgba(249, 194, 26, 0.6); }
+.welcomeChipOn { background: var(--milho); color: var(--noite); border-color: var(--milho); }
+
+/* turmas já escolhidas (vários filhos) — resumo no topo das boas-vindas */
+.welcomeSelWrap { width: 100%; margin: 0 0 14px; }
+.welcomeSelTitle {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #aecbe6;
+  text-align: left;
+  margin: 0 0 6px;
+}
+.welcomeSelChips { display: flex; flex-wrap: wrap; gap: 8px; }
+.welcomeSelChip {
+  border: 1.5px solid var(--milho);
+  background: rgba(249, 194, 26, 0.16);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  font-size: 0.9rem;
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.welcomeSelChip:active { transform: scale(0.93); }
+.welcomeSelChip span { opacity: 0.65; margin-left: 3px; }
 .welcomeCont { width: 100%; margin-bottom: 14px; }
 .welcomeHint { color: #aecbe6; font-size: 0.92rem; margin: 6px 0 16px; }
 .welcomeSkip {
