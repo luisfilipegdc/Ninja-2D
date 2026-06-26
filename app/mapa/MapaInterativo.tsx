@@ -259,11 +259,11 @@ function badgeAoVivo(
   agoraIdx: number,
   proxIdx: number,
 ): { live: boolean; tag: string; txt: string } | null {
-  if (seguindo && segui.idx >= 0) {
+  // turma que já se apresentou não fica fixa no selo — volta a mostrar o que está no palco
+  if (seguindo && segui.idx >= 0 && segui.estado !== "passou") {
     if (segui.estado === "agora") return { live: true, tag: "AO VIVO", txt: `${seguindo} no palco! 🎉` };
     if (segui.estado === "em_breve") return { live: false, tag: "SUA TURMA", txt: `${seguindo} em ${segui.minutos} min` };
     if (segui.estado === "aguardando") return { live: false, tag: "SUA TURMA", txt: `${seguindo} — aguarde` };
-    return { live: false, tag: "SUA TURMA", txt: `${seguindo} já se apresentou` };
   }
   if (agoraIdx >= 0) return { live: true, tag: "AO VIVO", txt: `no palco: ${programacao[agoraIdx].grupo}` };
   if (proxIdx >= 0) return { live: false, tag: "EM BREVE", txt: `${programacao[proxIdx].hora} ${programacao[proxIdx].grupo}` };
@@ -570,9 +570,10 @@ export default function MapaInterativo() {
       {screen === "mapa" && !coachSeen && (
         <div className={styles.coach}>
           <div className={styles.coachCard}>
-            <span className={styles.coachEmoji}>👆</span>
+            <span className={styles.coachEmoji}>💡</span>
             <p>
-              Toque nos <b>pontos do mapa</b> para ver as informações de cada local.
+              Toque no <b>💡</b> no topo para <b>acender os pontos</b> do mapa — depois é só
+              tocar em cada um para ver o local. 👆
             </p>
             <button className={styles.btnYellow} onClick={() => setCoachSeen(true)}>
               Entendi
@@ -707,7 +708,7 @@ function ImageScreen({
   selected: Hotspot | null;
 }) {
   const [zoom, setZoom] = useState(1);
-  const [hints, setHints] = useState(true);
+  const [hints, setHints] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLButtonElement>(null);
 

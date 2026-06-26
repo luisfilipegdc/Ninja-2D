@@ -745,7 +745,7 @@
 /* ─────────────── AO VIVO / coach-mark / toast ─────────────── */
 .liveBadge {
   position: fixed;
-  top: calc(env(safe-area-inset-top) + 10px);
+  top: calc(env(safe-area-inset-top) + 56px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 48;
