@@ -1040,6 +1040,124 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     setLogs((data || []) as EventRow[]);
   }, [sb]);
 
+  /* ---------- exportar relatório de uso (CSV pronto pra Excel) ---------- */
+  const [exporting, setExporting] = useState(false);
+  const exportReport = useCallback(async () => {
+    if (!sb) { showToast("Supabase não configurado — sem dados pra exportar."); return; }
+    setExporting(true);
+    try {
+      // eventos (todos do evento) + ranking (tempos de quem abriu o baú)
+      const [{ data: evData }, { data: scData }] = await Promise.all([
+        sb.from("events").select("*").eq("game_id", EVENT).order("at", { ascending: true }).limit(20000),
+        sb.from("scores").select("name,ms").eq("game_id", lockGameId(1)).order("ms", { ascending: true }).limit(5000),
+      ]);
+      const evs = (evData || []) as EventRow[];
+      const scores = (scData || []) as { name: string; ms: number }[];
+
+      if (evs.length === 0 && scores.length === 0) {
+        showToast("Ainda não há dados de uso pra exportar.");
+        setExporting(false);
+        return;
+      }
+
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const fmtMs = (ms: number) => {
+        const s = Math.max(0, Math.round(ms / 1000));
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+        return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+      };
+      const fmtDT = (d: Date) =>
+        `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      const fmtHM = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+
+      const scans = evs.filter((e) => e.kind === "scan");
+      const completes = evs.filter((e) => e.kind === "complete");
+      const players = new Set<string>();
+      evs.forEach((e) => { if ((e.kind === "scan" || e.kind === "complete") && e.actor) players.add(e.actor); });
+
+      // período
+      const times = evs.map((e) => new Date(e.at).getTime()).filter((t) => !isNaN(t));
+      let tMin = Infinity, tMax = -Infinity;
+      times.forEach((t) => { if (t < tMin) tMin = t; if (t > tMax) tMax = t; });
+      const ini = times.length ? new Date(tMin) : null;
+      const fim = times.length ? new Date(tMax) : null;
+      const durMin = ini && fim ? Math.round((fim.getTime() - ini.getTime()) / 60000) : 0;
+
+      // pico de usuários ativos por faixa de 15 min
+      const BUCKET = 15 * 60 * 1000;
+      const bucketActors: Record<number, Set<string>> = {};
+      const bucketScans: Record<number, number> = {};
+      [...scans, ...completes].forEach((e) => {
+        const t = new Date(e.at).getTime(); if (isNaN(t)) return;
+        const b = Math.floor(t / BUCKET) * BUCKET;
+        (bucketActors[b] ||= new Set<string>()); if (e.actor) bucketActors[b].add(e.actor);
+        if (e.kind === "scan") bucketScans[b] = (bucketScans[b] || 0) + 1;
+      });
+      const buckets = Object.keys(bucketActors).map(Number).sort((a, b) => a - b);
+      let pico = 0, picoB = 0;
+      buckets.forEach((b) => { const n = bucketActors[b].size; if (n > pico) { pico = n; picoB = b; } });
+
+      // tempos de caçada (ms do ranking)
+      const msList = scores.map((s) => s.ms).filter((n) => typeof n === "number" && n > 0).sort((a, b) => a - b);
+      const media = msList.length ? msList.reduce((a, b) => a + b, 0) / msList.length : 0;
+      const mediana = msList.length ? msList[Math.floor(msList.length / 2)] : 0;
+
+      // leituras por tag
+      const byTag: Record<string, number> = {};
+      scans.forEach((e) => { if (e.code) byTag[e.code] = (byTag[e.code] || 0) + 1; });
+      const tags = Object.entries(byTag).sort((a, b) => b[1] - a[1]);
+
+      // monta o CSV
+      const q = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+      const rows: string[] = [];
+      const push = (...cells: (string | number)[]) => rows.push(cells.map(q).join(","));
+
+      push("Relatório de uso — Arraiá do Tesouro");
+      push("Gerado em", fmtDT(new Date()));
+      push("Período", ini && fim ? `${fmtDT(ini)} a ${fmtDT(fim)}` : "—");
+      push("Duração da atividade", durMin >= 60 ? `${Math.floor(durMin / 60)}h ${durMin % 60}min` : `${durMin} min`);
+      push("");
+      push("RESUMO");
+      push("Jogadores únicos", players.size);
+      push("Leituras de bandeirinhas", scans.length);
+      push("Baús abertos (concluíram)", completes.length);
+      push("Pico de usuários (faixa de 15 min)", picoB ? `${pico} (entre ${fmtHM(new Date(picoB))} e ${fmtHM(new Date(picoB + BUCKET))})` : "—");
+      push("Tempo médio de caçada", msList.length ? fmtMs(media) : "—");
+      push("Tempo mediano de caçada", msList.length ? fmtMs(mediana) : "—");
+      push("Tempo mais rápido", msList.length ? fmtMs(msList[0]) : "—");
+      push("Tempo mais lento", msList.length ? fmtMs(msList[msList.length - 1]) : "—");
+      push("");
+      push("GANHADORES (ranking por tempo)");
+      push("Posição", "Nome", "Tempo");
+      scores.forEach((s, i) => push(i + 1, s.name || "—", fmtMs(s.ms)));
+      if (scores.length === 0) push("—", "ninguém concluiu ainda", "—");
+      push("");
+      push("USUÁRIOS POR FAIXA (15 min)");
+      push("Início da faixa", "Usuários ativos", "Leituras");
+      buckets.forEach((b) => push(fmtDT(new Date(b)), bucketActors[b].size, bucketScans[b] || 0));
+      push("");
+      push("LEITURAS POR TAG");
+      push("Tag", "Leituras");
+      tags.forEach(([code, n]) => push(code, n));
+      if (tags.length === 0) push("—", 0);
+
+      const csv = "﻿" + rows.join("\r\n"); // BOM p/ Excel abrir acentos/emoji certo
+      const now = new Date();
+      const fname = `relatorio-arraia-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}.csv`;
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8;" }));
+      const a = document.createElement("a");
+      a.href = url; a.download = fname; document.body.appendChild(a); a.click();
+      a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+      logEvent("admin", { actor: adminUser, detail: "exportou relatório de uso" });
+      showToast("📊 Relatório exportado!");
+    } catch (e: any) {
+      showToast("Não consegui exportar: " + (e?.message || "erro"));
+    } finally {
+      setExporting(false);
+    }
+  }, [sb, showToast, logEvent, adminUser]);
+
   const resetRanking = useCallback(async () => {
     if (!sb) return;
     if (!confirm("Zerar TODO o ranking? Apaga os tempos de todos os jogadores e o histórico de quem abriu o baú. Não dá pra desfazer.")) return;
@@ -1540,6 +1658,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
               <div className="admin-toolbar noprint">
                 <button className="btn ghost" onClick={() => editCard({ code: randCode(), kind: "senha", lock: 1, position: 1, digit: 0, media: "texto", location: "" })}>+ Nova tag</button>
                 <button className={"btn ghost" + (showLogs ? " on" : "")} onClick={() => { const ns = !showLogs; setShowLogs(ns); if (ns) loadLogs(); }}>📋 Logs</button>
+                <button className="btn ghost" onClick={exportReport} disabled={exporting}>{exporting ? "⏳ Gerando…" : "📊 Relatório"}</button>
                 {myRole === "master" ? <button className={"btn ghost" + (showAdmins ? " on" : "")} onClick={() => { const ns = !showAdmins; setShowAdmins(ns); if (ns) loadAdmins(); }}>👑 Admins</button> : null}
               </div>
 
