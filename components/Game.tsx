@@ -1087,12 +1087,16 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       const BUCKET = 15 * 60 * 1000;
       const bucketActors: Record<number, Set<string>> = {};
       const bucketScans: Record<number, number> = {};
+      const bucketCompletes: Record<number, number> = {};
       [...scans, ...completes].forEach((e) => {
         const t = new Date(e.at).getTime(); if (isNaN(t)) return;
         const b = Math.floor(t / BUCKET) * BUCKET;
         (bucketActors[b] ||= new Set<string>()); if (e.actor) bucketActors[b].add(e.actor);
         if (e.kind === "scan") bucketScans[b] = (bucketScans[b] || 0) + 1;
+        else if (e.kind === "complete") bucketCompletes[b] = (bucketCompletes[b] || 0) + 1;
       });
+      let picoC = 0, picoCB = 0;
+      Object.keys(bucketCompletes).map(Number).forEach((b) => { const n = bucketCompletes[b]; if (n > picoC) { picoC = n; picoCB = b; } });
       const buckets = Object.keys(bucketActors).map(Number).sort((a, b) => a - b);
       let pico = 0, picoB = 0;
       buckets.forEach((b) => { const n = bucketActors[b].size; if (n > pico) { pico = n; picoB = b; } });
@@ -1106,6 +1110,37 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       const byTag: Record<string, number> = {};
       scans.forEach((e) => { if (e.code) byTag[e.code] = (byTag[e.code] || 0) + 1; });
       const tags = Object.entries(byTag).sort((a, b) => b[1] - a[1]);
+
+      // melhor tempo por nome + quem concluiu
+      const scoreByName: Record<string, number> = {};
+      scores.forEach((s) => { if (s.name && (scoreByName[s.name] == null || s.ms < scoreByName[s.name])) scoreByName[s.name] = s.ms; });
+      const completedNames = new Set<string>();
+      completes.forEach((e) => { if (e.actor) completedNames.add(e.actor); });
+
+      // estatística por jogador (leituras, tags distintas, primeira/última atividade)
+      type PStat = { scans: number; tags: Set<string>; first: number; last: number };
+      const pstats: Record<string, PStat> = {};
+      evs.forEach((e) => {
+        if (!e.actor || (e.kind !== "scan" && e.kind !== "complete")) return;
+        const t = new Date(e.at).getTime(); if (isNaN(t)) return;
+        const p = (pstats[e.actor] ||= { scans: 0, tags: new Set<string>(), first: t, last: t });
+        if (e.kind === "scan") { p.scans++; if (e.code) p.tags.add(e.code); }
+        if (t < p.first) p.first = t;
+        if (t > p.last) p.last = t;
+      });
+      const playerRows = Object.entries(pstats).map(([name, p]) => ({
+        name, scans: p.scans, tags: p.tags.size, first: p.first, last: p.last,
+        done: completedNames.has(name) || scoreByName[name] != null,
+        ms: scoreByName[name] as number | undefined,
+      })).sort((a, b) => {
+        if (a.done !== b.done) return a.done ? -1 : 1;
+        if (a.done && b.done) return (a.ms ?? Infinity) - (b.ms ?? Infinity);
+        return b.scans - a.scans;
+      });
+      const naoConcluiram = playerRows.filter((r) => !r.done).length;
+      const taxa = players.size ? Math.round((completedNames.size / players.size) * 100) : 0;
+      const mediaScans = players.size ? scans.length / players.size : 0;
+      const tagsDistintas = Object.keys(byTag).length;
 
       // monta o CSV
       const q = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
@@ -1121,7 +1156,12 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       push("Jogadores únicos", players.size);
       push("Leituras de bandeirinhas", scans.length);
       push("Baús abertos (concluíram)", completes.length);
+      push("Concluíram / não concluíram", `${completedNames.size} / ${naoConcluiram}`);
+      push("Taxa de conclusão", `${taxa}%`);
+      push("Média de leituras por jogador", mediaScans ? mediaScans.toFixed(1) : "0");
+      push("Bandeirinhas distintas lidas", tagsDistintas);
       push("Pico de usuários (faixa de 15 min)", picoB ? `${pico} (entre ${fmtHM(new Date(picoB))} e ${fmtHM(new Date(picoB + BUCKET))})` : "—");
+      push("Pico de conclusões (faixa de 15 min)", picoCB ? `${picoC} (entre ${fmtHM(new Date(picoCB))} e ${fmtHM(new Date(picoCB + BUCKET))})` : "—");
       push("Tempo médio de caçada", msList.length ? fmtMs(media) : "—");
       push("Tempo mediano de caçada", msList.length ? fmtMs(mediana) : "—");
       push("Tempo mais rápido", msList.length ? fmtMs(msList[0]) : "—");
@@ -1133,8 +1173,14 @@ export default function Game({ start }: { start?: "admin" } = {}) {
       if (scores.length === 0) push("—", "ninguém concluiu ainda", "—");
       push("");
       push("USUÁRIOS POR FAIXA (15 min)");
-      push("Início da faixa", "Usuários ativos", "Leituras");
-      buckets.forEach((b) => push(fmtDT(new Date(b)), bucketActors[b].size, bucketScans[b] || 0));
+      push("Início da faixa", "Usuários ativos", "Leituras", "Conclusões");
+      buckets.forEach((b) => push(fmtDT(new Date(b)), bucketActors[b].size, bucketScans[b] || 0, bucketCompletes[b] || 0));
+      push("");
+      push("ATIVIDADE POR JOGADOR");
+      push("Nome", "Leituras", "Tags distintas", "Primeira leitura", "Última atividade", "Concluiu", "Tempo");
+      playerRows.forEach((r) =>
+        push(r.name || "—", r.scans, r.tags, fmtHM(new Date(r.first)), fmtHM(new Date(r.last)), r.done ? "Sim" : "Não", r.done && r.ms != null ? fmtMs(r.ms) : "—"));
+      if (playerRows.length === 0) push("—", 0, 0, "—", "—", "Não", "—");
       push("");
       push("LEITURAS POR TAG");
       push("Tag", "Leituras");
