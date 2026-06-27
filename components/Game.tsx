@@ -1218,6 +1218,30 @@ export default function Game({ start }: { start?: "admin" } = {}) {
     } catch (e: any) { showToast("Não consegui zerar: " + (e?.message || "erro") + " (rodou a migration 0009?)"); }
   }, [sb, adminUser, logEvent, showToast]);
 
+  /* ---------- limpar dados de teste (events + scores), mantendo as tags ---------- */
+  const [wiping, setWiping] = useState(false);
+  const wipeTestData = useCallback(async () => {
+    if (!sb) { showToast("Supabase não configurado."); return; }
+    if (!confirm("LIMPAR todos os dados de teste?\n\nApaga ranking, leituras e histórico (scores + events) para o evento começar do zero.\n\n✅ As tags/cartões cadastrados SÃO MANTIDOS.\n\nNão dá pra desfazer.")) return;
+    if (!confirm("Tem certeza? Isso zera o relatório e o ranking.")) return;
+    setWiping(true);
+    try {
+      const r1 = await sb.from("scores").delete().eq("game_id", lockGameId(1));
+      if (r1.error) throw r1.error;
+      const r2 = await sb.from("events").delete().eq("game_id", EVENT);
+      if (r2.error) throw r2.error;
+      try { localStorage.removeItem(LS_RANK); } catch {}
+      setRank1([]); setLogs(null);
+      // registra a limpeza (fica como único evento, p/ auditoria)
+      logEvent("admin", { actor: adminUser, detail: "limpou os dados de teste (events + scores)" });
+      showToast("🧹 Banco limpo! Pronto pro evento.");
+    } catch (e: any) {
+      showToast("Não consegui limpar: " + (e?.message || "erro"));
+    } finally {
+      setWiping(false);
+    }
+  }, [sb, adminUser, logEvent, showToast]);
+
   // grava o link ?c=<code> na tag (usado no "Salvar e gravar"); retorna msg de erro ou null
   const writeUrlToTag = useCallback(async (code: string): Promise<string | null> => {
     if (!flags.NFC_OK) return "no-nfc";
@@ -1663,6 +1687,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
           </>) : <p className="empty">Ninguém abriu o cadeado ainda. Seja o primeiro! 🔥</p>}
           <div className="spacer" />
           {authed && myRole === "master" ? <button className="btn danger-btn noprint" onClick={resetRanking}>🗑️ Zerar ranking</button> : null}
+          {authed && myRole === "master" ? <button className="btn danger-btn noprint" onClick={wipeTestData} disabled={wiping}>{wiping ? "⏳ Limpando…" : "🧹 Limpar banco (tirar testes)"}</button> : null}
           <button className="btn" style={{ marginTop: 10 }} onClick={() => { unsubAll(); setView(g ? "game" : "splash"); }}>Voltar</button>
         </section>
 
@@ -1883,6 +1908,7 @@ export default function Game({ start }: { start?: "admin" } = {}) {
                 <div className="note">Crie os cartões, grave cada um numa <b>tag NFC</b> (Android) e/ou imprima o <b>QR</b>. A mesma tag funciona no iPhone (encosta e toca no aviso) e no Android.</div>
                 {cards && cards.length ? <button className="btn fire" style={{ marginTop: 14 }} onClick={() => window.print()}>Imprimir os QR Codes 🖨️</button> : null}
                 {myRole === "master" ? <button className="btn danger-btn" style={{ marginTop: 12 }} onClick={resetRanking}>🗑️ Zerar ranking</button> : null}
+                {myRole === "master" ? <button className="btn danger-btn" style={{ marginTop: 12 }} onClick={wipeTestData} disabled={wiping}>{wiping ? "⏳ Limpando…" : "🧹 Limpar banco (tirar testes)"}</button> : null}
                 <button className="btn ghost" style={{ marginTop: 12 }} onClick={doLogout}>Sair do admin</button>
               </div>
             </div>
